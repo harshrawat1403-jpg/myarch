@@ -1,0 +1,408 @@
+// TNPArch — Prisma Schema
+//
+// This schema implements the Phase 1 (MVP) subset of the data model defined in
+// docs/database/08_Database_Design.md. It is the authoritative, frozen data
+// model per Day 1 of docs/planning/16_Project_Roadmap.md — changes to this
+// file are architecture changes and require the same approval as any other
+// change to docs/database/08_Database_Design.md.
+//
+// Phase 2+ entities (Company, PlacementDrive, Application, ApplicationStatusEvent)
+// are intentionally NOT implemented yet — they are explicitly scoped to Phase 2
+// in the database design doc, and adding them now would be building ahead of
+// what Phase 1 requires. RecruiterProfile has no company relation yet for the
+// same reason; docs/database/08_Database_Design.md's ER overview shows that
+// relation, but it is only load-bearing once Company/PlacementDrive exist in
+// Phase 2, so it is deferred to that phase's migration rather than added as
+// dead schema now.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  SECRETARY
+  COORDINATOR
+  STUDENT
+  RECRUITER
+}
+
+enum BatchStatus {
+  ACTIVE
+  GRADUATED
+  ARCHIVED
+}
+
+// Renamed from the original REJECTED per the Days 5-6 implementation
+// decision (approved by the Secretary): "Submitted" is a transient action,
+// not a stored state (DRAFT/CHANGES_REQUESTED -> PENDING_REVIEW), and the
+// terminal-sounding REJECTED is renamed to CHANGES_REQUESTED to reflect that
+// it is a non-terminal state a draft cycles back out of, not a dead end.
+// See docs/database/08_Database_Design.md (still documents REJECTED — this
+// is a known, deliberate, approved divergence; see CHANGELOG for the date
+// and reasoning) and docs/planning/16_Project_Roadmap.md Days 5-6.
+enum ProfileDraftStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  CHANGES_REQUESTED
+}
+
+enum FileClassification {
+  PRIVATE
+  PUBLIC
+}
+
+enum NotificationChannel {
+  EMAIL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+// Extended for the generic Background Job Processing System (2026-08-05,
+// see CHANGELOG). RUNNING/COMPLETE renamed to PROCESSING/COMPLETED, and
+// RETRYING/CANCELLED added, to support the job worker's full lifecycle
+// (retry/backoff, dead-lettering, cancellation). docs/database/08_Database_Design.md
+// still documents the original 4-value PENDING/RUNNING/COMPLETE/FAILED —
+// this is a known, deliberate, approved divergence (the Job table had zero
+// production usage before this change, so nothing depended on the old
+// values; see CHANGELOG for full reasoning), same pattern as the Days 5-6
+// ProfileDraftStatus rename.
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  RETRYING
+  CANCELLED
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String
+  role         Role
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  secretaryProfile  SecretaryProfile?
+  coordinatorProfile CoordinatorProfile?
+  studentProfile    StudentProfile?
+  recruiterProfile  RecruiterProfile?
+
+  refreshTokens RefreshToken[]
+
+  // Reverse relations for audit/traceability — who last touched a record.
+  updatedPrivateProfiles StudentPrivateProfile[] @relation("PrivateProfileUpdatedBy")
+  reviewedDrafts         StudentPublicProfileDraft[] @relation("DraftReviewedBy")
+  publishedProfiles      StudentPublicProfile[] @relation("ProfilePublishedBy")
+  uploadedFiles          FileAsset[] @relation("FileOwner")
+  auditLogEntries        AuditLog[] @relation("AuditActor")
+  notifications          Notification[] @relation("NotificationRecipient")
+
+  @@map("users")
+}
+
+// A refresh token is stored server-side (hashed) so it can be individually
+// revoked/rotated per docs/security/14_Security_Architecture.md. The raw
+// token is never persisted — only a hash of it.
+model RefreshToken {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @db.Uuid
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  familyId    String    @db.Uuid
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  replacedById String?  @db.Uuid
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+model SecretaryProfile {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fullName String
+
+  @@map("secretary_profiles")
+}
+
+model CoordinatorProfile {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fullName String
+
+  batchScopes CoordinatorBatchScope[]
+
+  @@map("coordinator_profiles")
+}
+
+// Join table enforcing that Coordinator authority is explicit and additive,
+// never global by default — see docs/security/09_User_Roles_and_Permissions.md.
+model CoordinatorBatchScope {
+  id                   String             @id @default(uuid()) @db.Uuid
+  coordinatorProfileId String             @db.Uuid
+  coordinatorProfile   CoordinatorProfile @relation(fields: [coordinatorProfileId], references: [id], onDelete: Cascade)
+  batchId              String             @db.Uuid
+  batch                Batch              @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  createdAt            DateTime           @default(now())
+
+  @@unique([coordinatorProfileId, batchId])
+  @@index([batchId])
+  @@map("coordinator_batch_scopes")
+}
+
+model RecruiterProfile {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fullName    String
+  companyName String
+  // Structured Company entity + FK arrives in Phase 2 with PlacementDrive
+  // (docs/database/08_Database_Design.md). companyName is a plain string for
+  // Phase 1 since only directory browsing is in scope, not drive-scoped
+  // self-service.
+
+  @@map("recruiter_profiles")
+}
+
+// ---------------------------------------------------------------------------
+// Batches & Students
+// ---------------------------------------------------------------------------
+
+model Batch {
+  id        String      @id @default(uuid()) @db.Uuid
+  name      String
+  year      Int
+  status    BatchStatus @default(ACTIVE)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  students        StudentProfile[]
+  coordinatorScopes CoordinatorBatchScope[]
+
+  @@map("batches")
+}
+
+model StudentProfile {
+  id         String  @id @default(uuid()) @db.Uuid
+  userId     String  @unique @db.Uuid
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  batchId    String  @db.Uuid
+  batch      Batch   @relation(fields: [batchId], references: [id])
+  rollNumber String  @unique
+  // Duplicated intentionally for non-sensitive identification without
+  // joining into StudentPrivateProfile — see docs/database/08_Database_Design.md
+  // Assumptions.
+  fullName   String
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  privateProfile StudentPrivateProfile?
+  publicProfile  StudentPublicProfile?
+  draft          StudentPublicProfileDraft?
+
+  @@index([batchId])
+  @@map("student_profiles")
+}
+
+// Accessible only to: the student themself, Secretary, and Coordinators
+// scoped to the student's batch. Never reachable from any Recruiter-facing
+// query path — see docs/security/14_Security_Architecture.md.
+model StudentPrivateProfile {
+  id               String   @id @default(uuid()) @db.Uuid
+  studentProfileId String   @unique @db.Uuid
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  phone               String?
+  personalEmail       String?
+  cgpa                Decimal? @db.Decimal(4, 2)
+  hasActiveBacklog    Boolean  @default(false)
+  backlogDetails      String?
+  internalRemarks     String?
+
+  updatedAt      DateTime @updatedAt
+  updatedByUserId String? @db.Uuid
+  updatedBy      User?    @relation("PrivateProfileUpdatedBy", fields: [updatedByUserId], references: [id])
+
+  confidentialDocuments FileAsset[] @relation("ConfidentialDocumentsOf")
+
+  @@map("student_private_profiles")
+}
+
+// The only table any Recruiter-facing query is permitted to read from.
+model StudentPublicProfile {
+  id               String   @id @default(uuid()) @db.Uuid
+  studentProfileId String   @unique @db.Uuid
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  bio              String?
+  skills           String[] @default([])
+  software         String[] @default([])
+  selectedProjects Json     @default("[]")
+  portfolioLinks   String[] @default([])
+  resumeFileId     String?  @db.Uuid
+  resumeFile       FileAsset? @relation("PublicResumeOf", fields: [resumeFileId], references: [id])
+  certifications   Json     @default("[]")
+  internships      Json     @default("[]")
+
+  publishedFromDraftId String?  @unique @db.Uuid
+  publishedFromDraft   StudentPublicProfileDraft? @relation("PublishedFrom", fields: [publishedFromDraftId], references: [id])
+  publishedAt          DateTime @default(now())
+  publishedByUserId    String   @db.Uuid
+  publishedBy          User     @relation("ProfilePublishedBy", fields: [publishedByUserId], references: [id])
+
+  @@map("student_public_profiles")
+}
+
+// Where a student's in-progress edits live. Never read by any Recruiter-facing
+// code path — see docs/architecture/05_System_Architecture.md's Core Data Flow.
+model StudentPublicProfileDraft {
+  id               String   @id @default(uuid()) @db.Uuid
+  studentProfileId String   @unique @db.Uuid
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  bio              String?
+  skills           String[] @default([])
+  software         String[] @default([])
+  selectedProjects Json     @default("[]")
+  portfolioLinks   String[] @default([])
+  resumeFileId     String?  @db.Uuid
+  resumeFile       FileAsset? @relation("DraftResumeOf", fields: [resumeFileId], references: [id])
+  certifications   Json     @default("[]")
+  internships      Json     @default("[]")
+
+  status            ProfileDraftStatus @default(DRAFT)
+  submittedAt       DateTime?
+  reviewedByUserId  String?  @db.Uuid
+  reviewedBy        User?    @relation("DraftReviewedBy", fields: [reviewedByUserId], references: [id])
+  reviewedAt        DateTime?
+  rejectionReason   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  publishedAs StudentPublicProfile? @relation("PublishedFrom")
+
+  @@map("student_public_profile_drafts")
+}
+
+// ---------------------------------------------------------------------------
+// Files
+// ---------------------------------------------------------------------------
+
+model FileAsset {
+  id             String             @id @default(uuid()) @db.Uuid
+  ownerUserId    String             @db.Uuid
+  owner          User               @relation("FileOwner", fields: [ownerUserId], references: [id])
+  storageKey     String             @unique
+  mimeType       String
+  sizeBytes      Int
+  classification FileClassification
+  createdAt      DateTime           @default(now())
+
+  confidentialOfPrivateProfileId String? @db.Uuid
+  confidentialOfPrivateProfile   StudentPrivateProfile? @relation("ConfidentialDocumentsOf", fields: [confidentialOfPrivateProfileId], references: [id])
+
+  usedAsPublicResume StudentPublicProfile[]      @relation("PublicResumeOf")
+  usedAsDraftResume  StudentPublicProfileDraft[] @relation("DraftResumeOf")
+
+  @@index([ownerUserId])
+  @@map("file_assets")
+}
+
+// ---------------------------------------------------------------------------
+// Cross-cutting: Audit, Notifications, Background Jobs
+// ---------------------------------------------------------------------------
+
+// Append-only. No update/delete path is exposed by the application layer —
+// see docs/security/14_Security_Architecture.md.
+model AuditLog {
+  id               String   @id @default(uuid()) @db.Uuid
+  actorUserId      String   @db.Uuid
+  actor            User     @relation("AuditActor", fields: [actorUserId], references: [id])
+  action           String
+  targetEntityType String
+  targetEntityId   String   @db.Uuid
+  metadata         Json     @default("{}")
+  occurredAt       DateTime @default(now())
+
+  @@index([actorUserId])
+  @@index([targetEntityType, targetEntityId])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id             String              @id @default(uuid()) @db.Uuid
+  recipientUserId String             @db.Uuid
+  recipient      User                @relation("NotificationRecipient", fields: [recipientUserId], references: [id])
+  channel        NotificationChannel @default(EMAIL)
+  template       String
+  status         NotificationStatus  @default(PENDING)
+  payload        Json                @default("{}")
+  createdAt      DateTime            @default(now())
+  sentAt         DateTime?
+
+  @@index([recipientUserId])
+  @@map("notifications")
+}
+
+// Generic background job queue backing the Background Job Processing
+// System (2026-08-05). `type` is a free-form string, deliberately not an
+// enum — new job types are added by other modules registering a handler,
+// never by changing this schema (see src/modules/jobs).
+model Job {
+  id        String    @id @default(uuid()) @db.Uuid
+  type      String
+  payload   Json      @default("{}")
+  status    JobStatus @default(PENDING)
+
+  attempts      Int       @default(0)
+  maxAttempts   Int       @default(5)
+  runAt         DateTime  @default(now())
+  lastAttemptAt DateTime?
+  nextRetryAt   DateTime?
+  completedAt   DateTime?
+  errorMessage  String?
+  // Milliseconds. Recorded for both successful and failed attempts.
+  executionTimeMs Int?
+  // Worker id that currently holds this job (set atomically by the claim
+  // query alongside status=PROCESSING; cleared on completion/failure/retry).
+  // Not a distributed lock by itself — the atomic claim (status transition
+  // + FOR UPDATE SKIP LOCKED) is what prevents double-claiming; this field
+  // exists for observability (which worker is/was handling this job).
+  lockedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, runAt])
+  @@map("jobs")
+}

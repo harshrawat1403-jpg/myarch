@@ -1,0 +1,41 @@
+/**
+ * Design tokens — single source of truth for color, typography, and spacing.
+ * Values match docs/design/12_Design_System.md exactly. Components must
+ * consume these tokens (via Tailwind's generated utilities or var(--token)),
+ * never hardcode a color/font/spacing value directly.
+ */
+
+@theme {
+  /* Color */
+  --color-background: #15171b;
+  --color-surface: #1d2024;
+  --color-text-primary: #ECEAE4;
+  --color-text-secondary: #8b8f98;
+  --color-accent: #4fb8d4;
+
+  /* Typography */
+  --font-display: "General Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --text-display: 1.875rem; /* ~30px */
+  --text-heading: 1.375rem; /* ~22px */
+  --text-body: 1rem; /* 16px */
+  --text-caption: 0.8125rem; /* 13px */
+  --text-data: 0.875rem; /* 14px */
+
+  /* Spacing (4px base scale) */
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-12: 3rem;
+  --spacing-16: 4rem;
+
+  /* Motion */
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --ease-standard: cubic-bezier(0, 0, 0.2, 1);
+}

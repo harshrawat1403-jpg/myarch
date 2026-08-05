@@ -1,0 +1,71 @@
+# Self-hosted / VPS deployment, or local production-parity testing.
+# On a managed container platform (Render, Railway, Fly.io, etc.) you deploy
+# the `web` and `worker` Dockerfile targets directly instead and use that
+# platform's own managed Postgres — this file is for the "plain VPS with
+# Docker" path documented in DEPLOYMENT_GUIDE.md.
+#
+# Usage:
+#   cp .env.example .env.production   # fill in real secrets
+#   docker compose --env-file .env.production up -d --build
+#   docker compose exec web npx prisma migrate deploy
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tnparch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-tnparch}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tnparch}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Not published to the host by default — only `web`/`worker` on the
+    # same compose network need it. Uncomment to inspect locally:
+    # ports:
+    #   - "5432:5432"
+
+  web:
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tnparch}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tnparch}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      BCRYPT_COST_FACTOR: ${BCRYPT_COST_FACTOR:-12}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@tnparch.in}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+
+  worker:
+    build:
+      context: .
+      target: worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tnparch}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tnparch}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@tnparch.in}
+      JOB_WORKER_POLL_INTERVAL_MS: ${JOB_WORKER_POLL_INTERVAL_MS:-2000}
+      JOB_WORKER_BATCH_SIZE: ${JOB_WORKER_BATCH_SIZE:-5}
+      NODE_ENV: production
+
+volumes:
+  postgres_data:
