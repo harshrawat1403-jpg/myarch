@@ -1,27 +1,37 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { Archive, ChevronLeft, GraduationCap, KeyRound, Layers, RotateCcw } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type { StudentRecord } from "@/modules/students";
 import type { Batch } from "@/modules/batches";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { TitleBlock } from "@/components/title-block";
+import { DataLabel } from "@/components/ui/typography";
+import { DashboardPanel } from "@/components/dashboard-panel";
+import { RevealPasswordModal } from "@/components/ui/reveal-password-modal";
+import { useToast } from "@/components/ui/toast";
 
 export default function StudentDetailPage() {
   const params = useParams<{ id: string }>();
   const studentId = params.id;
   const { accessToken } = useAuth();
   const router = useRouter();
+  const toast = useToast();
 
   const [student, setStudent] = useState<StudentRecord | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [isResetOpen, setIsResetOpen] = useState(false);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
 
   async function load() {
     if (!accessToken) return;
@@ -70,10 +80,28 @@ export default function StudentDetailPage() {
     }
   }
 
+  async function handleResetPassword() {
+    if (!accessToken || !student) return;
+    setIsResetting(true);
+    try {
+      const result = await apiClient.post<{ tempPassword: string }>(
+        `/api/students/${studentId}/reset-password`,
+        undefined,
+        accessToken,
+      );
+      setTempPassword(result.tempPassword);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to reset password.");
+      setIsResetOpen(false);
+    } finally {
+      setIsResetting(false);
+    }
+  }
+
   if (error && !student) {
     return (
       <div className="space-y-4">
-        <p className="text-sm text-red-400">{error}</p>
+        <p className="text-sm text-(--color-danger)">{error}</p>
         <Button variant="secondary" onClick={() => router.push("/dashboard/students")}>
           Back to students
         </Button>
@@ -82,79 +110,135 @@ export default function StudentDetailPage() {
   }
 
   if (!student) {
-    return <p className="text-sm text-[--color-text-secondary]">Loading…</p>;
+    return <p className="text-sm text-(--color-text-secondary)">Loading…</p>;
   }
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="font-[family-name:var(--font-display)] text-2xl text-[--color-text-primary]">
-          {student.fullName}
-        </h1>
+      <Link
+        href="/dashboard/students"
+        className="inline-flex items-center gap-1 text-sm font-medium text-(--color-accent) hover:underline"
+      >
+        <ChevronLeft aria-hidden="true" size={16} strokeWidth={2} />
+        Back to Students
+      </Link>
+
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-(--color-text-primary)">
+            {student.fullName}
+          </h1>
+          <p className="mt-0.5 flex items-center gap-1.5 text-sm text-(--color-text-secondary)">
+            <GraduationCap aria-hidden="true" size={14} strokeWidth={1.75} />
+            Roll {student.rollNumber}
+          </p>
+        </div>
         <Badge variant={student.isActive ? "active" : "archived"}>
           {student.isActive ? "Active" : "Archived"}
         </Badge>
       </div>
 
-      {notice && <p className="text-sm text-[--color-accent]">{notice}</p>}
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {notice && <p className="text-sm text-(--color-success)">{notice}</p>}
+      {error && <p className="text-sm text-(--color-danger)">{error}</p>}
 
-      <div className="rounded-lg border border-[--color-text-secondary]/20 bg-[--color-surface] p-5">
-        <dl className="grid grid-cols-2 gap-4 text-sm">
+      <Card>
+        <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-[--color-text-secondary]">Roll Number</dt>
-            <dd className="text-[--color-text-primary]">{student.rollNumber}</dd>
+            <DataLabel>Roll Number</DataLabel>
+            <dd className="mt-0.5 text-(--color-text-primary)">{student.rollNumber}</dd>
           </div>
           <div>
-            <dt className="text-[--color-text-secondary]">CGPA</dt>
-            <dd className="text-[--color-text-primary]">{student.private.cgpa ?? "—"}</dd>
+            <DataLabel>CGPA</DataLabel>
+            <dd className="mt-0.5 text-(--color-text-primary)">{student.private.cgpa ?? "—"}</dd>
           </div>
           <div>
-            <dt className="text-[--color-text-secondary]">Phone</dt>
-            <dd className="text-[--color-text-primary]">{student.private.phone ?? "—"}</dd>
+            <DataLabel>Phone</DataLabel>
+            <dd className="mt-0.5 text-(--color-text-primary)">{student.private.phone ?? "—"}</dd>
           </div>
           <div>
-            <dt className="text-[--color-text-secondary]">Personal Email</dt>
-            <dd className="text-[--color-text-primary]">{student.private.personalEmail ?? "—"}</dd>
+            <DataLabel>Personal Email</DataLabel>
+            <dd className="mt-0.5 break-words text-(--color-text-primary)">{student.private.personalEmail ?? "—"}</dd>
           </div>
           <div>
-            <dt className="text-[--color-text-secondary]">Active Backlog</dt>
-            <dd className="text-[--color-text-primary]">{student.private.hasActiveBacklog ? "Yes" : "No"}</dd>
+            <DataLabel>Active Backlog</DataLabel>
+            <dd className="mt-0.5 text-(--color-text-primary)">{student.private.hasActiveBacklog ? "Yes" : "No"}</dd>
           </div>
         </dl>
         {student.private.internalRemarks && (
-          <div className="mt-4">
-            <p className="text-[--color-text-secondary] text-sm">Internal Remarks</p>
-            <p className="text-sm text-[--color-text-primary]">{student.private.internalRemarks}</p>
+          <div className="mt-4 border-t border-(--color-border) pt-4">
+            <DataLabel>Internal Remarks</DataLabel>
+            <p className="mt-1 text-sm text-(--color-text-primary)">{student.private.internalRemarks}</p>
           </div>
         )}
-        <TitleBlock
-          project={student.fullName}
-          scale={`Roll ${student.rollNumber}`}
-          date={student.updatedAt}
-          drawnBy="Private Profile"
-        />
-      </div>
+        <p className="mt-4 border-t border-(--color-border) pt-3 text-xs text-(--color-text-secondary)">
+          Private profile · last updated {new Date(student.updatedAt).toISOString().slice(0, 10)}
+        </p>
+      </Card>
 
-      <div className="rounded-lg border border-[--color-text-secondary]/20 bg-[--color-surface] p-5 space-y-3">
-        <h2 className="font-[family-name:var(--font-display)] text-lg text-[--color-text-primary]">
-          Batch Reassignment
-        </h2>
-        <Select value={selectedBatchId} onChange={(e) => setSelectedBatchId(e.target.value)}>
-          {batches.map((batch) => (
-            <option key={batch.id} value={batch.id}>
-              {batch.name}
-            </option>
-          ))}
-        </Select>
-        <Button variant="secondary" onClick={handleReassign} disabled={selectedBatchId === student.batchId}>
-          Save Batch Reassignment
+      <DashboardPanel title="Batch Reassignment" icon={Layers}>
+        <div className="space-y-3">
+          <Select value={selectedBatchId} onChange={(e) => setSelectedBatchId(e.target.value)}>
+            {batches.map((batch) => (
+              <option key={batch.id} value={batch.id}>
+                {batch.name}
+              </option>
+            ))}
+          </Select>
+          <Button variant="secondary" onClick={handleReassign} disabled={selectedBatchId === student.batchId}>
+            Save Batch Reassignment
+          </Button>
+        </div>
+      </DashboardPanel>
+
+      <DashboardPanel title="Password" icon={KeyRound}>
+        <p className="text-sm text-(--color-text-secondary)">
+          Issue a new temporary password. The student will be required to change it on their next sign-in, and
+          every existing session will be signed out immediately.
+        </p>
+        <Button type="button" variant="secondary" className="mt-3" onClick={() => setIsResetOpen(true)}>
+          Reset Password
         </Button>
-      </div>
+      </DashboardPanel>
 
-      <Button variant={student.isActive ? "destructive" : "primary"} onClick={handleArchiveToggle}>
+      <Button
+        variant={student.isActive ? "destructive" : "primary"}
+        onClick={handleArchiveToggle}
+        className="gap-2"
+      >
+        {student.isActive ? (
+          <Archive aria-hidden="true" size={16} strokeWidth={1.75} />
+        ) : (
+          <RotateCcw aria-hidden="true" size={16} strokeWidth={1.75} />
+        )}
         {student.isActive ? "Archive Student" : "Restore Student"}
       </Button>
+
+      <RevealPasswordModal
+        isOpen={isResetOpen}
+        onClose={() => {
+          setIsResetOpen(false);
+          setTempPassword(null);
+        }}
+        pendingTitle="Reset password?"
+        revealedTitle="Password reset"
+        tempPassword={tempPassword}
+        description={<>Share this temporary password with {student.fullName} — it will not be shown again.</>}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-(--color-text-secondary)">
+            This generates a new temporary password and immediately signs {student.fullName} out of every
+            session. They&apos;ll need to set a new password on their next sign-in.
+          </p>
+          <div className="flex justify-end gap-3 border-t border-(--color-border) pt-4">
+            <Button type="button" variant="ghost" onClick={() => setIsResetOpen(false)} disabled={isResetting}>
+              Cancel
+            </Button>
+            <Button type="button" variant="primary" onClick={handleResetPassword} disabled={isResetting}>
+              {isResetting ? "Resetting…" : "Reset Password"}
+            </Button>
+          </div>
+        </div>
+      </RevealPasswordModal>
     </div>
   );
 }

@@ -47,6 +47,8 @@ describe("LoginUseCase", () => {
         passwordHash: await ctx.passwordHasher.hash("correct-password"),
         role: "STUDENT",
         isActive: true,
+        mustChangePassword: false,
+        avatarFileId: null,
       },
       { studentProfileId: "student-profile-1" },
     );
@@ -111,6 +113,8 @@ describe("LoginUseCase", () => {
       passwordHash: await ctx.passwordHasher.hash("correct-password"),
       role: "STUDENT",
       isActive: false,
+      mustChangePassword: false,
+      avatarFileId: null,
     });
 
     await expect(
@@ -131,6 +135,8 @@ describe("LoginUseCase", () => {
         passwordHash: await ctx.passwordHasher.hash("coord-password"),
         role: "COORDINATOR",
         isActive: true,
+        mustChangePassword: false,
+        avatarFileId: null,
       },
       { batchScope: ["batch-a", "batch-b"] },
     );
@@ -140,5 +146,33 @@ describe("LoginUseCase", () => {
 
     const claims = ctx.tokenService.verifyAccessToken(result.accessToken);
     expect(claims.batchScope).toEqual(["batch-a", "batch-b"]);
+  });
+
+  it("records lastLoginAt on a successful login", async () => {
+    await ctx.useCase.execute({ email: "student@example.edu", password: "correct-password" });
+    expect(ctx.userRepository.getLastLoginAt("user-1")).toEqual(ctx.clock.now());
+  });
+
+  it("embeds mustChangePassword in the actor and access token claims when set", async () => {
+    ctx.userRepository.seed({
+      id: "user-3",
+      email: "temp@example.edu",
+      passwordHash: await ctx.passwordHasher.hash("temp-password"),
+      role: "STUDENT",
+      isActive: true,
+      mustChangePassword: true,
+      avatarFileId: null,
+    });
+
+    const result = await ctx.useCase.execute({ email: "temp@example.edu", password: "temp-password" });
+    expect(result.actor.mustChangePassword).toBe(true);
+
+    const claims = ctx.tokenService.verifyAccessToken(result.accessToken);
+    expect(claims.mustChangePassword).toBe(true);
+  });
+
+  it("omits mustChangePassword from the actor when false, keeping the normal actor shape unchanged", async () => {
+    const result = await ctx.useCase.execute({ email: "student@example.edu", password: "correct-password" });
+    expect(result.actor).toEqual({ userId: "user-1", role: "STUDENT", studentProfileId: "student-profile-1" });
   });
 });

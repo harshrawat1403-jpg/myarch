@@ -73,3 +73,32 @@ export interface ConfidentialDocumentReference {
   readonly sizeBytes: number;
   readonly createdAt: Date;
 }
+
+/**
+ * V3.0 Administration Platform: Bulk CSV Student Import, run asynchronously
+ * via the Job queue (see infrastructure/bulk-import-job-handler.ts) so a
+ * multi-hundred-row roster upload never ties up an HTTP request.
+ */
+export type BulkImportRunStatus = "PENDING" | "RUNNING" | "COMPLETED" | "COMPLETED_WITH_ERRORS" | "FAILED";
+
+export interface BulkImportRowError {
+  readonly row: number;
+  readonly rollNumber?: string;
+  readonly email?: string;
+  readonly error: string;
+}
+
+export interface BulkImportRunRecord {
+  readonly id: string;
+  readonly actorUserId: string;
+  readonly batchId: string;
+  readonly status: BulkImportRunStatus;
+  readonly totalRows: number;
+  readonly processedRows: number;
+  readonly successCount: number;
+  readonly failureCount: number;
+  readonly errorReport: readonly BulkImportRowError[];
+  readonly createdAt: Date;
+  readonly startedAt: Date | null;
+  readonly completedAt: Date | null;
+}

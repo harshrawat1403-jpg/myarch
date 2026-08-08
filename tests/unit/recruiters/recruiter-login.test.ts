@@ -56,6 +56,8 @@ describe("Recruiter login (reuses the existing, unmodified LoginUseCase)", () =>
       passwordHash: await ctx.passwordHasher.hash("correct-password"),
       role: "RECRUITER",
       isActive: true,
+      mustChangePassword: false,
+      avatarFileId: null,
     });
   });
 
@@ -94,6 +96,8 @@ describe("Recruiter login (reuses the existing, unmodified LoginUseCase)", () =>
       passwordHash: await ctx.passwordHasher.hash("correct-password"),
       role: "RECRUITER",
       isActive: false,
+      mustChangePassword: false,
+      avatarFileId: null,
     });
 
     await expect(

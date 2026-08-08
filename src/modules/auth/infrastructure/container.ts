@@ -19,14 +19,22 @@
 import { getEnv } from "@/config/env";
 import { prisma } from "@/lib/prisma";
 import { parseDurationMs } from "@/lib/duration";
+import { notificationService } from "@/modules/notifications";
+import { saveFile, deleteFile } from "@/lib/file-storage";
 import { LoginUseCase } from "../application/use-cases/login";
 import { LogoutUseCase } from "../application/use-cases/logout";
 import { RefreshAccessTokenUseCase } from "../application/use-cases/refresh-access-token";
+import { AdminResetPasswordUseCase } from "../application/use-cases/admin-reset-password";
+import { ChangeOwnPasswordUseCase } from "../application/use-cases/change-own-password";
+import { UpdateOwnProfileUseCase } from "../application/use-cases/update-own-profile";
+import { UploadAvatarUseCase } from "../application/use-cases/upload-avatar";
 import { BcryptPasswordHasher } from "./bcrypt-password-hasher";
 import { JwtTokenService } from "./jwt-token-service";
 import { PrismaUserRepository } from "./prisma-user-repository";
 import { PrismaRefreshTokenRepository } from "./prisma-refresh-token-repository";
 import { PrismaAuditRecorder } from "./prisma-audit-recorder";
+import { PrismaProfileNameRepository } from "./prisma-profile-name-repository";
+import { PrismaAvatarFileRepository } from "./prisma-avatar-file-repository";
 import { SystemClock } from "./system-clock";
 import { InMemoryRateLimiter } from "./rate-limiter";
 import { createAuthMiddleware } from "../presentation/with-auth";
@@ -35,6 +43,8 @@ import { createAuthMiddleware } from "../presentation/with-auth";
 const userRepository = new PrismaUserRepository(prisma);
 const refreshTokenRepository = new PrismaRefreshTokenRepository(prisma);
 const auditRecorder = new PrismaAuditRecorder(prisma);
+const profileNameRepository = new PrismaProfileNameRepository(prisma);
+const avatarFileRepository = new PrismaAvatarFileRepository(prisma);
 const clock = new SystemClock();
 
 let cachedPasswordHasher: BcryptPasswordHasher | undefined;
@@ -90,6 +100,81 @@ export function getRefreshAccessTokenUseCase(): RefreshAccessTokenUseCase {
     auditRecorder,
     clock,
     refreshTokenTtlMs: getRefreshTokenTtlMs(),
+  }));
+}
+
+let cachedAdminResetPasswordUseCase: AdminResetPasswordUseCase | undefined;
+export function getAdminResetPasswordUseCase(): AdminResetPasswordUseCase {
+  return (cachedAdminResetPasswordUseCase ??= new AdminResetPasswordUseCase({
+    userRepository,
+    refreshTokenRepository,
+    passwordHasher: getPasswordHasher(),
+    auditRecorder,
+    notificationService,
+  }));
+}
+
+let cachedChangeOwnPasswordUseCase: ChangeOwnPasswordUseCase | undefined;
+export function getChangeOwnPasswordUseCase(): ChangeOwnPasswordUseCase {
+  return (cachedChangeOwnPasswordUseCase ??= new ChangeOwnPasswordUseCase({
+    userRepository,
+    refreshTokenRepository,
+    passwordHasher: getPasswordHasher(),
+    auditRecorder,
+    tokenService: getTokenService(),
+    clock,
+    refreshTokenTtlMs: getRefreshTokenTtlMs(),
+  }));
+}
+
+/** Exposed for the /api/files/[fileId] route (reads a PUBLIC FileAsset by id — avatars today). */
+export function getAvatarFileRepository(): PrismaAvatarFileRepository {
+  return avatarFileRepository;
+}
+
+/**
+ * V3.0: revokes every session for a user — used by Coordinator/Recruiter
+ * disable (kills access immediately, same pattern AdminResetPasswordUseCase
+ * already established for password resets). Exposed as a plain function
+ * rather than the repository itself, so other modules never depend on
+ * auth's infrastructure layer directly.
+ */
+export async function revokeUserSessions(userId: string): Promise<void> {
+  await refreshTokenRepository.revokeAllForUser(userId);
+}
+
+/** Backs the /api/auth/me route's email/fullName fields — see me.ts's doc comment. */
+export async function getMeProfile(actor: {
+  userId: string;
+  role: import("../domain/entities").Role;
+}): Promise<{ email: string | null; fullName: string | null; avatarUrl: string | null }> {
+  const user = await userRepository.findById(actor.userId);
+  const fullName = await profileNameRepository.getFullName(actor.userId, actor.role).catch(() => null);
+  return {
+    email: user?.email ?? null,
+    fullName,
+    avatarUrl: user?.avatarFileId ? `/api/files/${user.avatarFileId}` : null,
+  };
+}
+
+let cachedUpdateOwnProfileUseCase: UpdateOwnProfileUseCase | undefined;
+export function getUpdateOwnProfileUseCase(): UpdateOwnProfileUseCase {
+  return (cachedUpdateOwnProfileUseCase ??= new UpdateOwnProfileUseCase({
+    userRepository,
+    profileNameRepository,
+    passwordHasher: getPasswordHasher(),
+    auditRecorder,
+  }));
+}
+
+let cachedUploadAvatarUseCase: UploadAvatarUseCase | undefined;
+export function getUploadAvatarUseCase(): UploadAvatarUseCase {
+  return (cachedUploadAvatarUseCase ??= new UploadAvatarUseCase({
+    userRepository,
+    avatarFileRepository,
+    auditRecorder,
+    saveFile,
+    deleteFile,
   }));
 }
 

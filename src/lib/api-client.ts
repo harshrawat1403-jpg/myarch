@@ -83,6 +83,28 @@ async function download(
   return { blob, filename };
 }
 
+/**
+ * V3.0: multipart file upload (avatar today). Bypasses `request()`'s
+ * JSON.stringify + Content-Type: application/json — the browser sets the
+ * correct multipart boundary header itself when given a FormData body.
+ */
+async function upload<T>(path: string, formData: FormData, accessToken?: string): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+
+  const response = await fetch(path, { method: "POST", headers, body: formData, credentials: "include" });
+
+  const json: unknown = await response.json().catch(() => null);
+  const envelope = json as { data?: T; error?: { code: string; message: string; details?: unknown } } | null;
+
+  if (!response.ok) {
+    const err = envelope?.error ?? { code: "UNKNOWN_ERROR", message: "Upload failed" };
+    throw new ApiError(response.status, err.code, err.message, err.details);
+  }
+
+  return (envelope?.data ?? envelope) as T;
+}
+
 export const apiClient = {
   get: <T>(path: string, accessToken?: string) => request<T>("GET", path, { accessToken }),
   post: <T>(path: string, body?: unknown, accessToken?: string) =>
@@ -93,4 +115,5 @@ export const apiClient = {
     request<T>("PUT", path, { accessToken, body }),
   delete: <T>(path: string, accessToken?: string) => request<T>("DELETE", path, { accessToken }),
   download,
+  upload,
 };

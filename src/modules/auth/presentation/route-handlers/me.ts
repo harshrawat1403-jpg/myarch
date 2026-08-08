@@ -1,20 +1,28 @@
 import { NextResponse } from "next/server";
-import { withAuth } from "../../infrastructure/container";
+import { getMeProfile, withAuth } from "../../infrastructure/container";
 
 /**
- * Minimal protected route demonstrating the required request flow end to
- * end (docs/api/10_API_Architecture.md). No dedicated Student/Batch/Profile
- * module exists yet (that's Days 3–6 of docs/planning/16_Project_Roadmap.md),
- * so this endpoint's only job is to prove the auth foundation itself works:
- * it returns exactly what the verified access token says about the caller.
+ * The "who am I" endpoint — claims from the verified access token plus a
+ * small DB read for email/fullName (V3.0: Account Settings needs the
+ * current values to prefill its form; the token itself deliberately never
+ * carries email/name, only role/scope). One extra query per call, same
+ * cadence as the refresh endpoint already hits the DB on every use.
  */
-export const meRouteHandler = withAuth(async (_req, { actor }) => {
-  return NextResponse.json({
-    data: {
-      userId: actor.userId,
-      role: actor.role,
-      batchScope: actor.batchScope,
-      studentProfileId: actor.studentProfileId,
-    },
-  });
-});
+export const meRouteHandler = withAuth(
+  async (_req, { actor }) => {
+    const profile = await getMeProfile(actor);
+    return NextResponse.json({
+      data: {
+        userId: actor.userId,
+        role: actor.role,
+        batchScope: actor.batchScope,
+        studentProfileId: actor.studentProfileId,
+        mustChangePassword: actor.mustChangePassword ?? false,
+        email: profile.email,
+        fullName: profile.fullName,
+        avatarUrl: profile.avatarUrl,
+      },
+    });
+  },
+  { allowMustChangePassword: true },
+);

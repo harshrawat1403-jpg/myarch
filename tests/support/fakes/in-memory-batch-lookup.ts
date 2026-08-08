@@ -1,5 +1,5 @@
 import type { BatchStatus } from "../../../src/modules/batches";
-import type { BatchLookup } from "../../../src/modules/students/application/ports/batch-lookup";
+import type { BatchLookup } from "../../../src/lib/batch-lookup";
 
 export class InMemoryBatchLookup implements BatchLookup {
   private readonly byId = new Map<string, { id: string; status: BatchStatus }>();

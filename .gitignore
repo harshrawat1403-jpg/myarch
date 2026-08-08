@@ -18,6 +18,10 @@ dist/
 prisma/*.db
 prisma/*.db-journal
 
+# V3.0 local file storage (src/lib/file-storage.ts) — uploaded content,
+# never committed; the directory itself is created on first write.
+/storage/
+
 # logs
 npm-debug.log*
 *.log

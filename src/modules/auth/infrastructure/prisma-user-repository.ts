@@ -36,6 +36,32 @@ export class PrismaUserRepository implements UserRepository {
     // SECRETARY is unscoped by design; RECRUITER carries no batch/profile scope in Phase 1.
     return {};
   }
+
+  async recordSuccessfulLogin(userId: string, at: Date): Promise<void> {
+    await this.prisma.user.update({ where: { id: userId }, data: { lastLoginAt: at } });
+  }
+
+  async setPasswordAndForceChange(userId: string, passwordHash: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash, mustChangePassword: true },
+    });
+  }
+
+  async setPassword(userId: string, passwordHash: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash, mustChangePassword: false },
+    });
+  }
+
+  async updateEmail(userId: string, email: string): Promise<void> {
+    await this.prisma.user.update({ where: { id: userId }, data: { email } });
+  }
+
+  async setAvatarFileId(userId: string, avatarFileId: string | null): Promise<void> {
+    await this.prisma.user.update({ where: { id: userId }, data: { avatarFileId } });
+  }
 }
 
 function toAuthUserRecord(user: {
@@ -44,6 +70,8 @@ function toAuthUserRecord(user: {
   passwordHash: string;
   role: AuthUserRecord["role"];
   isActive: boolean;
+  mustChangePassword: boolean;
+  avatarFileId: string | null;
 }): AuthUserRecord {
   return {
     id: user.id,
@@ -51,5 +79,7 @@ function toAuthUserRecord(user: {
     passwordHash: user.passwordHash,
     role: user.role,
     isActive: user.isActive,
+    mustChangePassword: user.mustChangePassword,
+    avatarFileId: user.avatarFileId,
   };
 }

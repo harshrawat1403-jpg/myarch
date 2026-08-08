@@ -53,3 +53,17 @@ export class ConfidentialDocumentNotFoundError extends Error {
     this.name = "ConfidentialDocumentNotFoundError";
   }
 }
+
+export class EmptyCsvFileError extends Error {
+  constructor() {
+    super("The uploaded CSV file has no data rows");
+    this.name = "EmptyCsvFileError";
+  }
+}
+
+export class BulkImportRunNotFoundError extends Error {
+  constructor() {
+    super("Bulk import run not found");
+    this.name = "BulkImportRunNotFoundError";
+  }
+}

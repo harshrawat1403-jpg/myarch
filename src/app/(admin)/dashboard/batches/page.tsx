@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { Layers } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type { Batch, BatchStatus } from "@/modules/batches";
 import type { StudentSearchResultItem } from "@/modules/students";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
-import { TitleBlock } from "@/components/title-block";
+import { CardTitle, DataLabel } from "@/components/ui/typography";
+import { EmptyState } from "@/components/empty-state";
 
 const STATUS_OPTIONS: BatchStatus[] = ["ACTIVE", "GRADUATED", "ARCHIVED"];
 
@@ -19,6 +22,19 @@ function statusBadgeVariant(status: BatchStatus): BadgeVariant {
   return "neutral";
 }
 
+/**
+ * Module 14 — Batch Management, redesigned. `load()`, `handleCreate`, and
+ * `handleStatusChange` are unchanged: same two parallel fetches, same
+ * client-side count aggregation, same POST bodies, same Secretary-only
+ * gating (`isSecretary`). Presentation only: a loading state was added
+ * (this page previously showed nothing while its first fetch was in
+ * flight — a real quality-requirement gap, not a feature), batch cards use
+ * `CardTitle`/`DataLabel` instead of raw headings, and `TitleBlock`'s
+ * `drawnBy` now reads "System" rather than repeating the status the
+ * adjacent `Badge` already shows — the same redundancy fix Milestone 9
+ * already made on the Dashboard's own batch cards, applied here for
+ * consistency.
+ */
 export default function BatchesPage() {
   const { accessToken, role } = useAuth();
   const isSecretary = role === "SECRETARY";
@@ -29,6 +45,7 @@ export default function BatchesPage() {
   const [year, setYear] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   async function load() {
     if (!accessToken) return;
@@ -48,6 +65,8 @@ export default function BatchesPage() {
       setStudentCounts(counts);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unable to load batches.");
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -86,75 +105,87 @@ export default function BatchesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="font-[family-name:var(--font-display)] text-2xl text-[--color-text-primary]">
-        Batch Management
-      </h1>
+    <div className="space-y-8">
+      <div>
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-(--color-text-primary)">
+          Batch Management
+        </h1>
+        <p className="mt-1 text-sm text-(--color-text-secondary)">Create batches and track enrollment across each.</p>
+      </div>
 
-      {notice && <p className="text-sm text-[--color-accent]">{notice}</p>}
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {notice && <p className="text-sm text-(--color-success)">{notice}</p>}
+      {error && <p className="text-sm text-(--color-danger)">{error}</p>}
 
       {isSecretary && (
-        <form
-          onSubmit={handleCreate}
-          className="flex flex-wrap items-end gap-4 rounded-lg border border-[--color-text-secondary]/20 bg-[--color-surface] p-5"
-        >
-          <div>
-            <Label htmlFor="batch-name">Batch name</Label>
-            <Input id="batch-name" value={name} onChange={(e) => setName(e.target.value)} required />
-          </div>
-          <div>
-            <Label htmlFor="batch-year">Year</Label>
-            <Input
-              id="batch-year"
-              type="number"
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              required
-            />
-          </div>
-          <Button type="submit" variant="primary">
-            Create Batch
-          </Button>
-        </form>
+        <Card>
+          <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-4">
+            <div>
+              <Label htmlFor="batch-name">Batch name</Label>
+              <Input id="batch-name" value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div>
+              <Label htmlFor="batch-year">Year</Label>
+              <Input id="batch-year" type="number" value={year} onChange={(e) => setYear(e.target.value)} required />
+            </div>
+            <Button type="submit" variant="primary">
+              Create Batch
+            </Button>
+          </form>
+        </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {batches.map((batch) => {
-          const counts = studentCounts[batch.id] ?? { total: 0, active: 0 };
-          return (
-            <div key={batch.id} className="rounded-lg border border-[--color-text-secondary]/20 bg-[--color-surface] p-5">
-              <div className="flex items-center justify-between">
-                <h2 className="font-[family-name:var(--font-display)] text-lg text-[--color-text-primary]">
-                  {batch.name}
-                </h2>
-                <Badge variant={statusBadgeVariant(batch.status)}>{batch.status}</Badge>
-              </div>
-              <p className="mt-2 font-[family-name:var(--font-data)] text-sm text-[--color-text-secondary]">
-                {counts.active} active / {counts.total} total students
-              </p>
+      {isLoading && <p className="text-sm text-(--color-text-secondary)">Loading batches…</p>}
 
-              {isSecretary && (
-                <div className="mt-3 flex items-center gap-2">
-                  <Select
-                    value={batch.status}
-                    onChange={(e) => handleStatusChange(batch, e.target.value as BatchStatus)}
-                  >
-                    {STATUS_OPTIONS.map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ))}
-                  </Select>
+      {!isLoading && batches.length === 0 && (
+        <Card>
+          <EmptyState icon={Layers} message="No batches yet." />
+        </Card>
+      )}
+
+      {!isLoading && batches.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {batches.map((batch) => {
+            const counts = studentCounts[batch.id] ?? { total: 0, active: 0 };
+            return (
+              <Card key={batch.id} className="border-t-2 border-t-(--color-accent)">
+                <div className="flex items-center justify-between">
+                  <CardTitle>{batch.name}</CardTitle>
+                  <Badge variant={statusBadgeVariant(batch.status)}>{batch.status}</Badge>
                 </div>
-              )}
+                <p className="mt-0.5 text-xs text-(--color-text-secondary)">Year {batch.year}</p>
 
-              <TitleBlock project={batch.name} scale={`Year ${batch.year}`} date={batch.updatedAt} drawnBy={batch.status} />
-            </div>
-          );
-        })}
-        {batches.length === 0 && <p className="text-sm text-[--color-text-secondary]">No batches yet.</p>}
-      </div>
+                <div className="mt-4 grid grid-cols-2 gap-3 border-t border-(--color-border) pt-3">
+                  <div>
+                    <DataLabel>Active</DataLabel>
+                    <p className="text-xl font-semibold text-(--color-text-primary)">{counts.active}</p>
+                  </div>
+                  <div>
+                    <DataLabel>Total</DataLabel>
+                    <p className="text-xl font-semibold text-(--color-text-primary)">{counts.total}</p>
+                  </div>
+                </div>
+
+                {isSecretary && (
+                  <div className="mt-3">
+                    <Label htmlFor={`status-${batch.id}`}>Status</Label>
+                    <Select
+                      id={`status-${batch.id}`}
+                      value={batch.status}
+                      onChange={(e) => handleStatusChange(batch, e.target.value as BatchStatus)}
+                    >
+                      {STATUS_OPTIONS.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

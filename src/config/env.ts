@@ -52,6 +52,12 @@ const envSchema = z
     // size can be tuned per-environment without a code change.
     JOB_WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
     JOB_WORKER_BATCH_SIZE: z.coerce.number().int().positive().default(5),
+
+    // V3.0 Administration Platform: local-disk root for uploaded files
+    // (Account Settings avatar today; the future CMS Media Library extends
+    // the same src/lib/file-storage.ts rather than a second storage path).
+    // Defaults to a gitignored directory under the repo root for local dev.
+    FILE_STORAGE_ROOT: z.string().default("storage/uploads"),
   })
   .refine((value) => value.JWT_ACCESS_SECRET !== value.JWT_REFRESH_SECRET, {
     message: "JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must differ",

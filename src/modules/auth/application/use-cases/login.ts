@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import type { AuthenticatedActor } from "../../domain/entities";
 import { InvalidCredentialsError } from "../../domain/errors";
+import { issueSessionTokens } from "../issue-session";
 import type { AuditRecorder } from "../ports/audit-recorder";
 import type { Clock } from "../ports/clock";
 import type { PasswordHasher } from "../ports/password-hasher";
@@ -58,28 +59,20 @@ export class LoginUseCase {
     }
 
     const scope = await this.deps.userRepository.loadActorScope(user);
-    const actor: AuthenticatedActor = { userId: user.id, role: user.role, ...scope };
+    const actor: AuthenticatedActor = {
+      userId: user.id,
+      role: user.role,
+      ...scope,
+      ...(user.mustChangePassword ? { mustChangePassword: true } : {}),
+    };
 
-    const accessToken = this.deps.tokenService.signAccessToken({
-      sub: actor.userId,
-      role: actor.role,
-      batchScope: actor.batchScope,
-      studentProfileId: actor.studentProfileId,
-    });
-
-    const rawRefreshToken = this.deps.tokenService.generateRefreshToken();
-    const tokenHash = this.deps.tokenService.hashRefreshToken(rawRefreshToken);
-    const now = this.deps.clock.now();
-    const refreshTokenExpiresAt = new Date(now.getTime() + this.deps.refreshTokenTtlMs);
+    // Recorded now (post-credential-check, pre-token-issuance) so even a
+    // same-millisecond forced-change redirect sees an up-to-date lastLoginAt.
+    await this.deps.userRepository.recordSuccessfulLogin(user.id, this.deps.clock.now());
 
     // A new family per login — every rotation within this session shares it.
     const familyId = crypto.randomUUID();
-    await this.deps.refreshTokenRepository.create({
-      userId: actor.userId,
-      tokenHash,
-      familyId,
-      expiresAt: refreshTokenExpiresAt,
-    });
+    const tokens = await issueSessionTokens(this.deps, actor, familyId);
 
     await this.deps.auditRecorder.record({
       actorUserId: actor.userId,
@@ -88,6 +81,11 @@ export class LoginUseCase {
       targetEntityId: actor.userId,
     });
 
-    return { accessToken, refreshToken: rawRefreshToken, refreshTokenExpiresAt, actor };
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
+      actor,
+    };
   }
 }

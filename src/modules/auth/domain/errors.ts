@@ -37,3 +37,43 @@ export class RefreshTokenReusedError extends Error {
     this.name = "RefreshTokenReusedError";
   }
 }
+
+/** V3.0 Administration Platform: self-service password change with a wrong current password. */
+export class CurrentPasswordIncorrectError extends Error {
+  constructor() {
+    super("Current password is incorrect");
+    this.name = "CurrentPasswordIncorrectError";
+  }
+}
+
+/** V3.0: the new password must differ from the current one. */
+export class NewPasswordSameAsCurrentError extends Error {
+  constructor() {
+    super("New password must be different from your current password");
+    this.name = "NewPasswordSameAsCurrentError";
+  }
+}
+
+/** V3.0: AdminResetPasswordUseCase, target user not found. */
+export class UserNotFoundError extends Error {
+  constructor() {
+    super("User not found");
+    this.name = "UserNotFoundError";
+  }
+}
+
+/** V3.0 Account Settings: self-service email change to an address already in use. */
+export class EmailAlreadyInUseError extends Error {
+  constructor() {
+    super("This email address is already in use");
+    this.name = "EmailAlreadyInUseError";
+  }
+}
+
+/** V3.0 Account Settings: an avatar upload outside the allowed MIME types or size ceiling. */
+export class InvalidAvatarFileError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidAvatarFileError";
+  }
+}

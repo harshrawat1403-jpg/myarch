@@ -11,6 +11,8 @@ export interface AuthUserRecord {
   readonly passwordHash: string;
   readonly role: Role;
   readonly isActive: boolean;
+  readonly mustChangePassword: boolean;
+  readonly avatarFileId: string | null;
 }
 
 export interface UserRepository {
@@ -25,4 +27,25 @@ export interface UserRepository {
   loadActorScope(
     user: AuthUserRecord,
   ): Promise<Pick<AuthenticatedActor, "batchScope" | "studentProfileId">>;
+
+  /** Stamps the moment a login succeeds — V3.0 Administration Platform's "Last Login" column. */
+  recordSuccessfulLogin(userId: string, at: Date): Promise<void>;
+
+  /**
+   * Sets a new password hash and marks the account as requiring a change on
+   * next login — used by both account creation (temp password at creation
+   * time) and admin-initiated resets. Never called with `false`; the flag is
+   * only ever cleared by ChangeOwnPasswordUseCase, once the account holder
+   * proves they know the temporary password.
+   */
+  setPasswordAndForceChange(userId: string, passwordHash: string): Promise<void>;
+
+  /** Sets a new password hash and clears mustChangePassword — self-service only. */
+  setPassword(userId: string, passwordHash: string): Promise<void>;
+
+  /** V3.0 Account Settings: self-service email change. Caller must have already checked uniqueness via findByEmail. */
+  updateEmail(userId: string, email: string): Promise<void>;
+
+  /** V3.0 Account Settings: sets or clears (null) the user's avatar FileAsset reference. */
+  setAvatarFileId(userId: string, avatarFileId: string | null): Promise<void>;
 }

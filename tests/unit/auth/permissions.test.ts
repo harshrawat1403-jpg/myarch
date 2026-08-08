@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import type { AuthenticatedActor } from "../../../src/modules/auth";
 import {
+  canAccessUserDirectory,
   canApproveOrRejectDraft,
   canChangeBatchLifecycleStatus,
   canEditOwnContactInfo,
@@ -18,7 +19,6 @@ import {
   canExportBatchData,
   canManageBatches,
   canManageCoordinatorAccounts,
-  canManageRecruiterAccounts,
   canViewAuditLogs,
   canViewPrivateProfile,
 } from "../../../src/modules/auth";
@@ -153,12 +153,6 @@ describe("Secretary-only administrative capabilities", () => {
 });
 
 describe("Scoped administrative capabilities (Secretary or in-scope Coordinator)", () => {
-  it("canManageRecruiterAccounts respects batch scope", () => {
-    expect(canManageRecruiterAccounts(secretary, BATCH_A)).toBe(true);
-    expect(canManageRecruiterAccounts(coordinatorScopedToA, BATCH_A)).toBe(true);
-    expect(canManageRecruiterAccounts(coordinatorScopedToB, BATCH_A)).toBe(false);
-  });
-
   it("canExportBatchData respects batch scope", () => {
     expect(canExportBatchData(secretary, BATCH_A)).toBe(true);
     expect(canExportBatchData(coordinatorScopedToA, BATCH_A)).toBe(true);
@@ -169,5 +163,14 @@ describe("Scoped administrative capabilities (Secretary or in-scope Coordinator)
     expect(canViewAuditLogs(secretary)).toBe(true);
     expect(canViewAuditLogs(coordinatorScopedToA, BATCH_A)).toBe(true);
     expect(canViewAuditLogs(coordinatorScopedToB, BATCH_A)).toBe(false);
+  });
+});
+
+describe("canAccessUserDirectory", () => {
+  it("allows Secretary and Coordinator, denies Student and Recruiter", () => {
+    expect(canAccessUserDirectory(secretary)).toBe(true);
+    expect(canAccessUserDirectory(coordinatorScopedToA)).toBe(true);
+    expect(canAccessUserDirectory(studentInA)).toBe(false);
+    expect(canAccessUserDirectory(recruiter)).toBe(false);
   });
 });

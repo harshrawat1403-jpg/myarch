@@ -6,6 +6,7 @@ import { useAuth } from "@/modules/auth/client";
 import { ApiError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label } from "@/components/ui/input";
+import { Logo } from "@/components/logo";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -25,10 +26,10 @@ export default function LoginPage() {
         router.push("/dashboard");
       } else if (role === "RECRUITER") {
         router.push("/recruiter");
+      } else if (role === "STUDENT") {
+        router.push("/student");
       } else {
-        // Student self-service isn't built yet (deferred per the roadmap) —
-        // stay here rather than redirect into a route that doesn't exist.
-        setError("Student sign-in is not yet available in this portal.");
+        setError("Your account role isn't recognized by this portal.");
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
@@ -38,12 +39,14 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[--color-background] px-4">
-      <div className="w-full max-w-sm rounded-lg border border-[--color-text-secondary]/20 bg-[--color-surface] p-8">
-        <p className="font-[family-name:var(--font-data)] text-xs uppercase tracking-wide text-[--color-text-secondary]">
-          TNPArch
-        </p>
-        <h1 className="mt-1 font-[family-name:var(--font-display)] text-xl text-[--color-text-primary]">
+    <main className="flex min-h-screen items-center justify-center bg-(--color-background) px-4">
+      <div className="w-full max-w-sm rounded-lg border border-(--color-border) bg-(--color-surface) p-8">
+        <div className="flex flex-col items-center text-center">
+          <Logo variant="mark" size="lg" />
+          <p className="mt-4 font-[family-name:var(--font-display)] text-lg font-bold text-(--color-text-primary)">TNPArch</p>
+          <p className="text-xs text-(--color-text-secondary)">VNIT Nagpur</p>
+        </div>
+        <h1 className="mt-8 text-center font-[family-name:var(--font-display)] text-xl text-(--color-text-primary)">
           Department sign in
         </h1>
 

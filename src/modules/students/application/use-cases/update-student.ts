@@ -3,7 +3,7 @@ import { canEditPrivateAdminFields } from "@/modules/auth";
 import { NotAuthorizedError } from "@/lib/errors";
 import type { StudentPrivateFields, StudentRecord } from "../../domain/entities";
 import { BatchNotAssignableError, BatchNotFoundError, StudentNotFoundError } from "../../domain/errors";
-import type { BatchLookup } from "../ports/batch-lookup";
+import type { BatchLookup } from "@/lib/batch-lookup";
 import type { StudentRepository } from "../ports/student-repository";
 
 export interface UpdateStudentInput {

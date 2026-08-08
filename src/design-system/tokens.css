@@ -1,22 +1,96 @@
 /**
- * Design tokens — single source of truth for color, typography, and spacing.
- * Values match docs/design/12_Design_System.md exactly. Components must
- * consume these tokens (via Tailwind's generated utilities or var(--token)),
- * never hardcode a color/font/spacing value directly.
+ * Design tokens — single source of truth for color, radius, shadow,
+ * typography, and spacing.
+ *
+ * Version 2.0: re-themed from the Version 1.1 "drafting sheet" identity
+ * (dark background, cyan accent, flat bordered surfaces) to a light,
+ * premium SaaS identity, per the approved V2.0 brief. Wherever possible,
+ * the *token names* Version 1.1 components already consume are kept
+ * unchanged and only their *values* changed — `--color-accent`,
+ * `--color-background`, `--color-surface`, `--color-text-primary`,
+ * `--color-text-secondary`, `--color-success`, `--color-warning`, and
+ * `--color-danger` all existed before this file and are re-themed in
+ * place, so every component built against them (which is most of the
+ * app) picks up the new palette with zero component changes. Only
+ * genuinely new roles the V1.1 palette never had — `--color-secondary`,
+ * `--color-highlight`, `--color-surface-muted`, `--color-border`, the
+ * `--radius-*` scale, and the `--shadow-*` scale — are additions.
  */
 
 @theme {
-  /* Color */
-  --color-background: #15171b;
-  --color-surface: #1d2024;
-  --color-text-primary: #ECEAE4;
-  --color-text-secondary: #8b8f98;
-  --color-accent: #4fb8d4;
+  /* Color — surfaces */
+  --color-background: #f7f8fc;
+  --color-surface: #ffffff;
+  /* A second, slightly-recessed surface for nested/inset areas (the
+     sidebar's own background sits one step back from the floating white
+     cards inside it) — V1.1 had no equivalent since it only ever used one
+     surface tone against the dark background. */
+  --color-surface-muted: #eef0f8;
+  /* Hairline borders as an explicit token rather than `--color-text-
+     secondary` at partial opacity (V1.1's technique) — a premium light UI
+     needs a genuinely faint line, not a dimmed text color. */
+  --color-border: #e5e8f2;
 
-  /* Typography */
-  --font-display: "General Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  /* Color — text */
+  --color-text-primary: #1a1d29;
+  --color-text-secondary: #6b7280;
+
+  /* Color — brand roles. `--color-accent` is kept as the name every
+     existing component already reads for its one interactive color;
+     its value is now the brief's "Primary" (pastel lavender), not V1.1's
+     cyan. `--color-secondary` (soft blue) and `--color-highlight`
+     (pastel yellow — named "highlight," not "accent," since that name is
+     already taken by the token above) are new. */
+  --color-accent: #6c5ce7;
+  --color-accent-soft: #eeebfc;
+  --color-secondary: #4c7ce0;
+  --color-secondary-soft: #e7eefc;
+  --color-highlight: #f2b807;
+  --color-highlight-soft: #fdf3d6;
+
+  /* Color — semantic status. Same token names Milestone 0 (V1.1) declared
+     but consuming components never fully adopted (Badge/Button/FieldError
+     still used raw Tailwind red-400/emerald-400/amber-400 directly) — this
+     release finally migrates every consumer onto these tokens as part of
+     restyling those same components for the new palette, closing that
+     long-deferred item as a side effect rather than a separate pass. */
+  --color-success: #1fa971;
+  --color-success-soft: #e3f8ee;
+  --color-warning: #d97706;
+  --color-warning-soft: #fef3d9;
+  --color-danger: #e4485f;
+  --color-danger-soft: #fce7eb;
+
+  /* Radius — new for V2.0. `--radius-lg` (20px, the brief's explicit
+     figure) drives every `rounded-lg` utility already used for `Card`;
+     `--radius-md`/`--radius-sm` give buttons/inputs and small chips their
+     own, slightly tighter scale rather than every rounded corner in the
+     app becoming the same 20px. */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  /* Shadow — new for V2.0. V1.1 used zero shadows by design (a flat,
+     bordered, technical-drawing surface language). A premium light UI
+     needs soft elevation instead of a border to read as "raised." */
+  --shadow-sm: 0 1px 2px 0 rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 4px 12px -2px rgba(16, 24, 40, 0.06), 0 2px 4px -2px rgba(16, 24, 40, 0.04);
+  --shadow-lg: 0 12px 32px -4px rgba(16, 24, 40, 0.08), 0 4px 8px -4px rgba(16, 24, 40, 0.04);
+
+  /* Breakpoints — unchanged from V1.1; the responsive scale itself isn't
+     part of this visual reskin. */
+  --breakpoint-sm: 40rem; /* 640px */
+  --breakpoint-md: 48rem; /* 768px */
+  --breakpoint-lg: 64rem; /* 1024px */
+  --breakpoint-xl: 80rem; /* 1280px */
+
+  /* Typography — the physical font files are loaded once via `next/font/
+     google` in the root layout (see its doc comment) and exposed as
+     `--font-sora` / `--font-plex-sans` / `--font-plex-mono`; every
+     component keeps reading these stable semantic names, unchanged. */
+  --font-display: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-data: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
 
   --text-display: 1.875rem; /* ~30px */
   --text-heading: 1.375rem; /* ~22px */
@@ -24,7 +98,9 @@
   --text-caption: 0.8125rem; /* 13px */
   --text-data: 0.875rem; /* 14px */
 
-  /* Spacing (4px base scale) */
+  /* Spacing (4px base scale) — unchanged; "more whitespace" is achieved by
+     using larger existing steps more generously in components, not by
+     inventing a new scale. */
   --spacing-1: 0.25rem;
   --spacing-2: 0.5rem;
   --spacing-3: 0.75rem;
@@ -34,7 +110,7 @@
   --spacing-12: 3rem;
   --spacing-16: 4rem;
 
-  /* Motion */
+  /* Motion — unchanged. Subtle hover/transition timing, not a redesign target. */
   --duration-fast: 150ms;
   --duration-base: 200ms;
   --ease-standard: cubic-bezier(0, 0, 0.2, 1);

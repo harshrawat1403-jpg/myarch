@@ -18,6 +18,12 @@ export interface AuthContextValue {
   accessToken: string | null;
   role: Role | null;
   userId: string | null;
+  /** Only present for STUDENT actors — the StudentProfile row this session's own draft/published profile endpoints are scoped to. */
+  studentProfileId: string | null;
+  /** Only present for COORDINATOR actors — the batch IDs this session's server-side authorization checks are scoped to. Display-only here (e.g. the shell's scope sub-label); every real scope check still happens server-side. */
+  batchScope: readonly string[] | null;
+  /** True when this session must change its password before doing anything else — see with-auth.ts's `allowMustChangePassword` gate, which is the real enforcement; this is what drives the frontend's forced-redirect. */
+  mustChangePassword: boolean;
   isLoading: boolean;
   isAuthenticated: boolean;
   /**
@@ -28,17 +34,32 @@ export interface AuthContextValue {
    */
   login: (email: string, password: string) => Promise<{ role: Role | null }>;
   logout: () => Promise<void>;
+  /**
+   * Applies a freshly-issued access token without a full login round trip —
+   * used after a successful password change, whose response already
+   * includes a new token (mustChangePassword now cleared) rather than
+   * making the caller re-authenticate with the just-set password.
+   */
+  applySessionToken: (accessToken: string) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-function decodeAccessTokenClaims(token: string): { sub?: string; role?: string } {
+interface DecodedClaims {
+  sub?: string;
+  role?: string;
+  studentProfileId?: string;
+  batchScope?: readonly string[];
+  mustChangePassword?: boolean;
+}
+
+function decodeAccessTokenClaims(token: string): DecodedClaims {
   try {
     const payloadSegment = token.split(".")[1];
     if (!payloadSegment) return {};
     const base64 = payloadSegment.replace(/-/g, "+").replace(/_/g, "/");
     const json = typeof atob === "function" ? atob(base64) : Buffer.from(base64, "base64").toString("utf-8");
-    return JSON.parse(json) as { sub?: string; role?: string };
+    return JSON.parse(json) as DecodedClaims;
   } catch {
     // Display-only decoding — a malformed token here just means the UI
     // shows nothing extra; every real authorization check still happens
@@ -51,6 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [role, setRole] = useState<Role | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [studentProfileId, setStudentProfileId] = useState<string | null>(null);
+  const [batchScope, setBatchScope] = useState<readonly string[] | null>(null);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const applyToken = useCallback((token: string): Role | null => {
@@ -59,6 +83,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(token);
     setRole(decodedRole);
     setUserId(claims.sub ?? null);
+    setStudentProfileId(claims.studentProfileId ?? null);
+    setBatchScope(claims.batchScope ?? null);
+    setMustChangePassword(claims.mustChangePassword ?? false);
     return decodedRole;
   }, []);
 
@@ -66,6 +93,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(null);
     setRole(null);
     setUserId(null);
+    setStudentProfileId(null);
+    setBatchScope(null);
+    setMustChangePassword(false);
   }, []);
 
   useEffect(() => {
@@ -109,10 +139,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accessToken,
         role,
         userId,
+        studentProfileId,
+        batchScope,
+        mustChangePassword,
         isLoading,
         isAuthenticated: accessToken !== null,
         login,
         logout,
+        applySessionToken: applyToken,
       }}
     >
       {children}

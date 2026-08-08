@@ -102,12 +102,6 @@ export function canManageCoordinatorAccounts(actor: AuthenticatedActor): boolean
   return actor.role === "SECRETARY";
 }
 
-export function canManageRecruiterAccounts(actor: AuthenticatedActor, targetBatchId: string): boolean {
-  if (actor.role === "SECRETARY") return true;
-  if (actor.role === "COORDINATOR") return isScopedToBatch(actor, targetBatchId);
-  return false;
-}
-
 export function canExportBatchData(actor: AuthenticatedActor, targetBatchId: string): boolean {
   if (actor.role === "SECRETARY") return true;
   if (actor.role === "COORDINATOR") return isScopedToBatch(actor, targetBatchId);
@@ -122,4 +116,16 @@ export function canViewAuditLogs(actor: AuthenticatedActor, targetBatchId?: stri
 
 export function canChangeBatchLifecycleStatus(actor: AuthenticatedActor): boolean {
   return actor.role === "SECRETARY";
+}
+
+/**
+ * V3.0 User Directory (merged with Role Management — a read-only,
+ * cross-role search, never a role-change control). A Secretary sees every
+ * role; a Coordinator sees only Students within their batch scope (the
+ * directory's repository layer enforces that narrowing at the query level,
+ * mirroring PrismaStudentRepository.search — this function only gates
+ * whether the endpoint may be called at all).
+ */
+export function canAccessUserDirectory(actor: AuthenticatedActor): boolean {
+  return actor.role === "SECRETARY" || actor.role === "COORDINATOR";
 }

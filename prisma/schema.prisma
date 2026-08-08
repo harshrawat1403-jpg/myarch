@@ -89,6 +89,33 @@ enum JobStatus {
   CANCELLED
 }
 
+// V3.0 Administration Platform. A Secretary-created recruiter is
+// pre-approved (creating one directly *is* the approval) — PENDING exists
+// for a future public recruiter-signup path, not built yet, so this status
+// is ready without a fabricated signup flow ahead of it.
+enum RecruiterApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BulkRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
+}
+
+enum AcademicYearTransitionStatus {
+  DRAFT
+  PENDING_CONFIRMATION
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
 // ---------------------------------------------------------------------------
 // Identity
 // ---------------------------------------------------------------------------
@@ -102,20 +129,38 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  secretaryProfile  SecretaryProfile?
+  // V3.0 Administration Platform: set true whenever an admin issues a
+  // temporary password (account creation or reset) — see
+  // src/modules/auth/application/use-cases/admin-reset-password.ts. Cleared
+  // only by ChangeOwnPasswordUseCase, never by an admin action, so a forced
+  // change can't be silently bypassed by someone other than the account
+  // holder proving they know the temp password.
+  mustChangePassword Boolean   @default(false)
+  lastLoginAt        DateTime?
+
+  // V3.0 Account Settings: an optional profile photo, stored via the same
+  // FileAsset metadata table every other upload uses (classification
+  // PUBLIC — nothing sensitive about an account's own avatar). Nullable:
+  // most accounts never set one.
+  avatarFileId String?    @unique @db.Uuid
+  avatar       FileAsset? @relation("UserAvatar", fields: [avatarFileId], references: [id])
+
+  secretaryProfile   SecretaryProfile?
   coordinatorProfile CoordinatorProfile?
-  studentProfile    StudentProfile?
-  recruiterProfile  RecruiterProfile?
+  studentProfile     StudentProfile?
+  recruiterProfile   RecruiterProfile?
 
   refreshTokens RefreshToken[]
 
   // Reverse relations for audit/traceability — who last touched a record.
-  updatedPrivateProfiles StudentPrivateProfile[] @relation("PrivateProfileUpdatedBy")
-  reviewedDrafts         StudentPublicProfileDraft[] @relation("DraftReviewedBy")
-  publishedProfiles      StudentPublicProfile[] @relation("ProfilePublishedBy")
-  uploadedFiles          FileAsset[] @relation("FileOwner")
-  auditLogEntries        AuditLog[] @relation("AuditActor")
-  notifications          Notification[] @relation("NotificationRecipient")
+  updatedPrivateProfiles     StudentPrivateProfile[]     @relation("PrivateProfileUpdatedBy")
+  reviewedDrafts             StudentPublicProfileDraft[] @relation("DraftReviewedBy")
+  publishedProfiles          StudentPublicProfile[]      @relation("ProfilePublishedBy")
+  uploadedFiles              FileAsset[]                 @relation("FileOwner")
+  auditLogEntries            AuditLog[]                  @relation("AuditActor")
+  notifications              Notification[]              @relation("NotificationRecipient")
+  bulkImportRuns             BulkImportRun[]             @relation("BulkImportRunActor")
+  academicYearTransitionRuns AcademicYearTransitionRun[] @relation("AcademicYearTransitionRunActor")
 
   @@map("users")
 }
@@ -124,15 +169,15 @@ model User {
 // revoked/rotated per docs/security/14_Security_Architecture.md. The raw
 // token is never persisted — only a hash of it.
 model RefreshToken {
-  id          String    @id @default(uuid()) @db.Uuid
-  userId      String    @db.Uuid
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash   String    @unique
-  familyId    String    @db.Uuid
-  createdAt   DateTime  @default(now())
-  expiresAt   DateTime
-  revokedAt   DateTime?
-  replacedById String?  @db.Uuid
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique
+  familyId     String    @db.Uuid
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?   @db.Uuid
 
   @@index([userId])
   @@index([familyId])
@@ -155,6 +200,11 @@ model CoordinatorProfile {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   fullName String
+  // V3.0: mirrors StudentProfile.isActive exactly — flipped alongside
+  // User.isActive in one $transaction (see PrismaStudentRepository.setActive
+  // for the template). "Disable" and "Delete (soft delete)" are the same
+  // toggle, not two independent states.
+  isActive Boolean @default(true)
 
   batchScopes CoordinatorBatchScope[]
 
@@ -188,6 +238,15 @@ model RecruiterProfile {
   // Phase 1 since only directory browsing is in scope, not drive-scoped
   // self-service.
 
+  // V3.0: mirrors StudentProfile.isActive (see CoordinatorProfile.isActive
+  // doc comment — identical reasoning).
+  isActive       Boolean                 @default(true)
+  // Secretary-created recruiters default to APPROVED (creating one directly
+  // *is* the approval). PENDING/approve/reject are real, tested actions,
+  // ready for a future public recruiter-signup path that does not exist yet
+  // — see the RecruiterApprovalStatus enum doc comment.
+  approvalStatus RecruiterApprovalStatus @default(APPROVED)
+
   @@map("recruiter_profiles")
 }
 
@@ -203,19 +262,20 @@ model Batch {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
-  students        StudentProfile[]
+  students          StudentProfile[]
   coordinatorScopes CoordinatorBatchScope[]
+  bulkImportRuns    BulkImportRun[]
 
   @@map("batches")
 }
 
 model StudentProfile {
-  id         String  @id @default(uuid()) @db.Uuid
-  userId     String  @unique @db.Uuid
-  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  batchId    String  @db.Uuid
-  batch      Batch   @relation(fields: [batchId], references: [id])
-  rollNumber String  @unique
+  id         String @id @default(uuid()) @db.Uuid
+  userId     String @unique @db.Uuid
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  batchId    String @db.Uuid
+  batch      Batch  @relation(fields: [batchId], references: [id])
+  rollNumber String @unique
   // Duplicated intentionally for non-sensitive identification without
   // joining into StudentPrivateProfile — see docs/database/08_Database_Design.md
   // Assumptions.
@@ -237,20 +297,20 @@ model StudentProfile {
 // scoped to the student's batch. Never reachable from any Recruiter-facing
 // query path — see docs/security/14_Security_Architecture.md.
 model StudentPrivateProfile {
-  id               String   @id @default(uuid()) @db.Uuid
-  studentProfileId String   @unique @db.Uuid
+  id               String         @id @default(uuid()) @db.Uuid
+  studentProfileId String         @unique @db.Uuid
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
 
-  phone               String?
-  personalEmail       String?
-  cgpa                Decimal? @db.Decimal(4, 2)
-  hasActiveBacklog    Boolean  @default(false)
-  backlogDetails      String?
-  internalRemarks     String?
+  phone            String?
+  personalEmail    String?
+  cgpa             Decimal? @db.Decimal(4, 2)
+  hasActiveBacklog Boolean  @default(false)
+  backlogDetails   String?
+  internalRemarks  String?
 
-  updatedAt      DateTime @updatedAt
-  updatedByUserId String? @db.Uuid
-  updatedBy      User?    @relation("PrivateProfileUpdatedBy", fields: [updatedByUserId], references: [id])
+  updatedAt       DateTime @updatedAt
+  updatedByUserId String?  @db.Uuid
+  updatedBy       User?    @relation("PrivateProfileUpdatedBy", fields: [updatedByUserId], references: [id])
 
   confidentialDocuments FileAsset[] @relation("ConfidentialDocumentsOf")
 
@@ -259,25 +319,25 @@ model StudentPrivateProfile {
 
 // The only table any Recruiter-facing query is permitted to read from.
 model StudentPublicProfile {
-  id               String   @id @default(uuid()) @db.Uuid
-  studentProfileId String   @unique @db.Uuid
+  id               String         @id @default(uuid()) @db.Uuid
+  studentProfileId String         @unique @db.Uuid
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
 
   bio              String?
-  skills           String[] @default([])
-  software         String[] @default([])
-  selectedProjects Json     @default("[]")
-  portfolioLinks   String[] @default([])
-  resumeFileId     String?  @db.Uuid
+  skills           String[]   @default([])
+  software         String[]   @default([])
+  selectedProjects Json       @default("[]")
+  portfolioLinks   String[]   @default([])
+  resumeFileId     String?    @db.Uuid
   resumeFile       FileAsset? @relation("PublicResumeOf", fields: [resumeFileId], references: [id])
-  certifications   Json     @default("[]")
-  internships      Json     @default("[]")
+  certifications   Json       @default("[]")
+  internships      Json       @default("[]")
 
-  publishedFromDraftId String?  @unique @db.Uuid
+  publishedFromDraftId String?                    @unique @db.Uuid
   publishedFromDraft   StudentPublicProfileDraft? @relation("PublishedFrom", fields: [publishedFromDraftId], references: [id])
-  publishedAt          DateTime @default(now())
-  publishedByUserId    String   @db.Uuid
-  publishedBy          User     @relation("ProfilePublishedBy", fields: [publishedByUserId], references: [id])
+  publishedAt          DateTime                   @default(now())
+  publishedByUserId    String                     @db.Uuid
+  publishedBy          User                       @relation("ProfilePublishedBy", fields: [publishedByUserId], references: [id])
 
   @@map("student_public_profiles")
 }
@@ -285,26 +345,26 @@ model StudentPublicProfile {
 // Where a student's in-progress edits live. Never read by any Recruiter-facing
 // code path — see docs/architecture/05_System_Architecture.md's Core Data Flow.
 model StudentPublicProfileDraft {
-  id               String   @id @default(uuid()) @db.Uuid
-  studentProfileId String   @unique @db.Uuid
+  id               String         @id @default(uuid()) @db.Uuid
+  studentProfileId String         @unique @db.Uuid
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
 
   bio              String?
-  skills           String[] @default([])
-  software         String[] @default([])
-  selectedProjects Json     @default("[]")
-  portfolioLinks   String[] @default([])
-  resumeFileId     String?  @db.Uuid
+  skills           String[]   @default([])
+  software         String[]   @default([])
+  selectedProjects Json       @default("[]")
+  portfolioLinks   String[]   @default([])
+  resumeFileId     String?    @db.Uuid
   resumeFile       FileAsset? @relation("DraftResumeOf", fields: [resumeFileId], references: [id])
-  certifications   Json     @default("[]")
-  internships      Json     @default("[]")
+  certifications   Json       @default("[]")
+  internships      Json       @default("[]")
 
-  status            ProfileDraftStatus @default(DRAFT)
-  submittedAt       DateTime?
-  reviewedByUserId  String?  @db.Uuid
-  reviewedBy        User?    @relation("DraftReviewedBy", fields: [reviewedByUserId], references: [id])
-  reviewedAt        DateTime?
-  rejectionReason   String?
+  status           ProfileDraftStatus @default(DRAFT)
+  submittedAt      DateTime?
+  reviewedByUserId String?            @db.Uuid
+  reviewedBy       User?              @relation("DraftReviewedBy", fields: [reviewedByUserId], references: [id])
+  reviewedAt       DateTime?
+  rejectionReason  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -328,11 +388,12 @@ model FileAsset {
   classification FileClassification
   createdAt      DateTime           @default(now())
 
-  confidentialOfPrivateProfileId String? @db.Uuid
+  confidentialOfPrivateProfileId String?                @db.Uuid
   confidentialOfPrivateProfile   StudentPrivateProfile? @relation("ConfidentialDocumentsOf", fields: [confidentialOfPrivateProfileId], references: [id])
 
   usedAsPublicResume StudentPublicProfile[]      @relation("PublicResumeOf")
   usedAsDraftResume  StudentPublicProfileDraft[] @relation("DraftResumeOf")
+  usedAsAvatarOf     User?                       @relation("UserAvatar")
 
   @@index([ownerUserId])
   @@map("file_assets")
@@ -360,15 +421,15 @@ model AuditLog {
 }
 
 model Notification {
-  id             String              @id @default(uuid()) @db.Uuid
-  recipientUserId String             @db.Uuid
-  recipient      User                @relation("NotificationRecipient", fields: [recipientUserId], references: [id])
-  channel        NotificationChannel @default(EMAIL)
-  template       String
-  status         NotificationStatus  @default(PENDING)
-  payload        Json                @default("{}")
-  createdAt      DateTime            @default(now())
-  sentAt         DateTime?
+  id              String              @id @default(uuid()) @db.Uuid
+  recipientUserId String              @db.Uuid
+  recipient       User                @relation("NotificationRecipient", fields: [recipientUserId], references: [id])
+  channel         NotificationChannel @default(EMAIL)
+  template        String
+  status          NotificationStatus  @default(PENDING)
+  payload         Json                @default("{}")
+  createdAt       DateTime            @default(now())
+  sentAt          DateTime?
 
   @@index([recipientUserId])
   @@map("notifications")
@@ -379,18 +440,18 @@ model Notification {
 // enum — new job types are added by other modules registering a handler,
 // never by changing this schema (see src/modules/jobs).
 model Job {
-  id        String    @id @default(uuid()) @db.Uuid
-  type      String
-  payload   Json      @default("{}")
-  status    JobStatus @default(PENDING)
+  id      String    @id @default(uuid()) @db.Uuid
+  type    String
+  payload Json      @default("{}")
+  status  JobStatus @default(PENDING)
 
-  attempts      Int       @default(0)
-  maxAttempts   Int       @default(5)
-  runAt         DateTime  @default(now())
-  lastAttemptAt DateTime?
-  nextRetryAt   DateTime?
-  completedAt   DateTime?
-  errorMessage  String?
+  attempts        Int       @default(0)
+  maxAttempts     Int       @default(5)
+  runAt           DateTime  @default(now())
+  lastAttemptAt   DateTime?
+  nextRetryAt     DateTime?
+  completedAt     DateTime?
+  errorMessage    String?
   // Milliseconds. Recorded for both successful and failed attempts.
   executionTimeMs Int?
   // Worker id that currently holds this job (set atomically by the claim
@@ -398,11 +459,70 @@ model Job {
   // Not a distributed lock by itself — the atomic claim (status transition
   // + FOR UPDATE SKIP LOCKED) is what prevents double-claiming; this field
   // exists for observability (which worker is/was handling this job).
-  lockedBy String?
+  lockedBy        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([status, runAt])
   @@map("jobs")
+}
+
+// ---------------------------------------------------------------------------
+// V3.0 Administration Platform: bulk student import & academic year rollover
+// ---------------------------------------------------------------------------
+
+// One row per bulk-CSV-import request, executed asynchronously by
+// BulkImportJobHandler (src/modules/students) via the Job queue above.
+// Progress/errors are tracked here rather than per-row rows in a new table —
+// errorReport holds a small JSON array, matching how Job.payload already
+// carries structured JSON for arbitrarily large collections elsewhere in
+// this schema.
+model BulkImportRun {
+  id            String        @id @default(uuid()) @db.Uuid
+  actorUserId   String        @db.Uuid
+  actor         User          @relation("BulkImportRunActor", fields: [actorUserId], references: [id])
+  batchId       String        @db.Uuid
+  batch         Batch         @relation(fields: [batchId], references: [id])
+  status        BulkRunStatus @default(PENDING)
+  totalRows     Int           @default(0)
+  processedRows Int           @default(0)
+  successCount  Int           @default(0)
+  failureCount  Int           @default(0)
+  // { row: number, rollNumber?: string, email?: string, error: string }[] —
+  // never contains generated passwords (see admin-reset-password.ts's doc
+  // comment on why secrets never land in a JSON column).
+  errorReport   Json          @default("[]")
+  createdAt     DateTime      @default(now())
+  startedAt     DateTime?
+  completedAt   DateTime?
+
+  @@index([actorUserId])
+  @@index([batchId])
+  @@map("bulk_import_runs")
+}
+
+// One row per Academic Year Transition Wizard run. planJson freezes exactly
+// what the Secretary reviewed and confirmed — the job handler executes that
+// frozen plan, never a re-computed one, so nothing changes between review
+// and execution. stepLog is appended to after each step so the wizard's
+// execution-progress screen can poll live status; a failed step does not
+// roll back prior steps (no cross-aggregate rollback precedent exists
+// anywhere else in this schema either — see PrismaStudentRepository.setActive's
+// 2-write $transaction, the largest atomic unit that exists today).
+model AcademicYearTransitionRun {
+  id           String                       @id @default(uuid()) @db.Uuid
+  actorUserId  String                       @db.Uuid
+  actor        User                         @relation("AcademicYearTransitionRunActor", fields: [actorUserId], references: [id])
+  status       AcademicYearTransitionStatus @default(DRAFT)
+  planJson     Json
+  stepLog      Json                         @default("[]")
+  currentStep  String?
+  createdAt    DateTime                     @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+  errorMessage String?
+
+  @@index([actorUserId])
+  @@map("academic_year_transition_runs")
 }

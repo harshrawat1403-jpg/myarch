@@ -96,4 +96,12 @@ describe("Recruiter student profile page — approved public information only", 
     expect(await screen.findByText("Profile not found")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /back to directory/i })).toBeInTheDocument();
   });
+
+  it("shows a persistent back-to-directory link once the profile has loaded", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(PROFILE));
+    render(<RecruiterStudentProfilePage />);
+    await screen.findByRole("heading", { name: "Alice Architect" });
+
+    expect(screen.getByRole("link", { name: /back to directory/i })).toHaveAttribute("href", "/recruiter");
+  });
 });

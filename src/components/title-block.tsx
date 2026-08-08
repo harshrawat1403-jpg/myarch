@@ -23,20 +23,30 @@ function formatDate(date: Date | string): string {
  * panel appearing identically across dashboard cards, profile headers,
  * batch cards, and statistics panels — same frame, different content per
  * context. Field labels are fixed; only the values change.
+ *
+ * Version 2.0 Foundation: only the border token and colors were re-themed
+ * for the light palette here. Left deliberately undecided: whether this
+ * 4-field metadata-stamp concept itself (still monospace, still fairly
+ * dense) fits the brief's "reduce visible text," "icon-first," "premium
+ * SaaS" goals, or should be simplified/retired on the specific pages that
+ * use it (Dashboard batch cards, Recruiter directory, Student Portal).
+ * That's a page-content decision for when each of those pages is reached,
+ * not a primitive-level one — flagged here rather than decided unilaterally
+ * in the Foundation pass.
  */
 export function TitleBlock({ project, scale, date, drawnBy, status }: TitleBlockProps) {
   return (
-    <div className="border-t border-[--color-text-secondary]/20 pt-3">
+    <div className="border-t border-(--color-border) pt-3">
       <div className="mb-1 flex items-start justify-between gap-2">
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-[family-name:var(--font-data)] text-xs">
-          <dt className="text-[--color-text-secondary]">PROJECT</dt>
-          <dd className="text-[--color-text-primary]">{project}</dd>
-          <dt className="text-[--color-text-secondary]">SCALE</dt>
-          <dd className="text-[--color-text-primary]">{scale}</dd>
-          <dt className="text-[--color-text-secondary]">DATE</dt>
-          <dd className="text-[--color-text-primary]">{formatDate(date)}</dd>
-          <dt className="text-[--color-text-secondary]">DRAWN BY</dt>
-          <dd className="text-[--color-text-primary]">{drawnBy}</dd>
+          <dt className="text-(--color-text-secondary)">PROJECT</dt>
+          <dd className="text-(--color-text-primary)">{project}</dd>
+          <dt className="text-(--color-text-secondary)">SCALE</dt>
+          <dd className="text-(--color-text-primary)">{scale}</dd>
+          <dt className="text-(--color-text-secondary)">DATE</dt>
+          <dd className="text-(--color-text-primary)">{formatDate(date)}</dd>
+          <dt className="text-(--color-text-secondary)">DRAWN BY</dt>
+          <dd className="text-(--color-text-primary)">{drawnBy}</dd>
         </dl>
         {status ? <div className="shrink-0">{status}</div> : null}
       </div>

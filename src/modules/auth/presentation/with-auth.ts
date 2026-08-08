@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import type { AuthenticatedActor, Role } from "../domain/entities";
 import type { TokenService } from "../application/ports/token-service";
-import { forbidden, unauthorized } from "@/lib/http-errors";
+import { forbidden, passwordChangeRequired, unauthorized } from "@/lib/http-errors";
 
 /**
  * The required request flow for every protected route
@@ -34,6 +34,16 @@ export interface AuthOptions {
     req: NextRequest,
     routeContext: unknown,
   ) => string | undefined | Promise<string | undefined>;
+  /**
+   * V3.0 Administration Platform. A session with `mustChangePassword: true`
+   * (temp password from account creation or an admin reset) is rejected
+   * with MUST_CHANGE_PASSWORD on every route except the handful that opt in
+   * by setting this true — the change-password endpoint itself, logout, and
+   * /me (so the frontend can read the flag back). Claims-only check, no DB
+   * round trip, the same category of check as the role/batch-scope steps
+   * below it.
+   */
+  allowMustChangePassword?: boolean;
 }
 
 export type AuthenticatedHandler = (
@@ -81,7 +91,15 @@ export function createAuthMiddleware(tokenService: Pick<TokenService, "verifyAcc
         role: claims.role,
         batchScope: claims.batchScope,
         studentProfileId: claims.studentProfileId,
+        mustChangePassword: claims.mustChangePassword,
       };
+
+      // 2.5. Forced password-change gate — before role/scope checks, since a
+      // temp-password session should be blocked from every business route
+      // regardless of what role it holds.
+      if (actor.mustChangePassword && !options.allowMustChangePassword) {
+        return passwordChangeRequired("You must change your password before continuing");
+      }
 
       // 3. Role Validation.
       if (options.roles && !options.roles.includes(actor.role)) {

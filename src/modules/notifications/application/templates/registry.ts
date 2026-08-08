@@ -2,6 +2,7 @@ import type { NotificationTemplateId } from "../../domain/entities";
 import type { EmailTemplateDefinition } from "./types";
 import { profileApprovedTemplate } from "./definitions/profile-approved";
 import { profileChangesRequestedTemplate } from "./definitions/profile-changes-requested";
+import { accountCredentialsIssuedTemplate } from "./definitions/account-credentials-issued";
 
 /**
  * Every known template, keyed by the id business use cases pass to
@@ -11,4 +12,5 @@ import { profileChangesRequestedTemplate } from "./definitions/profile-changes-r
 export const EMAIL_TEMPLATE_REGISTRY: Record<NotificationTemplateId, EmailTemplateDefinition> = {
   PROFILE_APPROVED: profileApprovedTemplate,
   PROFILE_CHANGES_REQUESTED: profileChangesRequestedTemplate,
+  ACCOUNT_CREDENTIALS_ISSUED: accountCredentialsIssuedTemplate,
 };

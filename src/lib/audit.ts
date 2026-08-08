@@ -90,4 +90,31 @@ export class PrismaAuditRecorder implements AuditRecorder {
       occurredAt: row.occurredAt,
     }));
   }
+
+  /**
+   * V3.0 Administration Platform: "recent activity" for a single account
+   * (Coordinator/Recruiter management's activity panels) — entries where
+   * this user is either the actor (things they did, e.g. LOGIN_SUCCESS) or
+   * the target (things done to their account, e.g. PASSWORD_RESET).
+   * Separate from listRecent (Day 7's role-scoped feed) rather than
+   * overloading its filter shape, since the two have different callers and
+   * different scoping rules.
+   */
+  async listForAccount(userId: string, limit: number): Promise<AuditLogEntry[]> {
+    const rows = await this.prisma.auditLog.findMany({
+      where: { OR: [{ actorUserId: userId }, { targetEntityId: userId }] },
+      orderBy: { occurredAt: "desc" },
+      take: limit,
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      actorUserId: row.actorUserId,
+      action: row.action,
+      targetEntityType: row.targetEntityType,
+      targetEntityId: row.targetEntityId,
+      metadata: row.metadata as Record<string, unknown>,
+      occurredAt: row.occurredAt,
+    }));
+  }
 }

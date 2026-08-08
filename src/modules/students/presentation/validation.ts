@@ -64,6 +64,11 @@ const ALLOWED_CONFIDENTIAL_DOCUMENT_MIME_TYPES = [
   "image/png",
 ] as const;
 
+export const BulkSetStudentsActiveRequestSchema = z.object({
+  studentIds: z.array(z.string().uuid()).min(1),
+  isActive: z.boolean(),
+});
+
 export const AttachConfidentialDocumentRequestSchema = z.object({
   storageKey: z.string().trim().min(1).max(1024),
   mimeType: z.enum(ALLOWED_CONFIDENTIAL_DOCUMENT_MIME_TYPES),

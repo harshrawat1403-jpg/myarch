@@ -4,6 +4,7 @@ import {
   RefreshTokenExpiredError,
   RefreshTokenReusedError,
 } from "../../domain/errors";
+import { issueSessionTokens } from "../issue-session";
 import type { AuditRecorder } from "../ports/audit-recorder";
 import type { Clock } from "../ports/clock";
 import type { RefreshTokenRepository } from "../ports/refresh-token-repository";
@@ -67,33 +68,22 @@ export class RefreshAccessTokenUseCase {
     }
 
     const scope = await this.deps.userRepository.loadActorScope(user);
-    const actor: AuthenticatedActor = { userId: user.id, role: user.role, ...scope };
+    const actor: AuthenticatedActor = {
+      userId: user.id,
+      role: user.role,
+      ...scope,
+      ...(user.mustChangePassword ? { mustChangePassword: true } : {}),
+    };
 
-    const newRawRefreshToken = this.deps.tokenService.generateRefreshToken();
-    const newTokenHash = this.deps.tokenService.hashRefreshToken(newRawRefreshToken);
-    const newExpiresAt = new Date(now.getTime() + this.deps.refreshTokenTtlMs);
-
-    const newStored = await this.deps.refreshTokenRepository.create({
-      userId: actor.userId,
-      tokenHash: newTokenHash,
-      familyId: stored.familyId,
-      expiresAt: newExpiresAt,
-    });
-
-    // Rotate: the presented token is retired and linked to its replacement.
-    await this.deps.refreshTokenRepository.revoke(stored.id, newStored.id);
-
-    const accessToken = this.deps.tokenService.signAccessToken({
-      sub: actor.userId,
-      role: actor.role,
-      batchScope: actor.batchScope,
-      studentProfileId: actor.studentProfileId,
-    });
+    // Rotate: same family as the presented token, which is retired and
+    // linked to its replacement once the new one exists.
+    const tokens = await issueSessionTokens(this.deps, actor, stored.familyId);
+    await this.deps.refreshTokenRepository.revoke(stored.id, tokens.refreshTokenRecordId);
 
     return {
-      accessToken,
-      refreshToken: newRawRefreshToken,
-      refreshTokenExpiresAt: newExpiresAt,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
       actor,
     };
   }

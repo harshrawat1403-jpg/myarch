@@ -8,7 +8,7 @@ import {
   DuplicateEmailError,
   DuplicateRollNumberError,
 } from "../../domain/errors";
-import type { BatchLookup } from "../ports/batch-lookup";
+import type { BatchLookup } from "@/lib/batch-lookup";
 import type { StudentRepository } from "../ports/student-repository";
 import type { UserProvisioner } from "../ports/user-provisioner";
 

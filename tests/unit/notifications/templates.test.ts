@@ -50,6 +50,35 @@ describe("renderEmailTemplate — PROFILE_CHANGES_REQUESTED", () => {
   });
 });
 
+describe("renderEmailTemplate — ACCOUNT_CREDENTIALS_ISSUED", () => {
+  it("renders a distinct subject for account creation vs. password reset", () => {
+    const created = renderEmailTemplate(
+      "ACCOUNT_CREDENTIALS_ISSUED",
+      { recipientName: "Arjun Mehta", reason: "account_created" },
+      "arjun@tnparch.in",
+    );
+    const reset = renderEmailTemplate(
+      "ACCOUNT_CREDENTIALS_ISSUED",
+      { recipientName: "Arjun Mehta", reason: "password_reset" },
+      "arjun@tnparch.in",
+    );
+
+    expect(created.subject).toBe("Your TNPArch account is ready");
+    expect(reset.subject).toBe("Your TNPArch password was reset");
+  });
+
+  it("never includes a password field in the rendered content", () => {
+    const message = renderEmailTemplate(
+      "ACCOUNT_CREDENTIALS_ISSUED",
+      { recipientName: "Arjun Mehta", reason: "account_created", password: "should-never-appear" },
+      "arjun@tnparch.in",
+    );
+
+    expect(message.text).not.toContain("should-never-appear");
+    expect(message.html).not.toContain("should-never-appear");
+  });
+});
+
 describe("shared email layout — branding and footer applied uniformly", () => {
   it("every template's html includes the TNPArch brand name and the automated-message footer", () => {
     const approved = renderEmailTemplate("PROFILE_APPROVED", { studentName: "Alice" }, "a@vnit.ac.in");
@@ -58,8 +87,13 @@ describe("shared email layout — branding and footer applied uniformly", () => 
       { studentName: "Alice", reviewComment: "fix" },
       "a@vnit.ac.in",
     );
+    const credentialsIssued = renderEmailTemplate(
+      "ACCOUNT_CREDENTIALS_ISSUED",
+      { recipientName: "Alice", reason: "account_created" },
+      "a@vnit.ac.in",
+    );
 
-    for (const message of [approved, changesRequested]) {
+    for (const message of [approved, changesRequested, credentialsIssued]) {
       expect(message.html).toContain("TNPArch");
       expect(message.html).toContain("automated message");
       expect(message.text).toContain("TNPArch");

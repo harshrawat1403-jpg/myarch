@@ -14,6 +14,15 @@ export function forbidden(message: string): NextResponse {
   return NextResponse.json({ error: { code: "FORBIDDEN", message } }, { status: 403 });
 }
 
+/**
+ * A distinct code from plain FORBIDDEN so the frontend can redirect to the
+ * forced change-password flow instead of showing a generic permission-denied
+ * error (see with-auth.ts's `allowMustChangePassword` gate).
+ */
+export function passwordChangeRequired(message: string): NextResponse {
+  return NextResponse.json({ error: { code: "MUST_CHANGE_PASSWORD", message } }, { status: 403 });
+}
+
 export function badRequest(message: string, details?: unknown): NextResponse {
   return NextResponse.json(
     { error: { code: "VALIDATION_ERROR", message, details } },

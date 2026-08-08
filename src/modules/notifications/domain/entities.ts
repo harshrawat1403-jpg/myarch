@@ -4,7 +4,10 @@
  * it never requires changing a calling use case's code, only the string it
  * passes here.
  */
-export type NotificationTemplateId = "PROFILE_APPROVED" | "PROFILE_CHANGES_REQUESTED";
+export type NotificationTemplateId =
+  | "PROFILE_APPROVED"
+  | "PROFILE_CHANGES_REQUESTED"
+  | "ACCOUNT_CREDENTIALS_ISSUED";
 
 /**
  * The one thing a business use case knows about a notification: who should

@@ -24,11 +24,14 @@
  */
 import { createJobWorker } from "@/modules/jobs";
 import { registerJobHandlers as registerNotificationJobHandlers } from "@/modules/notifications";
+import { registerBulkImportJobHandlers } from "@/modules/students";
+import { registerAcademicYearJobHandlers } from "@/modules/academic-year";
 
 function registerAllJobHandlers(): void {
   registerNotificationJobHandlers();
+  registerBulkImportJobHandlers();
+  registerAcademicYearJobHandlers();
   // Future modules with background jobs register here too, e.g.:
-  // registerExportJobHandlers();
   // registerCleanupJobHandlers();
 }
 

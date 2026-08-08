@@ -63,7 +63,7 @@ describe("LoginPage — UI integration", () => {
     expect(pushMock).not.toHaveBeenCalledWith("/dashboard");
   });
 
-  it("does not redirect a Student anywhere (self-service portal not yet built)", async () => {
+  it("redirects a Student to their own self-service profile page", async () => {
     loginMock.mockResolvedValueOnce({ role: "STUDENT" });
     const user = userEvent.setup();
     render(<LoginPage />);
@@ -72,8 +72,7 @@ describe("LoginPage — UI integration", () => {
     await user.type(screen.getByLabelText(/password/i), "correct-password");
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
-    await screen.findByText(/not yet available/i);
-    expect(pushMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/student"));
   });
 
   it("shows the server's error message and does not redirect on failed login", async () => {

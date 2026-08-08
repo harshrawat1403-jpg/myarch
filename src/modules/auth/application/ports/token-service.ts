@@ -7,6 +7,7 @@ export interface AccessTokenClaims {
   readonly role: Role;
   readonly batchScope?: readonly string[];
   readonly studentProfileId?: string;
+  readonly mustChangePassword?: boolean;
 }
 
 export interface TokenService {

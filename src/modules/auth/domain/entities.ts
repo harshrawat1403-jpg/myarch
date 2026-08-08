@@ -20,4 +20,12 @@ export interface AuthenticatedActor {
   readonly batchScope?: readonly string[];
   /** Populated only for STUDENT; used for "own data" checks. */
   readonly studentProfileId?: string;
+  /**
+   * True when this session must change its password before doing anything
+   * else (temp password issued at account creation or an admin reset — see
+   * admin-reset-password.ts). Present for every role, not role-conditional
+   * like batchScope/studentProfileId. Enforced by with-auth.ts's
+   * `allowMustChangePassword` gate.
+   */
+  readonly mustChangePassword?: boolean;
 }

@@ -47,6 +47,14 @@ export class InMemoryRefreshTokenRepository implements RefreshTokenRepository {
     }
   }
 
+  async revokeAllForUser(userId: string): Promise<void> {
+    for (const [id, row] of this.byId.entries()) {
+      if (row.userId === userId && !row.revokedAt) {
+        this.byId.set(id, { ...row, revokedAt: new Date() });
+      }
+    }
+  }
+
   /** Test-only accessor for asserting on stored state directly. */
   all(): readonly StoredRefreshToken[] {
     return [...this.byId.values()];

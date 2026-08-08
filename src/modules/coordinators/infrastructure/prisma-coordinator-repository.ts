@@ -1,0 +1,107 @@
+import type { Prisma, PrismaClient } from "@prisma/client";
+import type { CoordinatorRecord, CoordinatorSearchFilters } from "../domain/entities";
+import type {
+  CoordinatorRepository,
+  CreateCoordinatorData,
+  UpdateCoordinatorData,
+} from "../application/ports/coordinator-repository";
+
+type CoordinatorProfileWithUser = Prisma.CoordinatorProfileGetPayload<{
+  include: { user: true; batchScopes: true };
+}>;
+
+export class PrismaCoordinatorRepository implements CoordinatorRepository {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async create(data: CreateCoordinatorData): Promise<CoordinatorRecord> {
+    const row = await this.prisma.coordinatorProfile.create({
+      data: { userId: data.userId, fullName: data.fullName },
+      include: { user: true, batchScopes: true },
+    });
+    return toDomain(row);
+  }
+
+  async findById(id: string): Promise<CoordinatorRecord | null> {
+    const row = await this.prisma.coordinatorProfile.findUnique({
+      where: { id },
+      include: { user: true, batchScopes: true },
+    });
+    return row ? toDomain(row) : null;
+  }
+
+  async findByUserId(userId: string): Promise<CoordinatorRecord | null> {
+    const row = await this.prisma.coordinatorProfile.findUnique({
+      where: { userId },
+      include: { user: true, batchScopes: true },
+    });
+    return row ? toDomain(row) : null;
+  }
+
+  async update(id: string, data: UpdateCoordinatorData): Promise<CoordinatorRecord> {
+    const row = await this.prisma.coordinatorProfile.update({
+      where: { id },
+      data: { fullName: data.fullName },
+      include: { user: true, batchScopes: true },
+    });
+    return toDomain(row);
+  }
+
+  async setActive(id: string, isActive: boolean): Promise<CoordinatorRecord> {
+    // Mirrors PrismaStudentRepository.setActive: the roster record and the
+    // login flip together in one transaction.
+    const [row] = await this.prisma.$transaction([
+      this.prisma.coordinatorProfile.update({
+        where: { id },
+        data: { isActive },
+        include: { user: true, batchScopes: true },
+      }),
+      this.prisma.user.updateMany({
+        where: { coordinatorProfile: { id } },
+        data: { isActive },
+      }),
+    ]);
+    return toDomain(row);
+  }
+
+  async search(filters: CoordinatorSearchFilters): Promise<CoordinatorRecord[]> {
+    const where: Prisma.CoordinatorProfileWhereInput = {
+      isActive: filters.includeInactive ? undefined : true,
+      fullName: filters.name ? { contains: filters.name, mode: "insensitive" } : undefined,
+      user: filters.email ? { email: { contains: filters.email, mode: "insensitive" } } : undefined,
+    };
+
+    const rows = await this.prisma.coordinatorProfile.findMany({
+      where,
+      include: { user: true, batchScopes: true },
+      orderBy: { fullName: "asc" },
+    });
+
+    return rows.map(toDomain);
+  }
+
+  async assignBatch(id: string, batchId: string): Promise<CoordinatorRecord> {
+    await this.prisma.coordinatorBatchScope.create({
+      data: { coordinatorProfileId: id, batchId },
+    });
+    return (await this.findById(id))!;
+  }
+
+  async removeBatch(id: string, batchId: string): Promise<CoordinatorRecord> {
+    await this.prisma.coordinatorBatchScope.deleteMany({
+      where: { coordinatorProfileId: id, batchId },
+    });
+    return (await this.findById(id))!;
+  }
+}
+
+function toDomain(row: CoordinatorProfileWithUser): CoordinatorRecord {
+  return {
+    id: row.id,
+    userId: row.userId,
+    email: row.user.email,
+    fullName: row.fullName,
+    isActive: row.isActive,
+    batchIds: row.batchScopes.map((scope) => scope.batchId),
+    createdAt: row.user.createdAt,
+  };
+}

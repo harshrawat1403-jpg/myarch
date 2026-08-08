@@ -32,4 +32,15 @@ export interface RefreshTokenRepository {
 
   /** Revokes every currently-unrevoked token in a family (logout, or reuse detection). */
   revokeFamily(familyId: string): Promise<void>;
+
+  /**
+   * Revokes every currently-unrevoked token across every family for a user
+   * (account disable, admin password reset, self-service password change) —
+   * broader than revokeFamily, since a user can have multiple active
+   * families at once (multiple devices/browsers, each login mints a new
+   * family). Does not shorten the lifetime of an already-issued access
+   * token (see with-auth.ts's doc comment on the accepted, bounded
+   * residual-access-token window) — it only stops renewal.
+   */
+  revokeAllForUser(userId: string): Promise<void>;
 }

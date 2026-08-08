@@ -49,6 +49,8 @@ describe("RefreshAccessTokenUseCase", () => {
       passwordHash: "irrelevant-for-this-suite",
       role: "STUDENT",
       isActive: true,
+      mustChangePassword: false,
+      avatarFileId: null,
     }, { studentProfileId: "student-profile-1" });
 
     rawToken = ctx.tokenService.generateRefreshToken();
@@ -109,6 +111,8 @@ describe("RefreshAccessTokenUseCase", () => {
       passwordHash: "irrelevant-for-this-suite",
       role: "STUDENT",
       isActive: false,
+      mustChangePassword: false,
+      avatarFileId: null,
     });
     await expect(ctx.useCase.execute({ refreshToken: rawToken })).rejects.toBeInstanceOf(
       InvalidRefreshTokenError,

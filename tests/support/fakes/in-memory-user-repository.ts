@@ -7,6 +7,7 @@ export class InMemoryUserRepository implements UserRepository {
     string,
     Pick<AuthenticatedActor, "batchScope" | "studentProfileId">
   >();
+  private readonly lastLoginByUserId = new Map<string, Date>();
 
   seed(
     user: AuthUserRecord,
@@ -31,5 +32,43 @@ export class InMemoryUserRepository implements UserRepository {
     user: AuthUserRecord,
   ): Promise<Pick<AuthenticatedActor, "batchScope" | "studentProfileId">> {
     return this.scopesById.get(user.id) ?? {};
+  }
+
+  async recordSuccessfulLogin(userId: string, at: Date): Promise<void> {
+    this.lastLoginByUserId.set(userId, at);
+  }
+
+  /** Test-only accessor for asserting a login was recorded. */
+  getLastLoginAt(userId: string): Date | undefined {
+    return this.lastLoginByUserId.get(userId);
+  }
+
+  async setPasswordAndForceChange(userId: string, passwordHash: string): Promise<void> {
+    const user = this.usersById.get(userId);
+    if (!user) return;
+    this.usersById.set(userId, { ...user, passwordHash, mustChangePassword: true });
+  }
+
+  async setPassword(userId: string, passwordHash: string): Promise<void> {
+    const user = this.usersById.get(userId);
+    if (!user) return;
+    this.usersById.set(userId, { ...user, passwordHash, mustChangePassword: false });
+  }
+
+  async updateEmail(userId: string, email: string): Promise<void> {
+    const user = this.usersById.get(userId);
+    if (!user) return;
+    this.usersById.set(userId, { ...user, email });
+  }
+
+  async setAvatarFileId(userId: string, avatarFileId: string | null): Promise<void> {
+    const user = this.usersById.get(userId);
+    if (!user) return;
+    this.usersById.set(userId, { ...user, avatarFileId });
+  }
+
+  /** Test-only accessor. */
+  getAvatarFileId(userId: string): string | null | undefined {
+    return this.usersById.get(userId)?.avatarFileId;
   }
 }

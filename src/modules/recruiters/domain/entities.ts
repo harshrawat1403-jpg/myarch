@@ -64,3 +64,31 @@ export interface ResumeReference {
   readonly storageKey: string;
   readonly mimeType: string;
 }
+
+export type RecruiterApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+/**
+ * V3.0 Administration Platform — the Secretary-facing account record
+ * (name/email/company/status), deliberately separate from
+ * RecruiterStudentProfileDTO above (that one is what a Recruiter sees of a
+ * Student; this one is what a Secretary sees of a Recruiter — different
+ * audiences, different fields, never reused for each other).
+ */
+export interface RecruiterAccountRecord {
+  readonly id: string;
+  readonly userId: string;
+  readonly email: string;
+  readonly fullName: string;
+  readonly companyName: string;
+  readonly isActive: boolean;
+  readonly approvalStatus: RecruiterApprovalStatus;
+  readonly createdAt: Date;
+}
+
+export interface RecruiterAccountSearchFilters {
+  readonly name?: string;
+  readonly email?: string;
+  readonly companyName?: string;
+  readonly approvalStatus?: RecruiterApprovalStatus;
+  readonly includeInactive?: boolean;
+}
