@@ -31,6 +31,19 @@ export interface SheetLayoutProps {
   children: ReactNode;
 }
 
+/**
+ * Where the TNPArch sidebar/drawer branding sends an authenticated user who
+ * wants to see the public website — not `/`, whose own page component
+ * deliberately bounces any authenticated session straight back to its
+ * portal home (exactly right for someone who lands on the bare domain by
+ * accident, exactly wrong for a deliberate "let me see the public site"
+ * click, which would just flash and redirect right back). `/about` is a
+ * real, already-existing public page with no such guard; the full public
+ * nav (including "Home") is reachable from there — no new page, no change
+ * to `/`'s own behavior.
+ */
+const PUBLIC_WEBSITE_HREF = "/about";
+
 function isHrefMatch(pathname: string | null, href: string): boolean {
   return pathname === href || (pathname?.startsWith(`${href}/`) ?? false);
 }
@@ -173,9 +186,9 @@ export function SheetLayout({ navItems, roleLabel, scopeLabel, accountSettingsHr
       <aside className={`hidden shrink-0 p-3 transition-[width] duration-200 md:block ${isCollapsed ? "md:w-[88px]" : "md:w-64"}`}>
         <div className="sticky top-3 flex h-[calc(100vh-1.5rem)] flex-col rounded-lg border border-(--color-border) bg-(--color-surface) p-4 shadow-sm">
           <Link
-            href={navItems[0]?.href ?? "/"}
-            className="mb-6 flex items-center gap-2.5 px-1"
-            title={isCollapsed ? "TNPArch" : undefined}
+            href={PUBLIC_WEBSITE_HREF}
+            aria-label="TNPArch — Visit public website"
+            className="mb-6 flex items-center gap-2.5 rounded-md px-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)"
           >
             <Logo variant={isCollapsed ? "mark" : "full"} size="sm" />
           </Link>
@@ -266,6 +279,18 @@ export function SheetLayout({ navItems, roleLabel, scopeLabel, accountSettingsHr
             ref={menuRef}
             className="border-b border-(--color-border) bg-(--color-surface) md:hidden"
           >
+            {/* The desktop sidebar's branding-as-public-website-link, mirrored
+                here since the desktop <aside> above is `hidden md:block` and
+                never renders below md — this drawer is mobile's equivalent of
+                the sidebar, so it gets the same branding block at its head. */}
+            <Link
+              href={PUBLIC_WEBSITE_HREF}
+              aria-label="TNPArch — Visit public website"
+              onClick={() => setIsMenuOpen(false)}
+              className="mx-4 mt-4 flex items-center gap-2.5 rounded-md px-1 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)"
+            >
+              <Logo variant="full" size="sm" />
+            </Link>
             <nav aria-label="Primary" className="flex flex-col gap-1 px-4 py-4">
               {renderNavLinks(false)}
             </nav>

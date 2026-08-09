@@ -94,6 +94,53 @@ describe("SheetLayout — the authenticated application shell", () => {
     expect(screen.getAllByText("Scoped to 2 batches").length).toBeGreaterThan(0);
   });
 
+  it("the sidebar branding is one accessible link to the public website, not three unrelated ones", () => {
+    mockPathname = "/dashboard";
+    render(
+      <SheetLayout navItems={NAV_ITEMS} roleLabel="Secretary" onLogout={vi.fn()}>
+        content
+      </SheetLayout>,
+    );
+
+    const brandingLink = screen.getByRole("link", { name: /tnparch.*visit public website/i });
+    expect(brandingLink).toHaveAttribute("href", "/about");
+    // The logo, "TNPArch", and "VNIT Nagpur" all live inside this one link —
+    // not three separately-clickable things.
+    expect(within(brandingLink).getByText("TNPArch")).toBeInTheDocument();
+    expect(within(brandingLink).getByText("VNIT Nagpur")).toBeInTheDocument();
+  });
+
+  it("the branding link still points to the public website when the sidebar is collapsed", async () => {
+    mockPathname = "/dashboard";
+    const user = userEvent.setup();
+    render(
+      <SheetLayout navItems={NAV_ITEMS} roleLabel="Secretary" onLogout={vi.fn()}>
+        content
+      </SheetLayout>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /collapse sidebar/i }));
+
+    const brandingLink = screen.getByRole("link", { name: /tnparch.*visit public website/i });
+    expect(brandingLink).toHaveAttribute("href", "/about");
+  });
+
+  it("the mobile drawer offers the same branding link to the public website", async () => {
+    mockPathname = "/dashboard";
+    const user = userEvent.setup();
+    render(
+      <SheetLayout navItems={NAV_ITEMS} roleLabel="Secretary" onLogout={vi.fn()}>
+        content
+      </SheetLayout>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /open navigation menu/i }));
+
+    const drawer = document.getElementById("authenticated-mobile-menu")!;
+    const brandingLink = within(drawer).getByRole("link", { name: /tnparch.*visit public website/i });
+    expect(brandingLink).toHaveAttribute("href", "/about");
+  });
+
   it("the mobile menu is closed by default and opens on hamburger click, focus-trapped", async () => {
     mockPathname = "/dashboard";
     const user = userEvent.setup();
