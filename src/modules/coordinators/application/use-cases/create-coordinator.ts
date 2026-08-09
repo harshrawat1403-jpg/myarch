@@ -4,7 +4,7 @@ import { NotAuthorizedError } from "@/lib/errors";
 import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import type { AuditRecorder } from "@/lib/audit";
 import type { BatchLookup } from "@/lib/batch-lookup";
-import type { CoordinatorRecord } from "../../domain/entities";
+import type { CoordinatorPosition, CoordinatorRecord } from "../../domain/entities";
 import { BatchNotFoundError, DuplicateEmailError } from "../../domain/errors";
 import type { CoordinatorRepository } from "../ports/coordinator-repository";
 import type { CoordinatorUserProvisioner } from "../ports/coordinator-user-provisioner";
@@ -13,6 +13,8 @@ export interface CreateCoordinatorInput {
   actor: AuthenticatedActor;
   email: string;
   fullName: string;
+  /** Display/reporting label only — see CoordinatorPosition doc comment. */
+  position?: CoordinatorPosition;
   /** Optional initial batch assignments — same effect as creating, then calling AssignBatchUseCase once per id. */
   batchIds?: readonly string[];
 }
@@ -56,7 +58,11 @@ export class CreateCoordinatorUseCase {
       throw err;
     }
 
-    let coordinator = await this.deps.coordinatorRepository.create({ userId, fullName: input.fullName });
+    let coordinator = await this.deps.coordinatorRepository.create({
+      userId,
+      fullName: input.fullName,
+      position: input.position,
+    });
 
     for (const batchId of input.batchIds ?? []) {
       coordinator = await this.deps.coordinatorRepository.assignBatch(coordinator.id, batchId);

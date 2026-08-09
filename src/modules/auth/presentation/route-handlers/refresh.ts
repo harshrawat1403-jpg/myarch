@@ -6,12 +6,22 @@ import {
 } from "../../domain/errors";
 import { getRefreshAccessTokenUseCase } from "../../infrastructure/container";
 import { REFRESH_TOKEN_COOKIE, clearRefreshTokenCookie, setRefreshTokenCookie } from "../cookies";
-import { unauthorized } from "@/lib/http-errors";
+import { tooManyRequests, unauthorized } from "@/lib/http-errors";
+import { refreshRateLimiter } from "@/lib/rate-limiters";
+import { clientIp } from "@/lib/client-ip";
 
 export async function refreshRouteHandler(req: NextRequest): Promise<Response> {
   const refreshToken = req.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
   if (!refreshToken) {
     return unauthorized("Missing refresh token");
+  }
+
+  // V4.0 A2 (§18): retrofits a pre-existing gap — this endpoint previously
+  // had no rate limiting at all. Per-IP only, since no account is known
+  // until the refresh token itself is validated below.
+  const ipLimit = await refreshRateLimiter.consume(`refresh:ip:${clientIp(req)}`);
+  if (!ipLimit.allowed) {
+    return tooManyRequests("Too many requests. Please try again later.", ipLimit.retryAfterMs);
   }
 
   try {

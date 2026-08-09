@@ -37,8 +37,13 @@ function formatDate(value: string | Date): string {
  */
 export default function ReviewDraftPage() {
   const { studentId } = useParams<{ studentId: string }>();
-  const { accessToken } = useAuth();
+  const { accessToken, role } = useAuth();
   const router = useRouter();
+  // V4.0 (Q1): the Secretary is the sole final approval authority — a
+  // Coordinator can still request changes, never approve. Enforced
+  // server-side by canApprovePublicProfile; hidden here too so a
+  // Coordinator is never shown an action that will just be rejected.
+  const canApprove = role === "SECRETARY";
 
   const [draft, setDraft] = useState<ProfileDraft | null>(null);
   const [reviewComment, setReviewComment] = useState("");
@@ -178,12 +183,21 @@ export default function ReviewDraftPage() {
         <Card className="space-y-4 border-t-2 border-t-(--color-accent)">
           <DataLabel>Reviewer Actions</DataLabel>
 
-          <Button variant="primary" onClick={handleApprove}>
-            Approve
-          </Button>
+          {canApprove && (
+            <Button variant="primary" onClick={handleApprove}>
+              Approve
+            </Button>
+          )}
+          {!canApprove && (
+            <p className="text-sm text-(--color-text-secondary)">
+              Only the Secretary can approve a profile. You can review the submission and request changes below.
+            </p>
+          )}
 
           <div className="border-t border-(--color-border) pt-4">
-            <Label htmlFor="review-comment">Or request changes</Label>
+            <Label htmlFor="review-comment">
+              {canApprove ? "Or request changes" : "Request changes"}
+            </Label>
             <Textarea
               id="review-comment"
               placeholder="Describe what needs to change…"

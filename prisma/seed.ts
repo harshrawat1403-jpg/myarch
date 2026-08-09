@@ -10,8 +10,13 @@
  *
  * Usage: npm run db:seed (see package.json / ENVIRONMENT_SETUP.md).
  */
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
+// V4.0 E3 — imported rather than hand-duplicated: these structures must
+// match PublicationTemplateStructure exactly, and copying them a second
+// time here would be a real drift risk this codebase has otherwise avoided
+// (every other seed row below is a small literal, not a structured tree).
+import { PUBLICATION_TEMPLATE_SEEDS } from "@/modules/publications/domain/template-definitions";
 
 const prisma = new PrismaClient();
 
@@ -53,7 +58,7 @@ async function main() {
   const coordinatorProfile = await prisma.coordinatorProfile.upsert({
     where: { userId: coordinatorUser.id },
     update: {},
-    create: { userId: coordinatorUser.id, fullName: "Arjun Mehta" },
+    create: { userId: coordinatorUser.id, fullName: "Arjun Mehta", position: "T_AND_P" },
   });
   await prisma.coordinatorBatchScope.upsert({
     where: { coordinatorProfileId_batchId: { coordinatorProfileId: coordinatorProfile.id, batchId: batch.id } },
@@ -168,6 +173,24 @@ async function main() {
       cgpa: 9.1,
     },
   });
+
+  // V4.0 E3 — the ten publication kinds (§13.1), seeded once. No
+  // template-authoring UI exists in V4.0; the app's own flow starts at
+  // "Choose Template," so these rows are the only source of templates.
+  for (const seed of PUBLICATION_TEMPLATE_SEEDS) {
+    const existing = await prisma.publicationTemplate.findFirst({ where: { name: seed.name } });
+    if (existing) continue;
+    await prisma.publicationTemplate.create({
+      data: {
+        name: seed.name,
+        type: seed.type,
+        description: seed.description,
+        structureJson: seed.structure as unknown as Prisma.InputJsonValue,
+        status: "ACTIVE",
+        createdByUserId: secretaryUser.id,
+      },
+    });
+  }
 
   console.log("Seed complete:");
   console.log("  Secretary:   secretary@tnparch.in");

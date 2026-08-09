@@ -43,6 +43,17 @@ export class PrismaPublishedProfileRepository implements PublishedProfileReposit
 
     return toDomain(row);
   }
+
+  async updateVisibility(
+    studentProfileId: string,
+    data: { isPubliclyDiscoverable?: boolean; showCgpa?: boolean },
+  ): Promise<PublishedProfile> {
+    const row = await this.prisma.studentPublicProfile.update({
+      where: { studentProfileId },
+      data: { isPubliclyDiscoverable: data.isPubliclyDiscoverable, showCgpa: data.showCgpa },
+    });
+    return toDomain(row);
+  }
 }
 
 function toDomain(row: StudentPublicProfile): PublishedProfile {
@@ -60,5 +71,7 @@ function toDomain(row: StudentPublicProfile): PublishedProfile {
     publishedFromDraftId: row.publishedFromDraftId,
     publishedAt: row.publishedAt,
     publishedByUserId: row.publishedByUserId,
+    isPubliclyDiscoverable: row.isPubliclyDiscoverable,
+    showCgpa: row.showCgpa,
   };
 }

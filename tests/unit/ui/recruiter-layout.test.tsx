@@ -69,4 +69,15 @@ describe("RecruiterLayout — isolation from the admin dashboard", () => {
     expect(await screen.findByText("recruiter content")).toBeInTheDocument();
     expect(replaceMock).not.toHaveBeenCalled();
   });
+
+  it("links Dashboard, Student Directory, Saved, and Interests (V4.0 C4)", async () => {
+    mockAuthState = { isLoading: false, isAuthenticated: true, role: "RECRUITER", logout: vi.fn() };
+    render(<RecruiterLayout>{"recruiter content"}</RecruiterLayout>);
+
+    await screen.findByText("recruiter content");
+    expect(screen.getByRole("link", { name: /^dashboard$/i })).toHaveAttribute("href", "/recruiter");
+    expect(screen.getByRole("link", { name: /student directory/i })).toHaveAttribute("href", "/recruiter/directory");
+    expect(screen.getByRole("link", { name: /^saved$/i })).toHaveAttribute("href", "/recruiter/saved");
+    expect(screen.getByRole("link", { name: /^interests$/i })).toHaveAttribute("href", "/recruiter/interests");
+  });
 });

@@ -3,7 +3,7 @@
  * only from here (docs/architecture/07_Repository_Structure.md).
  */
 
-export type { CoordinatorRecord, CoordinatorSearchFilters } from "./domain/entities";
+export type { CoordinatorPosition, CoordinatorRecord, CoordinatorSearchFilters } from "./domain/entities";
 export {
   CoordinatorNotFoundError,
   DuplicateEmailError,

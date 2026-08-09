@@ -104,6 +104,26 @@ describe("UpdateOwnProfileUseCase", () => {
     );
   });
 
+  it("updates the display name for a Student actor too (V4.0 A3: Account Settings now serves Students as well)", async () => {
+    ctx.userRepository.seed({
+      id: "stu-1",
+      email: "alice@vnit.ac.in",
+      passwordHash: "irrelevant",
+      role: "STUDENT",
+      isActive: true,
+      mustChangePassword: false,
+      avatarFileId: null,
+    });
+
+    await ctx.useCase.execute({ actor: { userId: "stu-1", role: "STUDENT" }, fullName: "Alice A. Architect" });
+
+    expect(ctx.profileNameRepository.updates).toContainEqual({
+      userId: "stu-1",
+      role: "STUDENT",
+      fullName: "Alice A. Architect",
+    });
+  });
+
   it("updates both fullName and email in one call", async () => {
     await ctx.useCase.execute({
       actor: ACTOR,

@@ -12,11 +12,11 @@ vi.mock("next/navigation", () => ({
 import { PublicNav } from "../../../src/components/public/public-nav";
 
 describe("PublicNav — public site navigation", () => {
-  it("renders all 6 content links plus Sign In", () => {
+  it("renders all 8 content links plus Sign In", () => {
     mockPathname = "/";
     render(<PublicNav />);
 
-    for (const label of ["Home", "About", "Placements", "Students", "Recruiters", "Contact"]) {
+    for (const label of ["Home", "About", "Placements", "Students", "Recruiters", "Student Directory", "Register", "Contact"]) {
       expect(screen.getAllByRole("link", { name: label }).length).toBeGreaterThan(0);
     }
     expect(screen.getAllByRole("link", { name: "Sign In" }).length).toBeGreaterThan(0);

@@ -11,16 +11,27 @@ import { describe, expect, it } from "vitest";
 import type { AuthenticatedActor } from "../../../src/modules/auth";
 import {
   canAccessUserDirectory,
-  canApproveOrRejectDraft,
+  canApprovePublicProfile,
+  canRequestProfileChanges,
   canChangeBatchLifecycleStatus,
   canEditOwnContactInfo,
   canEditPrivateAdminFields,
   canEditPublicProfileDraft,
   canExportBatchData,
   canManageBatches,
+  canManageCompanies,
+  canViewCompanies,
+  canReviewRegistrationRequest,
+  canDecideRegistrationRequest,
   canManageCoordinatorAccounts,
   canViewAuditLogs,
   canViewPrivateProfile,
+  canManagePlacementDrive,
+  canPublishPlacementDrive,
+  canApplyToPlacementDrive,
+  canManageApplication,
+  canManageAlumni,
+  canManagePublications,
 } from "../../../src/modules/auth";
 
 const BATCH_A = "batch-a";
@@ -113,7 +124,7 @@ describe("canEditOwnContactInfo", () => {
   });
 });
 
-describe("canEditPublicProfileDraft / canApproveOrRejectDraft", () => {
+describe("canEditPublicProfileDraft", () => {
   it("allows the owning student to edit their own draft", () => {
     expect(canEditPublicProfileDraft(studentInA, BATCH_A, STUDENT_IN_A)).toBe(true);
   });
@@ -121,17 +132,45 @@ describe("canEditPublicProfileDraft / canApproveOrRejectDraft", () => {
   it("denies a Recruiter from ever editing a draft", () => {
     expect(canEditPublicProfileDraft(recruiter, BATCH_A, STUDENT_IN_A)).toBe(false);
   });
+});
 
-  it("allows an in-scope Coordinator to approve/reject", () => {
-    expect(canApproveOrRejectDraft(coordinatorScopedToA, BATCH_A)).toBe(true);
+describe("canApprovePublicProfile — V4.0 Q1: Secretary is the sole final approval authority", () => {
+  it("allows the Secretary", () => {
+    expect(canApprovePublicProfile(secretary)).toBe(true);
   });
 
-  it("denies an out-of-scope Coordinator from approving/rejecting", () => {
-    expect(canApproveOrRejectDraft(coordinatorScopedToB, BATCH_A)).toBe(false);
+  it("denies an in-scope Coordinator (narrowed from the former canApproveOrRejectDraft — Coordinators may request changes, never approve)", () => {
+    expect(canApprovePublicProfile(coordinatorScopedToA)).toBe(false);
+  });
+
+  it("denies an out-of-scope Coordinator", () => {
+    expect(canApprovePublicProfile(coordinatorScopedToB)).toBe(false);
   });
 
   it("denies a Student from approving their own draft", () => {
-    expect(canApproveOrRejectDraft(studentInA, BATCH_A)).toBe(false);
+    expect(canApprovePublicProfile(studentInA)).toBe(false);
+  });
+
+  it("denies a Recruiter", () => {
+    expect(canApprovePublicProfile(recruiter)).toBe(false);
+  });
+});
+
+describe("canRequestProfileChanges — Coordinator's retained (non-final) review authority", () => {
+  it("allows the Secretary", () => {
+    expect(canRequestProfileChanges(secretary, BATCH_A)).toBe(true);
+  });
+
+  it("allows an in-scope Coordinator", () => {
+    expect(canRequestProfileChanges(coordinatorScopedToA, BATCH_A)).toBe(true);
+  });
+
+  it("denies an out-of-scope Coordinator", () => {
+    expect(canRequestProfileChanges(coordinatorScopedToB, BATCH_A)).toBe(false);
+  });
+
+  it("denies a Student from requesting changes on their own draft", () => {
+    expect(canRequestProfileChanges(studentInA, BATCH_A)).toBe(false);
   });
 });
 
@@ -166,11 +205,114 @@ describe("Scoped administrative capabilities (Secretary or in-scope Coordinator)
   });
 });
 
+describe("canManageCompanies / canViewCompanies (V4.0 A4)", () => {
+  it("only the Secretary can manage companies", () => {
+    expect(canManageCompanies(secretary)).toBe(true);
+    expect(canManageCompanies(coordinatorScopedToA)).toBe(false);
+    expect(canManageCompanies(studentInA)).toBe(false);
+    expect(canManageCompanies(recruiter)).toBe(false);
+  });
+
+  it("Secretary and Coordinator can both view companies, Student and Recruiter cannot", () => {
+    expect(canViewCompanies(secretary)).toBe(true);
+    expect(canViewCompanies(coordinatorScopedToA)).toBe(true);
+    expect(canViewCompanies(studentInA)).toBe(false);
+    expect(canViewCompanies(recruiter)).toBe(false);
+  });
+});
+
+describe("canReviewRegistrationRequest / canDecideRegistrationRequest (V4.0 B2/B3)", () => {
+  it("canReviewRegistrationRequest: Secretary unscoped, Coordinator batch-scoped, Student/Recruiter denied", () => {
+    expect(canReviewRegistrationRequest(secretary, BATCH_A)).toBe(true);
+    expect(canReviewRegistrationRequest(coordinatorScopedToA, BATCH_A)).toBe(true);
+    expect(canReviewRegistrationRequest(coordinatorScopedToB, BATCH_A)).toBe(false);
+    expect(canReviewRegistrationRequest(studentInA, BATCH_A)).toBe(false);
+    expect(canReviewRegistrationRequest(recruiter, BATCH_A)).toBe(false);
+  });
+
+  it("canDecideRegistrationRequest: Secretary only (Q1 — final approval authority)", () => {
+    expect(canDecideRegistrationRequest(secretary)).toBe(true);
+    expect(canDecideRegistrationRequest(coordinatorScopedToA)).toBe(false);
+    expect(canDecideRegistrationRequest(studentInA)).toBe(false);
+    expect(canDecideRegistrationRequest(recruiter)).toBe(false);
+  });
+});
+
 describe("canAccessUserDirectory", () => {
   it("allows Secretary and Coordinator, denies Student and Recruiter", () => {
     expect(canAccessUserDirectory(secretary)).toBe(true);
     expect(canAccessUserDirectory(coordinatorScopedToA)).toBe(true);
     expect(canAccessUserDirectory(studentInA)).toBe(false);
     expect(canAccessUserDirectory(recruiter)).toBe(false);
+  });
+});
+
+describe("canManagePlacementDrive (V4.0 D1 — §4: 'Coordinator: Scoped, no publish')", () => {
+  it("Secretary can manage a drive regardless of its eligible batches, including one open to every batch", () => {
+    expect(canManagePlacementDrive(secretary, [BATCH_A])).toBe(true);
+    expect(canManagePlacementDrive(secretary, [])).toBe(true);
+  });
+
+  it("a Coordinator may manage a drive only when EVERY eligible batch is within their own scope", () => {
+    expect(canManagePlacementDrive(coordinatorScopedToA, [BATCH_A])).toBe(true);
+    expect(canManagePlacementDrive(coordinatorScopedToA, [BATCH_A, BATCH_B])).toBe(false);
+    expect(canManagePlacementDrive(coordinatorScopedToB, [BATCH_A])).toBe(false);
+  });
+
+  it("a Coordinator can never manage a drive open to every batch (empty eligibleBatchIds)", () => {
+    expect(canManagePlacementDrive(coordinatorScopedToA, [])).toBe(false);
+  });
+
+  it("denies Student and Recruiter", () => {
+    expect(canManagePlacementDrive(studentInA, [BATCH_A])).toBe(false);
+    expect(canManagePlacementDrive(recruiter, [BATCH_A])).toBe(false);
+  });
+});
+
+describe("canPublishPlacementDrive (V4.0 D1 — the DRAFT→ANNOUNCED 'publish' decision)", () => {
+  it("Secretary only, even a fully-scoped Coordinator is denied", () => {
+    expect(canPublishPlacementDrive(secretary)).toBe(true);
+    expect(canPublishPlacementDrive(coordinatorScopedToA)).toBe(false);
+    expect(canPublishPlacementDrive(studentInA)).toBe(false);
+    expect(canPublishPlacementDrive(recruiter)).toBe(false);
+  });
+});
+
+describe("canApplyToPlacementDrive", () => {
+  it("Student only", () => {
+    expect(canApplyToPlacementDrive(studentInA)).toBe(true);
+    expect(canApplyToPlacementDrive(secretary)).toBe(false);
+    expect(canApplyToPlacementDrive(coordinatorScopedToA)).toBe(false);
+    expect(canApplyToPlacementDrive(recruiter)).toBe(false);
+  });
+});
+
+describe("canManageApplication (V4.0 D1 — scoped to the applying student's own batch)", () => {
+  it("Secretary unscoped, Coordinator batch-scoped, Student/Recruiter denied", () => {
+    expect(canManageApplication(secretary, BATCH_A)).toBe(true);
+    expect(canManageApplication(coordinatorScopedToA, BATCH_A)).toBe(true);
+    expect(canManageApplication(coordinatorScopedToB, BATCH_A)).toBe(false);
+    expect(canManageApplication(studentInA, BATCH_A)).toBe(false);
+    expect(canManageApplication(recruiter, BATCH_A)).toBe(false);
+  });
+});
+
+describe("canManageAlumni (V4.0 D5 — the one entity where Secretary and Coordinator are identically 'Full', unscoped)", () => {
+  it("Secretary and any Coordinator (regardless of batch scope), Student/Recruiter denied", () => {
+    expect(canManageAlumni(secretary)).toBe(true);
+    expect(canManageAlumni(coordinatorScopedToA)).toBe(true);
+    expect(canManageAlumni(coordinatorScopedToB)).toBe(true);
+    expect(canManageAlumni(studentInA)).toBe(false);
+    expect(canManageAlumni(recruiter)).toBe(false);
+  });
+});
+
+describe("canManagePublications (V4.0 E3-E5 — mirrors canManageAlumni: Secretary and Coordinator identically 'Full', unscoped, per PRD §13/§9)", () => {
+  it("Secretary and any Coordinator (regardless of batch scope), Student/Recruiter denied", () => {
+    expect(canManagePublications(secretary)).toBe(true);
+    expect(canManagePublications(coordinatorScopedToA)).toBe(true);
+    expect(canManagePublications(coordinatorScopedToB)).toBe(true);
+    expect(canManagePublications(studentInA)).toBe(false);
+    expect(canManagePublications(recruiter)).toBe(false);
   });
 });

@@ -22,8 +22,8 @@ export interface DashboardPanelProps {
  * The dashboard's operational panel — a titled `Card` with an optional
  * link to the full page a preview summarizes. Extracted because this
  * milestone's overview page uses it five times (Pending Approvals, Recent
- * Activity, Batch Overview, Export Shortcuts, Recruiter Activity) — the
- * same same-page-reuse threshold `ProcessSteps`/`SectionHeader` were
+ * Activity, Batch Overview, Pending Registrations, Placement Pipeline) —
+ * the same same-page-reuse threshold `ProcessSteps`/`SectionHeader` were
  * extracted at on the public site — and every future authenticated page
  * this project redesigns (Batches, Approvals, Audit, Exports) is likely to
  * need the identical "titled panel with a link to more" shape.

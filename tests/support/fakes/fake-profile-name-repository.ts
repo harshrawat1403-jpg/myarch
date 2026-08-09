@@ -1,6 +1,7 @@
 import type { Role } from "../../../src/modules/auth";
 import type { ProfileNameRepository } from "../../../src/modules/auth/application/ports/profile-name-repository";
 
+/** Mirrors PrismaProfileNameRepository's role support exactly (Secretary/Coordinator/Student), including its throw for unsupported roles — a fake that's more permissive than the real implementation would hide exactly the kind of gap V4.0 A3 found. */
 export class FakeProfileNameRepository implements ProfileNameRepository {
   readonly updates: { userId: string; role: Role; fullName: string }[] = [];
   private readonly namesByUserId = new Map<string, string>();
@@ -10,6 +11,9 @@ export class FakeProfileNameRepository implements ProfileNameRepository {
   }
 
   async updateFullName(userId: string, role: Role, fullName: string): Promise<void> {
+    if (role !== "SECRETARY" && role !== "COORDINATOR" && role !== "STUDENT") {
+      throw new Error(`No editable display name for role ${role}`);
+    }
     this.updates.push({ userId, role, fullName });
     this.namesByUserId.set(userId, fullName);
   }

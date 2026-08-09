@@ -1,5 +1,5 @@
 import type { AuthenticatedActor } from "@/modules/auth";
-import { canApproveOrRejectDraft } from "@/modules/auth";
+import { canApprovePublicProfile } from "@/modules/auth";
 import { NotAuthorizedError } from "@/lib/errors";
 import type { AuditRecorder } from "@/lib/audit";
 import type { NotificationService } from "@/modules/notifications";
@@ -42,7 +42,7 @@ export class ApproveDraftUseCase {
       throw new StudentNotFoundError();
     }
 
-    if (!canApproveOrRejectDraft(input.actor, student.batchId)) {
+    if (!canApprovePublicProfile(input.actor)) {
       throw new NotAuthorizedError("Not authorized to approve this student's profile draft");
     }
 

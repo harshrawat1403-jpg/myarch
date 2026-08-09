@@ -12,3 +12,13 @@ export interface EmailTemplateDefinition {
   bodyText(context: Record<string, unknown>): string;
   bodyHtml(context: Record<string, unknown>): string;
 }
+
+/**
+ * V4.0 E1 — the IN_APP counterpart to EmailTemplateDefinition. Deliberately
+ * much smaller: a notification-center row is one line of title plus one
+ * line of message, not a full email with subject/text/html variants.
+ */
+export interface InAppTemplateDefinition {
+  title(context: Record<string, unknown>): string;
+  message(context: Record<string, unknown>): string;
+}

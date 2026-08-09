@@ -15,6 +15,11 @@ export type {
   RecruiterAccountRecord,
   RecruiterAccountSearchFilters,
   RecruiterApprovalStatus,
+  RecruiterInterestRequestStatus,
+  RecruiterInterestRequestRecord,
+  StudentInterestDTO,
+  RecruiterOverviewStats,
+  RecruiterSentInterestDTO,
 } from "./domain/entities";
 export {
   ApprovedProfileNotFoundError,
@@ -24,12 +29,24 @@ export {
   RecruiterAlreadyActiveError,
   RecruiterAlreadyDisabledError,
   RecruiterNotPendingError,
+  RecruiterProfileNotFoundError,
+  StudentNotSavedError,
+  InterestRequestNotFoundError,
+  InterestRequestAlreadyRespondedError,
 } from "./domain/errors";
 
 export { searchDirectoryRouteHandler } from "./presentation/route-handlers/search";
 export { getRecruiterProfileRouteHandler } from "./presentation/route-handlers/get-profile";
 export { recruiterDashboardStatsRouteHandler } from "./presentation/route-handlers/dashboard-stats";
 export { getRecruiterResumeRouteHandler } from "./presentation/route-handlers/get-resume";
+export { setSavedStudentRouteHandler } from "./presentation/route-handlers/set-saved";
+export { setShortlistedStudentRouteHandler } from "./presentation/route-handlers/set-shortlisted";
+export { expressInterestRouteHandler } from "./presentation/route-handlers/express-interest";
+export { listStudentInterestsRouteHandler } from "./presentation/route-handlers/student/list-interests";
+export { respondToInterestRouteHandler } from "./presentation/route-handlers/student/respond-to-interest";
+export { listSavedStudentsRouteHandler } from "./presentation/route-handlers/list-saved";
+export { listSentInterestsRouteHandler } from "./presentation/route-handlers/list-interests";
+export { getRecruiterOverviewRouteHandler } from "./presentation/route-handlers/overview";
 
 // V3.0 Administration Platform — admin-side recruiter account management.
 export { createRecruiterAccountRouteHandler } from "./presentation/route-handlers/admin/create";

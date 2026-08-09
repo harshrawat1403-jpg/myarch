@@ -34,12 +34,19 @@ describe("DefaultNotificationService", () => {
       context: { studentName: "Alice Architect" },
     });
 
-    expect(ctx.notificationRepository.records).toHaveLength(1);
-    const notification = ctx.notificationRepository.records[0]!;
+    // V4.0 E1: every pre-E1 template is dual-channel now (NOTIFICATION_CHANNELS),
+    // so this call writes both an EMAIL row (unchanged behavior, still job-dispatched)
+    // and a new IN_APP row (persisted-and-immediately-SENT, no job).
+    expect(ctx.notificationRepository.records).toHaveLength(2);
+    const notification = ctx.notificationRepository.records.find((r) => r.channel === "EMAIL")!;
     expect(notification.status).toBe("PENDING");
-    expect(notification.channel).toBe("EMAIL");
     expect(notification.template).toBe("PROFILE_APPROVED");
     expect(notification.payload).toEqual({ studentName: "Alice Architect" });
+
+    const inAppNotification = ctx.notificationRepository.records.find((r) => r.channel === "IN_APP")!;
+    expect(inAppNotification.status).toBe("SENT");
+    expect(inAppNotification.template).toBe("PROFILE_APPROVED");
+    expect(inAppNotification.payload).toEqual({ studentName: "Alice Architect" });
 
     expect(ctx.jobRepository.jobs).toHaveLength(1);
     const job = ctx.jobRepository.jobs[0]!;
@@ -70,7 +77,13 @@ describe("DefaultNotificationService", () => {
 
   it("never throws when creating the Notification row itself fails — NFR-AVAIL-03", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    const brokenRepository = { create: vi.fn().mockRejectedValue(new Error("db down")), markSent: vi.fn(), markFailed: vi.fn() };
+    const brokenRepository = {
+      create: vi.fn().mockRejectedValue(new Error("db down")),
+      markSent: vi.fn(),
+      markFailed: vi.fn(),
+      listInAppForRecipient: vi.fn(),
+      markRead: vi.fn(),
+    };
     const jobRepository = new InMemoryJobRepository();
     const service = new DefaultNotificationService({
       jobDispatcher: new DefaultJobDispatcher({ jobRepository }),

@@ -14,6 +14,7 @@ export type {
   BulkImportRowError,
   BulkImportRunRecord,
 } from "./domain/entities";
+export type { CreateStudentInput } from "./application/use-cases/create-student";
 export {
   StudentNotFoundError,
   DuplicateRollNumberError,
@@ -45,3 +46,10 @@ export { getBulkImportRunRouteHandler } from "./presentation/route-handlers/get-
 // handler (BULK_IMPORT_STUDENTS) — called once by scripts/run-worker.ts,
 // never at import time. Mirrors notifications' registerJobHandlers().
 export { registerBulkImportJobHandlers } from "./infrastructure/container";
+
+// V4.0 B3: registration approval calls the *same* CreateStudentUseCase
+// internally rather than a new public-facing variant (docs/planning/V4_0_PRD.md
+// §6's "existing routes that change behavior, not shape"). Exported the same
+// way auth exports revokeUserSessions/getAdminResetPasswordUseCase for
+// cross-module reuse.
+export { getCreateStudentUseCase } from "./infrastructure/container";

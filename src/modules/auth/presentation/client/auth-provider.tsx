@@ -100,13 +100,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    // React Strict Mode double-invokes effects in development, mounting →
+    // cleaning up → mounting again. Without aborting the first request, both
+    // would reach POST /api/auth/refresh for real: the first rotates the
+    // single-use httpOnly refresh-token cookie, and the second — still
+    // holding the pre-rotation cookie value the browser had already sent —
+    // gets rejected as a reused/stale token, bouncing an otherwise-valid
+    // session to /login. Aborting on cleanup means only the second
+    // (post-remount) invocation ever completes a real request.
+    const controller = new AbortController();
 
     (async () => {
       try {
-        const result = await apiClient.post<{ accessToken: string }>("/api/auth/refresh");
+        const result = await apiClient.post<{ accessToken: string }>(
+          "/api/auth/refresh",
+          undefined,
+          undefined,
+          controller.signal,
+        );
         if (!cancelled) applyToken(result.accessToken);
       } catch {
-        // No valid session yet — normal for a first visit or a logged-out user.
+        // No valid session yet, or this request was aborted by the cleanup
+        // above — both are normal, not an error to surface.
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -114,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [applyToken]);
 

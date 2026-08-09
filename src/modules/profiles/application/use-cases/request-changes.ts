@@ -1,5 +1,5 @@
 import type { AuthenticatedActor } from "@/modules/auth";
-import { canApproveOrRejectDraft } from "@/modules/auth";
+import { canRequestProfileChanges } from "@/modules/auth";
 import { NotAuthorizedError } from "@/lib/errors";
 import type { AuditRecorder } from "@/lib/audit";
 import type { NotificationService } from "@/modules/notifications";
@@ -46,7 +46,7 @@ export class RequestChangesUseCase {
       throw new StudentNotFoundError();
     }
 
-    if (!canApproveOrRejectDraft(input.actor, student.batchId)) {
+    if (!canRequestProfileChanges(input.actor, student.batchId)) {
       throw new NotAuthorizedError("Not authorized to review this student's profile draft");
     }
 

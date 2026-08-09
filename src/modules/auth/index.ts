@@ -19,7 +19,8 @@ export {
   canEditPrivateAdminFields,
   canEditOwnContactInfo,
   canEditPublicProfileDraft,
-  canApproveOrRejectDraft,
+  canApprovePublicProfile,
+  canRequestProfileChanges,
   canViewApprovedPublicProfile,
   canAccessRecruiterDirectory,
   canManageBatches,
@@ -28,6 +29,16 @@ export {
   canViewAuditLogs,
   canChangeBatchLifecycleStatus,
   canAccessUserDirectory,
+  canManageCompanies,
+  canViewCompanies,
+  canReviewRegistrationRequest,
+  canDecideRegistrationRequest,
+  canManagePlacementDrive,
+  canPublishPlacementDrive,
+  canApplyToPlacementDrive,
+  canManageApplication,
+  canManageAlumni,
+  canManagePublications,
 } from "./domain/permissions";
 
 // RBAC primitive other modules use to protect their own routes — see

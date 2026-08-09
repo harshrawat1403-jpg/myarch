@@ -198,7 +198,7 @@ export default function StudentsPage() {
             <Upload aria-hidden="true" size={16} strokeWidth={1.75} />
             Bulk Import
           </Button>
-          <Link href="/dashboard/exports" className={buttonClassName("secondary", "gap-2")}>
+          <Link href="/dashboard/reports" className={buttonClassName("secondary", "gap-2")}>
             <Download aria-hidden="true" size={16} strokeWidth={1.75} />
             Export Student Directory
           </Link>

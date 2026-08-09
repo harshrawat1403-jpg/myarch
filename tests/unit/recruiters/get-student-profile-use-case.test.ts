@@ -5,6 +5,9 @@ import { GetRecruiterStudentProfileUseCase } from "../../../src/modules/recruite
 import { ApprovedProfileNotFoundError } from "../../../src/modules/recruiters/domain/errors";
 import { NotAuthorizedError } from "../../../src/lib/errors";
 import { InMemoryRecruiterDirectoryRepository } from "../../support/fakes/in-memory-recruiter-directory-repository";
+import { InMemoryRecruiterInteractionRepository } from "../../support/fakes/in-memory-recruiter-interaction-repository";
+import { InMemoryRecruiterInterestRepository } from "../../support/fakes/in-memory-recruiter-interest-repository";
+import { FakeRecruiterSelfLookup } from "../../support/fakes/fake-recruiter-self-lookup";
 
 const recruiter: AuthenticatedActor = { userId: "rec-1", role: "RECRUITER" };
 const secretary: AuthenticatedActor = { userId: "sec-1", role: "SECRETARY" };
@@ -25,6 +28,9 @@ const APPROVED: RecruiterStudentProfileDTO = {
   internships: [],
   hasResume: true,
   profilePhotoUrl: null,
+  isSaved: false,
+  isShortlisted: false,
+  interestStatus: null,
 };
 
 describe("GetRecruiterStudentProfileUseCase — privacy boundaries", () => {
@@ -33,7 +39,12 @@ describe("GetRecruiterStudentProfileUseCase — privacy boundaries", () => {
 
   beforeEach(() => {
     repo = new InMemoryRecruiterDirectoryRepository();
-    useCase = new GetRecruiterStudentProfileUseCase({ directoryRepository: repo });
+    useCase = new GetRecruiterStudentProfileUseCase({
+      directoryRepository: repo,
+      interactionRepository: new InMemoryRecruiterInteractionRepository(),
+      interestRepository: new InMemoryRecruiterInterestRepository(),
+      recruiterSelfLookup: new FakeRecruiterSelfLookup(),
+    });
     repo.seedApproved(APPROVED);
   });
 

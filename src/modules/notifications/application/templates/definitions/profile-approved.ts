@@ -1,4 +1,4 @@
-import type { EmailTemplateDefinition } from "../types";
+import type { EmailTemplateDefinition, InAppTemplateDefinition } from "../types";
 import { escapeHtml } from "../layout";
 
 /** Context: { studentName: string } */
@@ -24,4 +24,9 @@ export const profileApprovedTemplate: EmailTemplateDefinition = {
       "<p>You can review your published profile anytime by logging in to your TNPArch account.</p>"
     );
   },
+};
+
+export const profileApprovedInAppTemplate: InAppTemplateDefinition = {
+  title: () => "Profile approved",
+  message: () => "Your public profile has been approved and is now visible to recruiters.",
 };

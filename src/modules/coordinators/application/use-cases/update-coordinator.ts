@@ -3,7 +3,7 @@ import { canManageCoordinatorAccounts } from "@/modules/auth";
 import { NotAuthorizedError } from "@/lib/errors";
 import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import type { AuditRecorder } from "@/lib/audit";
-import type { CoordinatorRecord } from "../../domain/entities";
+import type { CoordinatorPosition, CoordinatorRecord } from "../../domain/entities";
 import { CoordinatorNotFoundError } from "../../domain/errors";
 import type { CoordinatorRepository } from "../ports/coordinator-repository";
 
@@ -11,6 +11,8 @@ export interface UpdateCoordinatorInput {
   actor: AuthenticatedActor;
   coordinatorId: string;
   fullName?: string;
+  /** Display/reporting label only — see CoordinatorPosition doc comment. `null` clears it. */
+  position?: CoordinatorPosition | null;
 }
 
 export class UpdateCoordinatorUseCase {
@@ -26,6 +28,7 @@ export class UpdateCoordinatorUseCase {
 
     const updated = await this.deps.coordinatorRepository.update(input.coordinatorId, {
       fullName: input.fullName,
+      position: input.position,
     });
 
     await this.deps.auditRecorder.record({

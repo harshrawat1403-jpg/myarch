@@ -6,11 +6,13 @@ import { Plus, UserCog, Users } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { useRowSelection } from "@/lib/use-row-selection";
-import type { CoordinatorRecord } from "@/modules/coordinators";
+import type { CoordinatorPosition, CoordinatorRecord } from "@/modules/coordinators";
 import type { Batch } from "@/modules/batches";
+import { COORDINATOR_POSITION_OPTIONS, coordinatorPositionLabel } from "@/lib/coordinator-position";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { StatPanel } from "@/components/ui/stat-panel";
@@ -46,6 +48,7 @@ export default function CoordinatorsPage() {
   const [coordinators, setCoordinators] = useState<CoordinatorRecord[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [name, setName] = useState("");
+  const [position, setPosition] = useState<CoordinatorPosition | "">("");
   const [includeInactive, setIncludeInactive] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +66,7 @@ export default function CoordinatorsPage() {
     try {
       const params = new URLSearchParams();
       if (name) params.set("name", name);
+      if (position) params.set("position", position);
       if (includeInactive) params.set("includeInactive", "true");
       const [coordinatorResults, batchResults] = await Promise.all([
         apiClient.get<CoordinatorRecord[]>(`/api/coordinators?${params.toString()}`, accessToken),
@@ -75,7 +79,7 @@ export default function CoordinatorsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, name, includeInactive]);
+  }, [accessToken, name, position, includeInactive]);
 
   useEffect(() => {
     // load() only sets state after its own awaited fetch resolves — the
@@ -145,6 +149,21 @@ export default function CoordinatorsPage() {
             <Label htmlFor="search-name">Name</Label>
             <Input id="search-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Search by name" />
           </div>
+          <div className="min-w-40">
+            <Label htmlFor="search-position">Position</Label>
+            <Select
+              id="search-position"
+              value={position}
+              onChange={(e) => setPosition(e.target.value as CoordinatorPosition | "")}
+            >
+              <option value="">All positions</option>
+              {COORDINATOR_POSITION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </div>
           <Checkbox
             id="include-inactive"
             label="Include disabled"
@@ -180,6 +199,7 @@ export default function CoordinatorsPage() {
                   />
                   <TableHeaderCell>Name</TableHeaderCell>
                   <TableHeaderCell>Email</TableHeaderCell>
+                  <TableHeaderCell>Position</TableHeaderCell>
                   <TableHeaderCell>Batches</TableHeaderCell>
                   <TableHeaderCell>Status</TableHeaderCell>
                   <TableHeaderCell>Actions</TableHeaderCell>
@@ -199,6 +219,7 @@ export default function CoordinatorsPage() {
                       </Link>
                     </TableCell>
                     <TableCell>{coordinator.email}</TableCell>
+                    <TableCell>{coordinatorPositionLabel(coordinator.position)}</TableCell>
                     <TableCell>
                       {coordinator.batchIds.length === 0 ? (
                         <span className="text-(--color-text-secondary)">None</span>
@@ -250,6 +271,7 @@ export default function CoordinatorsPage() {
                   </Badge>
                 </div>
                 <p className="mt-2 text-xs text-(--color-text-secondary)">{coordinator.email}</p>
+                <p className="mt-1 text-xs text-(--color-text-secondary)">{coordinatorPositionLabel(coordinator.position)}</p>
                 {coordinator.batchIds.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {coordinator.batchIds.map((batchId) => (
@@ -318,6 +340,7 @@ interface CreateCoordinatorModalProps {
 function CreateCoordinatorModal({ isOpen, onClose, batches, accessToken, onCreated }: CreateCoordinatorModalProps) {
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
+  const [position, setPosition] = useState<CoordinatorPosition | "">("");
   const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -326,6 +349,7 @@ function CreateCoordinatorModal({ isOpen, onClose, batches, accessToken, onCreat
   function reset() {
     setEmail("");
     setFullName("");
+    setPosition("");
     setSelectedBatchIds([]);
     setError(null);
     setTempPassword(null);
@@ -343,7 +367,7 @@ function CreateCoordinatorModal({ isOpen, onClose, batches, accessToken, onCreat
     try {
       const result = await apiClient.post<{ tempPassword: string }>(
         "/api/coordinators",
-        { email, fullName, batchIds: selectedBatchIds },
+        { email, fullName, position: position || undefined, batchIds: selectedBatchIds },
         accessToken ?? undefined,
       );
       setTempPassword(result.tempPassword);
@@ -377,6 +401,21 @@ function CreateCoordinatorModal({ isOpen, onClose, batches, accessToken, onCreat
         <div>
           <Label htmlFor="create-email">Email</Label>
           <Input id="create-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor="create-position">Position</Label>
+          <Select
+            id="create-position"
+            value={position}
+            onChange={(e) => setPosition(e.target.value as CoordinatorPosition | "")}
+          >
+            <option value="">Unspecified</option>
+            {COORDINATOR_POSITION_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
         </div>
         {batches.length > 0 && (
           <div>

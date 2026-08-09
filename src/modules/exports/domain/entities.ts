@@ -45,10 +45,9 @@ export interface PublicPlacementRow {
 }
 
 /**
- * "Active Drives" has no backing data yet — PlacementDrive is explicitly a
- * Phase 2 entity (docs/database/08_Database_Design.md) that does not exist
- * in the frozen Phase 1 schema. Always 0 until that phase exists; see this
- * module's CHANGELOG entry for the full reasoning.
+ * V4.0 E7: `activeDrives` is now a real, computed count (PlacementDrive
+ * shipped in D1) — matched by company name, since RecruiterProfile has no
+ * Company FK (see PrismaRecruiterDirectoryExportRepository's doc comment).
  */
 export interface RecruiterDirectoryRow {
   readonly company: string;

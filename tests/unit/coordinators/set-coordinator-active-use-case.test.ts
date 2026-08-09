@@ -21,6 +21,7 @@ function seedRecord(overrides: Partial<CoordinatorRecord> = {}): CoordinatorReco
     email: "target@tnparch.in",
     fullName: "Target Coordinator",
     isActive: true,
+    position: null,
     batchIds: [],
     createdAt: new Date(),
     ...overrides,

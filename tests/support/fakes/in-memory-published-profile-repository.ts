@@ -23,8 +23,28 @@ export class InMemoryPublishedProfileRepository implements PublishedProfileRepos
       publishedFromDraftId: data.publishedFromDraftId,
       publishedAt: new Date(),
       publishedByUserId: data.publishedByUserId,
+      // Deliberately untouched on re-publish, exactly like the Prisma
+      // implementation — a re-approval must never reset a student's chosen
+      // visibility settings back to defaults.
+      isPubliclyDiscoverable: existing?.isPubliclyDiscoverable ?? true,
+      showCgpa: existing?.showCgpa ?? false,
     };
     this.byStudentId.set(data.studentProfileId, published);
     return published;
+  }
+
+  async updateVisibility(
+    studentProfileId: string,
+    data: { isPubliclyDiscoverable?: boolean; showCgpa?: boolean },
+  ): Promise<PublishedProfile> {
+    const existing = this.byStudentId.get(studentProfileId);
+    if (!existing) throw new Error("not found");
+    const updated: PublishedProfile = {
+      ...existing,
+      isPubliclyDiscoverable: data.isPubliclyDiscoverable ?? existing.isPubliclyDiscoverable,
+      showCgpa: data.showCgpa ?? existing.showCgpa,
+    };
+    this.byStudentId.set(studentProfileId, updated);
+    return updated;
   }
 }

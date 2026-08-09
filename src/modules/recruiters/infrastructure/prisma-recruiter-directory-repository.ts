@@ -8,7 +8,7 @@ import type {
 import type { RecruiterDirectoryRepository } from "../application/ports/recruiter-directory-repository";
 
 type ApprovedProfileRow = Prisma.StudentPublicProfileGetPayload<{
-  include: { studentProfile: { include: { batch: true } } };
+  include: { studentProfile: { include: { batch: true; user: true } } };
 }>;
 
 /**
@@ -46,7 +46,7 @@ export class PrismaRecruiterDirectoryRepository implements RecruiterDirectoryRep
 
     const rows = await this.prisma.studentPublicProfile.findMany({
       where: { AND: and },
-      include: { studentProfile: { include: { batch: true } } },
+      include: { studentProfile: { include: { batch: true, user: true } } },
     });
 
     const dtos = rows.map(toDTO).sort((a, b) => a.fullName.localeCompare(b.fullName));
@@ -70,10 +70,22 @@ export class PrismaRecruiterDirectoryRepository implements RecruiterDirectoryRep
         studentProfileId: studentId,
         studentProfile: { isActive: true, batch: { status: "ACTIVE" } },
       },
-      include: { studentProfile: { include: { batch: true } } },
+      include: { studentProfile: { include: { batch: true, user: true } } },
     });
 
     return row ? toDTO(row) : null;
+  }
+
+  async findManyByIds(studentIds: readonly string[]): Promise<RecruiterStudentProfileDTO[]> {
+    if (studentIds.length === 0) return [];
+    const rows = await this.prisma.studentPublicProfile.findMany({
+      where: {
+        studentProfileId: { in: [...studentIds] },
+        studentProfile: { isActive: true, batch: { status: "ACTIVE" } },
+      },
+      include: { studentProfile: { include: { batch: true, user: true } } },
+    });
+    return rows.map(toDTO).sort((a, b) => a.fullName.localeCompare(b.fullName));
   }
 
   async getDashboardStats(): Promise<RecruiterDashboardStats> {
@@ -143,7 +155,13 @@ export function toDTO(row: ApprovedProfileRow): RecruiterStudentProfileDTO {
     certifications: row.certifications as unknown as RecruiterStudentProfileDTO["certifications"],
     internships: row.internships as unknown as RecruiterStudentProfileDTO["internships"],
     hasResume: row.resumeFileId !== null,
-    profilePhotoUrl: null,
+    profilePhotoUrl: row.studentProfile.user.avatarFileId ? `/api/files/${row.studentProfile.user.avatarFileId}` : null,
+    // Merged in afterward by the use-case layer, which knows which recruiter
+    // is asking — this repository has no actor context (see
+    // RecruiterInteractionRepository in the same module for that lookup).
+    isSaved: false,
+    isShortlisted: false,
+    interestStatus: null,
   };
 }
 

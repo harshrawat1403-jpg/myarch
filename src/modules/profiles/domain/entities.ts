@@ -69,13 +69,22 @@ export interface ProfileDraft extends ProfileContent {
   readonly updatedAt: Date;
 }
 
-/** Immutable except through ApproveDraftUseCase's publish step. */
+/**
+ * Content fields are immutable except through ApproveDraftUseCase's publish
+ * step. isPubliclyDiscoverable/showCgpa (V4.0 B4) are the one exception —
+ * deliberately NOT part of the draft/approval content-review cycle (they're
+ * visibility settings, not profile content), so the student toggles them
+ * directly here via UpdateProfileVisibilityUseCase without needing another
+ * approval round-trip.
+ */
 export interface PublishedProfile extends ProfileContent {
   readonly id: string;
   readonly studentProfileId: string;
   readonly publishedFromDraftId: string | null;
   readonly publishedAt: Date;
   readonly publishedByUserId: string;
+  readonly isPubliclyDiscoverable: boolean;
+  readonly showCgpa: boolean;
 }
 
 export interface ApprovalQueueItem {

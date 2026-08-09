@@ -15,6 +15,12 @@ const NAV_ITEMS = [
   { href: "/placements", label: "Placements" },
   { href: "/students", label: "Students" },
   { href: "/recruiters", label: "Recruiters" },
+  // V4.0 B5: explicitly named in docs/planning/V4_0_PRD.md §3.
+  { href: "/directory", label: "Student Directory" },
+  // V4.0 B1: the public registration entry point (§7 step 2) — added here
+  // for discoverability, the same reasoning the PRD gives for
+  // "Student Directory" above.
+  { href: "/register", label: "Register" },
   { href: "/contact", label: "Contact" },
 ] as const;
 

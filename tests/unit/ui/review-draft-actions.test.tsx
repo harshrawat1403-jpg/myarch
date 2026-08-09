@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const pushMock = vi.fn();
 const fetchMock = vi.fn();
+const useAuthMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ studentId: "student-1" }),
@@ -12,7 +13,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/modules/auth/client", () => ({
-  useAuth: () => ({ accessToken: "test-access-token" }),
+  useAuth: () => useAuthMock(),
 }));
 
 import ReviewDraftPage from "../../../src/app/(admin)/dashboard/approvals/[studentId]/page";
@@ -29,6 +30,8 @@ describe("Approval review page — dashboard actions call the existing use cases
   beforeEach(() => {
     pushMock.mockClear();
     fetchMock.mockReset();
+    useAuthMock.mockReset();
+    useAuthMock.mockReturnValue({ accessToken: "test-access-token", role: "SECRETARY" });
     vi.stubGlobal("fetch", fetchMock);
   });
 
@@ -67,6 +70,7 @@ describe("Approval review page — dashboard actions call the existing use cases
   });
 
   it("calls the request-changes endpoint with the entered comment", async () => {
+    useAuthMock.mockReturnValue({ accessToken: "test-access-token", role: "COORDINATOR" });
     fetchMock.mockResolvedValueOnce(jsonResponse(pendingDraft));
     fetchMock.mockResolvedValueOnce(jsonResponse({ ...pendingDraft, status: "CHANGES_REQUESTED" }));
 
@@ -93,5 +97,17 @@ describe("Approval review page — dashboard actions call the existing use cases
 
     await screen.findByText("An architecture student");
     expect(screen.queryByRole("button", { name: /^approve$/i })).not.toBeInTheDocument();
+  });
+
+  it("hides the Approve action from a Coordinator (V4.0 Q1: Secretary is the sole final approval authority)", async () => {
+    useAuthMock.mockReturnValue({ accessToken: "test-access-token", role: "COORDINATOR" });
+    fetchMock.mockResolvedValueOnce(jsonResponse(pendingDraft));
+
+    render(<ReviewDraftPage />);
+
+    await screen.findByText("An architecture student");
+    expect(screen.queryByRole("button", { name: /^approve$/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/only the secretary can approve a profile/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /request changes/i })).toBeInTheDocument();
   });
 });

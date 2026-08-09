@@ -7,7 +7,21 @@
 export type NotificationTemplateId =
   | "PROFILE_APPROVED"
   | "PROFILE_CHANGES_REQUESTED"
-  | "ACCOUNT_CREDENTIALS_ISSUED";
+  | "ACCOUNT_CREDENTIALS_ISSUED"
+  | "INTEREST_FACILITATION_REQUIRED"
+  // V4.0 E2 — wired into the registration (B), recruiter-interest (C), and
+  // placement (D) use cases that never called notify() at all before this
+  // milestone. DEADLINE_REMINDER, PUBLICATION_PUBLISHED, and
+  // ANNOUNCEMENT_POSTED (also named in §12) are deliberately NOT added here
+  // yet — see this module's CHANGELOG-style note in registry.ts for why
+  // each is structurally blocked rather than simply unimplemented.
+  | "REGISTRATION_SUBMITTED"
+  | "REGISTRATION_REVIEWED"
+  | "REGISTRATION_DECIDED"
+  | "RECRUITER_INTEREST_RECEIVED"
+  | "RECRUITER_INTEREST_RESPONDED"
+  | "PLACEMENT_DRIVE_ANNOUNCED"
+  | "APPLICATION_STATUS_CHANGED";
 
 /**
  * The one thing a business use case knows about a notification: who should
@@ -27,11 +41,35 @@ export interface NotificationRequest {
 }
 
 /**
- * Mirrors prisma/schema.prisma's NotificationChannel enum (currently EMAIL
- * only). Kept as a project-owned type rather than importing the Prisma enum
- * directly so the domain layer stays framework-free.
+ * Mirrors prisma/schema.prisma's NotificationChannel enum. Kept as a
+ * project-owned type rather than importing the Prisma enum directly so the
+ * domain layer stays framework-free.
  */
-export type NotificationChannel = "EMAIL";
+export type NotificationChannel = "EMAIL" | "IN_APP";
+
+/**
+ * One persisted IN_APP notification row, as read back for the notification
+ * center. `payload` is the same raw context `notify()` was called with —
+ * rendering it into a title/message happens in the application layer
+ * (`renderInAppTemplate`), the same "render at read time from raw context"
+ * choice `renderEmailTemplate` already makes for the EMAIL channel.
+ */
+export interface NotificationRecord {
+  readonly id: string;
+  readonly template: NotificationTemplateId;
+  readonly payload: Record<string, unknown>;
+  readonly createdAt: Date;
+  readonly readAt: Date | null;
+}
+
+/** The notification center's actual read model — pre-rendered, ready to display. */
+export interface InAppNotificationDTO {
+  readonly id: string;
+  readonly title: string;
+  readonly message: string;
+  readonly isRead: boolean;
+  readonly createdAt: Date;
+}
 
 /**
  * The job type this module registers with the Background Job Processing

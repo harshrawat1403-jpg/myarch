@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const replaceMock = vi.fn();
@@ -61,5 +62,41 @@ describe("StudentLayout — Student-only route protection", () => {
 
     expect(await screen.findByText("student content")).toBeInTheDocument();
     expect(replaceMock).not.toHaveBeenCalled();
+  });
+
+  it("links to /student/applications (V4.0 D2)", async () => {
+    mockAuthState = { isLoading: false, isAuthenticated: true, role: "STUDENT", logout: vi.fn() };
+    render(<StudentLayout>{"student content"}</StudentLayout>);
+
+    await screen.findByText("student content");
+    expect(screen.getByRole("link", { name: /applications/i })).toHaveAttribute("href", "/student/applications");
+  });
+
+  it("links to /student/interests (V4.0 C3)", async () => {
+    mockAuthState = { isLoading: false, isAuthenticated: true, role: "STUDENT", logout: vi.fn() };
+    render(<StudentLayout>{"student content"}</StudentLayout>);
+
+    await screen.findByText("student content");
+    expect(screen.getByRole("link", { name: /interests/i })).toHaveAttribute("href", "/student/interests");
+  });
+
+  it("links Overview to /student and My Profile to /student/profile (V4.0 D6 — career hub split)", async () => {
+    mockAuthState = { isLoading: false, isAuthenticated: true, role: "STUDENT", logout: vi.fn() };
+    render(<StudentLayout>{"student content"}</StudentLayout>);
+
+    await screen.findByText("student content");
+    expect(screen.getByRole("link", { name: /^overview$/i })).toHaveAttribute("href", "/student");
+    expect(screen.getByRole("link", { name: /^my profile$/i })).toHaveAttribute("href", "/student/profile");
+  });
+
+  it("offers Account Settings from the user menu, linking to /student/account (V4.0 A3 parity fix)", async () => {
+    mockAuthState = { isLoading: false, isAuthenticated: true, role: "STUDENT", logout: vi.fn() };
+    const user = userEvent.setup();
+    render(<StudentLayout>{"student content"}</StudentLayout>);
+
+    await screen.findByText("student content");
+    await user.click(screen.getByRole("button", { name: /account menu/i }));
+
+    expect(screen.getByRole("link", { name: /account settings/i })).toHaveAttribute("href", "/student/account");
   });
 });

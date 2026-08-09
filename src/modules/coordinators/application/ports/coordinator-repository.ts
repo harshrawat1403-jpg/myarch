@@ -1,12 +1,14 @@
-import type { CoordinatorRecord, CoordinatorSearchFilters } from "../../domain/entities";
+import type { CoordinatorPosition, CoordinatorRecord, CoordinatorSearchFilters } from "../../domain/entities";
 
 export interface CreateCoordinatorData {
   userId: string;
   fullName: string;
+  position?: CoordinatorPosition | null;
 }
 
 export interface UpdateCoordinatorData {
   fullName?: string;
+  position?: CoordinatorPosition | null;
 }
 
 export interface CoordinatorRepository {

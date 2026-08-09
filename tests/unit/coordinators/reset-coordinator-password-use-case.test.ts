@@ -14,6 +14,7 @@ function record(overrides: Partial<CoordinatorRecord> = {}): CoordinatorRecord {
     email: "alice@tnparch.in",
     fullName: "Alice Coordinator",
     isActive: true,
+    position: null,
     batchIds: [],
     createdAt: new Date(),
     ...overrides,

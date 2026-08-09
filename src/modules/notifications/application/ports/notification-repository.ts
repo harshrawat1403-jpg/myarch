@@ -1,4 +1,4 @@
-import type { NotificationChannel, NotificationTemplateId } from "../../domain/entities";
+import type { NotificationChannel, NotificationRecord, NotificationTemplateId } from "../../domain/entities";
 
 /**
  * Persistence for the Notification table (prisma/schema.prisma, designed in
@@ -29,4 +29,15 @@ export interface NotificationRepository {
    * signature.
    */
   markFailed(id: string, reason: string): Promise<void>;
+
+  /** V4.0 E1 — the notification center's read query: this recipient's own IN_APP rows, newest first. */
+  listInAppForRecipient(recipientUserId: string, limit: number): Promise<NotificationRecord[]>;
+
+  /**
+   * Scoped to `recipientUserId` so one user can never mark another's
+   * notification read by guessing an id — returns false (not found/not
+   * owned) rather than throwing, letting the use case decide how to map
+   * that to a 404 without a separate existence check.
+   */
+  markRead(id: string, recipientUserId: string): Promise<boolean>;
 }

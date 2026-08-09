@@ -63,6 +63,10 @@ enum FileClassification {
 
 enum NotificationChannel {
   EMAIL
+  // V4.0 E1 — the concrete backing for the notification bell SheetLayout's
+  // header already reserved (previously a literal "not yet available"
+  // placeholder). Additive; existing EMAIL rows/behavior untouched.
+  IN_APP
 }
 
 enum NotificationStatus {
@@ -97,6 +101,25 @@ enum RecruiterApprovalStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+// V4.0 B1: SUBMITTED → (REVIEWED | NEEDS_ATTENTION, Coordinator, non-final)
+// → (APPROVED | REJECTED, Secretary, final — Q1). Coordinator's mark is
+// advisory context for the Secretary's decision, not a gate.
+enum RegistrationRequestStatus {
+  SUBMITTED
+  REVIEWED
+  NEEDS_ATTENTION
+  APPROVED
+  REJECTED
+}
+
+// V4.0 (A1): display/reporting label only — both positions have
+// byte-for-byte identical permissions (§4 of the V4.0 PRD). Never read by
+// any permission function; only ever branch on `role === "COORDINATOR"`.
+enum CoordinatorPosition {
+  T_AND_P
+  ALUMNI
 }
 
 enum BulkRunStatus {
@@ -153,14 +176,23 @@ model User {
   refreshTokens RefreshToken[]
 
   // Reverse relations for audit/traceability — who last touched a record.
-  updatedPrivateProfiles     StudentPrivateProfile[]     @relation("PrivateProfileUpdatedBy")
-  reviewedDrafts             StudentPublicProfileDraft[] @relation("DraftReviewedBy")
-  publishedProfiles          StudentPublicProfile[]      @relation("ProfilePublishedBy")
-  uploadedFiles              FileAsset[]                 @relation("FileOwner")
-  auditLogEntries            AuditLog[]                  @relation("AuditActor")
-  notifications              Notification[]              @relation("NotificationRecipient")
-  bulkImportRuns             BulkImportRun[]             @relation("BulkImportRunActor")
-  academicYearTransitionRuns AcademicYearTransitionRun[] @relation("AcademicYearTransitionRunActor")
+  updatedPrivateProfiles       StudentPrivateProfile[]     @relation("PrivateProfileUpdatedBy")
+  reviewedDrafts               StudentPublicProfileDraft[] @relation("DraftReviewedBy")
+  publishedProfiles            StudentPublicProfile[]      @relation("ProfilePublishedBy")
+  uploadedFiles                FileAsset[]                 @relation("FileOwner")
+  auditLogEntries              AuditLog[]                  @relation("AuditActor")
+  notifications                Notification[]              @relation("NotificationRecipient")
+  bulkImportRuns               BulkImportRun[]             @relation("BulkImportRunActor")
+  academicYearTransitionRuns   AcademicYearTransitionRun[] @relation("AcademicYearTransitionRunActor")
+  reviewedRegistrationRequests RegistrationRequest[]       @relation("RegistrationRequestReviewedBy")
+  decidedRegistrationRequests  RegistrationRequest[]       @relation("RegistrationRequestDecidedBy")
+  createdPlacementDrives       PlacementDrive[]            @relation("PlacementDriveCreatedBy")
+  applicationStatusChanges     ApplicationStatusEvent[]    @relation("ApplicationStatusChangedBy")
+  createdPublicationTemplates  PublicationTemplate[]       @relation("PublicationTemplateCreatedBy")
+  createdPublications          Publication[]               @relation("PublicationCreatedBy")
+  lastEditedPublications       Publication[]               @relation("PublicationLastEditedBy")
+  createdPublicationVersions   PublicationVersion[]        @relation("PublicationVersionCreatedBy")
+  generatedPublicationExports  PublicationExport[]         @relation("PublicationExportGeneratedBy")
 
   @@map("users")
 }
@@ -204,7 +236,9 @@ model CoordinatorProfile {
   // User.isActive in one $transaction (see PrismaStudentRepository.setActive
   // for the template). "Disable" and "Delete (soft delete)" are the same
   // toggle, not two independent states.
-  isActive Boolean @default(true)
+  isActive Boolean              @default(true)
+  // V4.0 (A1): T&P vs Alumni — display/reporting label only, see enum doc comment.
+  position CoordinatorPosition?
 
   batchScopes CoordinatorBatchScope[]
 
@@ -247,7 +281,60 @@ model RecruiterProfile {
   // — see the RecruiterApprovalStatus enum doc comment.
   approvalStatus RecruiterApprovalStatus @default(APPROVED)
 
+  savedStudents    RecruiterStudentInteraction[]
+  interestRequests RecruiterInterestRequest[]
+
   @@map("recruiter_profiles")
+}
+
+// V4.0 C1: Save + Shortlist collapsed into one row with two flags (Q3,
+// §23) — a promoted-save is still the same row, never a separate
+// named-collection table. Both fields are private to the recruiter; never
+// visible to the student or any other recruiter (§8).
+model RecruiterStudentInteraction {
+  id                 String           @id @default(uuid()) @db.Uuid
+  recruiterProfileId String           @db.Uuid
+  recruiterProfile   RecruiterProfile @relation(fields: [recruiterProfileId], references: [id], onDelete: Cascade)
+  studentProfileId   String           @db.Uuid
+  studentProfile     StudentProfile   @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  savedAt       DateTime?
+  isShortlisted Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([recruiterProfileId, studentProfileId])
+  @@index([studentProfileId])
+  @@map("recruiter_student_interactions")
+}
+
+// V4.0 C2: the unique constraint below is the mechanism that satisfies
+// "prevent duplicate submissions" (§5.1) — a second Express Interest attempt
+// updates/reads the same row rather than creating a new one.
+model RecruiterInterestRequest {
+  id                 String           @id @default(uuid()) @db.Uuid
+  recruiterProfileId String           @db.Uuid
+  recruiterProfile   RecruiterProfile @relation(fields: [recruiterProfileId], references: [id], onDelete: Cascade)
+  studentProfileId   String           @db.Uuid
+  studentProfile     StudentProfile   @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  message     String?
+  status      RecruiterInterestStatus @default(SENT)
+  sentAt      DateTime                @default(now())
+  respondedAt DateTime?
+  completedAt DateTime?
+
+  @@unique([recruiterProfileId, studentProfileId])
+  @@index([studentProfileId])
+  @@map("recruiter_interest_requests")
+}
+
+enum RecruiterInterestStatus {
+  SENT
+  ACCEPTED
+  DECLINED
+  COMPLETED
 }
 
 // ---------------------------------------------------------------------------
@@ -262,9 +349,10 @@ model Batch {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
-  students          StudentProfile[]
-  coordinatorScopes CoordinatorBatchScope[]
-  bulkImportRuns    BulkImportRun[]
+  students             StudentProfile[]
+  coordinatorScopes    CoordinatorBatchScope[]
+  bulkImportRuns       BulkImportRun[]
+  registrationRequests RegistrationRequest[]
 
   @@map("batches")
 }
@@ -285,9 +373,20 @@ model StudentProfile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  privateProfile StudentPrivateProfile?
-  publicProfile  StudentPublicProfile?
-  draft          StudentPublicProfileDraft?
+  // V4.0 E6 (§15/§19) — Postgres-generated tsvector over fullName+rollNumber,
+  // GIN-indexed, populated by the hand-written migration.sql (Prisma can't
+  // express GENERATED ALWAYS AS ... STORED via the schema DSL). Read-only —
+  // never written to from application code, hence Unsupported.
+  searchVector Unsupported("tsvector")?
+
+  privateProfile               StudentPrivateProfile?
+  publicProfile                StudentPublicProfile?
+  draft                        StudentPublicProfileDraft?
+  registrationRequest          RegistrationRequest?
+  recruiterStudentInteractions RecruiterStudentInteraction[]
+  recruiterInterestRequests    RecruiterInterestRequest[]
+  applications                 Application[]
+  alumniProfile                AlumniProfile?
 
   @@index([batchId])
   @@map("student_profiles")
@@ -333,6 +432,14 @@ model StudentPublicProfile {
   certifications   Json       @default("[]")
   internships      Json       @default("[]")
 
+  // V4.0 B4: the concrete implementation of "students control visibility of
+  // sensitive information" (§7). isPubliclyDiscoverable gates appearing in
+  // the public directory at all; showCgpa is a narrow, separate opt-in for
+  // the single CGPA value — enforced server-side in the public repository's
+  // query/projection only, never trusted from a client parameter (§18.2).
+  isPubliclyDiscoverable Boolean @default(true)
+  showCgpa               Boolean @default(false)
+
   publishedFromDraftId String?                    @unique @db.Uuid
   publishedFromDraft   StudentPublicProfileDraft? @relation("PublishedFrom", fields: [publishedFromDraftId], references: [id])
   publishedAt          DateTime                   @default(now())
@@ -374,6 +481,43 @@ model StudentPublicProfileDraft {
   @@map("student_public_profile_drafts")
 }
 
+// V4.0 B1: the public, unauthenticated entry point into the platform — no
+// User/StudentProfile exists until a Secretary approves this (§7 step 2–4,
+// §24 "Public Registration must NOT create active accounts before Secretary
+// approval"). submittedData holds self-reported contact fields (phone,
+// personal email, notes) kept separate from StudentPrivateProfile until
+// approval, matching the PRD's field list (§5.1).
+model RegistrationRequest {
+  id            String                    @id @default(uuid()) @db.Uuid
+  email         String
+  fullName      String
+  rollNumber    String
+  batchId       String                    @db.Uuid
+  batch         Batch                     @relation(fields: [batchId], references: [id])
+  submittedData Json                      @default("{}")
+  status        RegistrationRequestStatus @default(SUBMITTED)
+
+  coordinatorComment String?
+  reviewedByUserId   String?   @db.Uuid
+  reviewedBy         User?     @relation("RegistrationRequestReviewedBy", fields: [reviewedByUserId], references: [id])
+  reviewedAt         DateTime?
+
+  decidedByUserId String?   @db.Uuid
+  decidedBy       User?     @relation("RegistrationRequestDecidedBy", fields: [decidedByUserId], references: [id])
+  decidedAt       DateTime?
+  rejectionReason String?
+
+  resultingStudentProfileId String?         @unique @db.Uuid
+  resultingStudentProfile   StudentProfile? @relation(fields: [resultingStudentProfileId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([batchId])
+  @@index([status])
+  @@map("registration_requests")
+}
+
 // ---------------------------------------------------------------------------
 // Files
 // ---------------------------------------------------------------------------
@@ -391,12 +535,219 @@ model FileAsset {
   confidentialOfPrivateProfileId String?                @db.Uuid
   confidentialOfPrivateProfile   StudentPrivateProfile? @relation("ConfidentialDocumentsOf", fields: [confidentialOfPrivateProfileId], references: [id])
 
-  usedAsPublicResume StudentPublicProfile[]      @relation("PublicResumeOf")
-  usedAsDraftResume  StudentPublicProfileDraft[] @relation("DraftResumeOf")
-  usedAsAvatarOf     User?                       @relation("UserAvatar")
+  usedAsPublicResume        StudentPublicProfile[]      @relation("PublicResumeOf")
+  usedAsDraftResume         StudentPublicProfileDraft[] @relation("DraftResumeOf")
+  usedAsAvatarOf            User?                       @relation("UserAvatar")
+  usedAsLogoOf              Company?                    @relation("CompanyLogo")
+  usedAsCertificateOf       InternshipOutcome?          @relation("InternshipCertificate")
+  usedAsTemplateThumbnailOf PublicationTemplate?        @relation("PublicationTemplateThumbnail")
+  usedAsPublicationExportOf PublicationExport?          @relation("PublicationExportFile")
 
   @@index([ownerUserId])
   @@map("file_assets")
+}
+
+// ---------------------------------------------------------------------------
+// Placement Pipeline (V4.0 A4 — Company only; PlacementDrive/Application
+// arrive with Phase D, per docs/planning/V4_0_PRD.md §17)
+// ---------------------------------------------------------------------------
+
+// V4.0 A4: the directory record docs/database/08_Database_Design.md
+// pre-designed as a "Phase 2" entity — a pure directory record, not a
+// login-capable entity (RecruiterProfile still authenticates as an
+// individual; see §24 Q5). Secretary-managed, Coordinator-viewable (§4).
+// RecruiterProfile.companyName → companyId FK migration is deliberately
+// deferred to Phase C, where /recruiter/company first needs it — wiring it
+// now would be a schema change with no consumer yet.
+model Company {
+  id      String  @id @default(uuid()) @db.Uuid
+  name    String
+  sector  String?
+  website String?
+
+  logoFileId String?    @unique @db.Uuid
+  logoFile   FileAsset? @relation("CompanyLogo", fields: [logoFileId], references: [id])
+
+  // Mirrors CoordinatorProfile.isActive/RecruiterProfile.isActive — the
+  // same "disable is soft delete" pattern used everywhere else in the app.
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // V4.0 E6 — see StudentProfile.searchVector's doc comment; same pattern, over `name`.
+  searchVector Unsupported("tsvector")?
+
+  placementDrives PlacementDrive[]
+
+  @@index([name])
+  @@map("companies")
+}
+
+enum PlacementDriveType {
+  PLACEMENT
+  INTERNSHIP
+}
+
+enum PlacementDriveStatus {
+  DRAFT
+  ANNOUNCED
+  IN_PROGRESS
+  CLOSED
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SHORTLISTED
+  INTERVIEW
+  OFFER
+  REJECTED
+  ACCEPTED
+  ACTIVE
+  COMPLETED
+  WITHDRAWN
+}
+
+// V4.0 D1 (§0, §5.1, §11) — Internships are a `type` variant of this same
+// model, never a parallel entity tree ("data entered once, reused
+// everywhere" — explicitly approved over a separate Internship entity).
+model PlacementDrive {
+  id        String             @id @default(uuid()) @db.Uuid
+  companyId String             @db.Uuid
+  company   Company            @relation(fields: [companyId], references: [id])
+  title     String
+  type      PlacementDriveType
+
+  // { minCgpa?: number, backlogAllowance?: boolean, eligibleBatchIds: string[] }
+  eligibility         Json
+  packageOrStipend    String?
+  description         String?
+  status              PlacementDriveStatus @default(DRAFT)
+  applicationDeadline DateTime?
+
+  createdByUserId String @db.Uuid
+  createdBy       User   @relation("PlacementDriveCreatedBy", fields: [createdByUserId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // V4.0 E6 — see StudentProfile.searchVector's doc comment; same pattern, over `title`.
+  searchVector Unsupported("tsvector")?
+
+  applications Application[]
+
+  @@index([companyId])
+  @@index([status])
+  @@map("placement_drives")
+}
+
+// V4.0 D1 (§5.1, §11) — currentStatus walks APPLIED → SHORTLISTED →
+// INTERVIEW → OFFER → ACCEPTED (placement), or for an INTERNSHIP drive
+// continues ACCEPTED → ACTIVE → COMPLETED. REJECTED/WITHDRAWN are terminal
+// exits from any non-terminal state. One row per student per drive — the
+// unique constraint is the "prevent duplicate applications" mechanism,
+// mirroring RecruiterInterestRequest's own unique-constraint precedent.
+model Application {
+  id               String         @id @default(uuid()) @db.Uuid
+  studentProfileId String         @db.Uuid
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  placementDriveId String         @db.Uuid
+  placementDrive   PlacementDrive @relation(fields: [placementDriveId], references: [id], onDelete: Cascade)
+
+  currentStatus ApplicationStatus @default(APPLIED)
+  currentRound  Int?
+
+  // V4.0 D3 (§14, §18) — "simple date/time/mode fields on Application, no
+  // calendar-sync integration." Both nullable: an interview only exists
+  // once a Secretary/Coordinator schedules one, and either can be
+  // rescheduled by setting them again.
+  interviewScheduledAt DateTime?
+  interviewMode        InterviewMode?
+
+  appliedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  statusEvents      ApplicationStatusEvent[]
+  internshipOutcome InternshipOutcome?
+
+  @@unique([studentProfileId, placementDriveId])
+  @@index([placementDriveId])
+  @@index([studentProfileId])
+  @@map("applications")
+}
+
+// V4.0 D4 (§5.1) — "the internship-specific tail end of the lifecycle, kept
+// OFF Application itself so a placement Application never carries
+// irrelevant certificate/feedback columns." One row per Application, only
+// ever created once the application reaches ACTIVE on an INTERNSHIP drive.
+model InternshipOutcome {
+  id            String      @id @default(uuid()) @db.Uuid
+  applicationId String      @unique @db.Uuid
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  certificateFileId String?    @unique @db.Uuid
+  certificateFile   FileAsset? @relation("InternshipCertificate", fields: [certificateFileId], references: [id])
+
+  companyFeedback String?
+  studentFeedback String?
+  completedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("internship_outcomes")
+}
+
+enum InterviewMode {
+  ONLINE
+  IN_PERSON
+  PHONE
+}
+
+// V4.0 D5 (§5.1) — "Manage alumni records: Coordinator Full (operational),
+// Secretary Full" (§4's permission matrix — the one entity in this PRD
+// where both roles have byte-for-byte identical CRUD authority, no
+// approve/decide split). studentProfileId is nullable for rare
+// pre-platform alumni with no StudentProfile row at all.
+model AlumniProfile {
+  id               String          @id @default(uuid()) @db.Uuid
+  studentProfileId String?         @unique @db.Uuid
+  studentProfile   StudentProfile? @relation(fields: [studentProfileId], references: [id])
+
+  fullName            String
+  graduationYear      Int
+  currentCompany      String?
+  designation         String?
+  location            String?
+  portfolioUrl        String?
+  linkedInUrl         String?
+  mentorshipAvailable Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([graduationYear])
+  @@map("alumni_profiles")
+}
+
+// V4.0 D1 (§5.1, §11) — append-only audit trail of status changes, never
+// mutated in place, directly mirroring the existing AuditLog pattern.
+model ApplicationStatusEvent {
+  id            String      @id @default(uuid()) @db.Uuid
+  applicationId String      @db.Uuid
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  fromStatus ApplicationStatus?
+  toStatus   ApplicationStatus
+  note       String?
+
+  changedByUserId String @db.Uuid
+  changedBy       User   @relation("ApplicationStatusChangedBy", fields: [changedByUserId], references: [id])
+
+  occurredAt DateTime @default(now())
+
+  @@index([applicationId])
+  @@map("application_status_events")
 }
 
 // ---------------------------------------------------------------------------
@@ -430,6 +781,9 @@ model Notification {
   payload         Json                @default("{}")
   createdAt       DateTime            @default(now())
   sentAt          DateTime?
+  // V4.0 E1 — set when the recipient dismisses/opens an IN_APP row in the
+  // notification center. Unused (always null) for EMAIL rows.
+  readAt          DateTime?
 
   @@index([recipientUserId])
   @@map("notifications")
@@ -525,4 +879,182 @@ model AcademicYearTransitionRun {
 
   @@index([actorUserId])
   @@map("academic_year_transition_runs")
+}
+
+// V4.0 (A2): Postgres-backed token-bucket rate limiter — one row per
+// (surface, key) pair, e.g. "login:email:x@y.com" or
+// "recruiter-discovery:<userId>". Deliberately DB-backed rather than
+// in-process, matching the same "avoid new infrastructure at this scale"
+// reasoning that put the job queue in Postgres instead of a message broker
+// (see docs/planning/V4_0_PRD.md §18). See src/lib/rate-limit.ts for the
+// token-bucket algorithm and src/lib/prisma-rate-limiter.ts for the
+// row-locked read-refill-write that keeps concurrent requests correct.
+model RateLimitBucket {
+  key          String   @id
+  tokens       Float
+  lastRefillAt DateTime
+  updatedAt    DateTime @updatedAt
+
+  @@map("rate_limit_buckets")
+}
+
+// ---------------------------------------------------------------------------
+// Publication Studio (V4.0 E3 — docs/planning/V4_0_PRD.md §13, §5.1)
+// Template-driven, never freeform: PublicationTemplate is a fixed skeleton of
+// named block slots; Publication.contentJson is the actual block tree a
+// Secretary/Coordinator edits (reorder/show-hide/edit text/swap images), never
+// arbitrary positioning. PublicationVersion is an append-only snapshot
+// written on every Publish, mirroring AcademicYearTransitionRun's own frozen-
+// plan pattern above. PublicationExport artifacts are always generated by a
+// background job (never inline in a request — see src/modules/jobs), exactly
+// like every other file-producing action in this codebase.
+// ---------------------------------------------------------------------------
+
+// The ten publication kinds named in §13.1 map onto these seven storage
+// categories (PublicationTemplate.name carries the specific kind — e.g. both
+// "Placement Brochure" and "Department Brochure" are type=BROCHURE, distinguished
+// by their own templates' structureJson/data-binding, not by a 10-value enum).
+enum PublicationType {
+  BROCHURE
+  BOOKLET
+  PORTFOLIO_BOOK
+  ANNUAL_REPORT
+  NEWSLETTER
+  MAGAZINE
+  CUSTOM
+}
+
+enum PublicationTemplateStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum PublicationStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PublicationPageSize {
+  A4_PORTRAIT
+  A4_LANDSCAPE
+  A3
+  CUSTOM
+}
+
+enum PublicationExportFormat {
+  PDF
+  PPTX
+  PNG
+  JPEG
+}
+
+enum PublicationExportStatus {
+  PENDING
+  GENERATING
+  READY
+  FAILED
+}
+
+// A pre-built structure with named data-binding slots — never authored by an
+// end user in V4.0 (no template-builder UI; §13 explicitly starts the flow at
+// "Choose Template"). Seeded once via prisma/seed.ts, one row per kind in §13.1.
+model PublicationTemplate {
+  id              String                    @id @default(uuid()) @db.Uuid
+  name            String
+  type            PublicationType
+  description     String?
+  thumbnailFileId String?                   @unique @db.Uuid
+  thumbnailFile   FileAsset?                @relation("PublicationTemplateThumbnail", fields: [thumbnailFileId], references: [id])
+  structureJson   Json
+  status          PublicationTemplateStatus @default(ACTIVE)
+  createdByUserId String                    @db.Uuid
+  createdBy       User                      @relation("PublicationTemplateCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime                  @default(now())
+
+  publications Publication[]
+
+  @@index([type])
+  @@map("publication_templates")
+}
+
+model Publication {
+  id     String            @id @default(uuid()) @db.Uuid
+  title  String
+  type   PublicationType
+  status PublicationStatus @default(DRAFT)
+
+  templateId String?              @db.Uuid
+  template   PublicationTemplate? @relation(fields: [templateId], references: [id])
+
+  // The live, editable block tree — see src/modules/publications/domain/blocks.ts.
+  // Data-bound blocks store only a reference id (e.g. studentProfileId), never
+  // a copy of the underlying record — resolved live at preview/export time
+  // (§13.1 step 2: "never copy-pasted/retyped").
+  contentJson Json
+
+  pageSize         PublicationPageSize @default(A4_PORTRAIT)
+  customDimensions Json?
+
+  // Optimistic lock (§13.4) — bumped on every save, compared on write;
+  // a mismatch means someone else edited this since it was loaded.
+  version Int @default(1)
+
+  createdByUserId    String   @db.Uuid
+  createdBy          User     @relation("PublicationCreatedBy", fields: [createdByUserId], references: [id])
+  lastEditedByUserId String   @db.Uuid
+  lastEditedBy       User     @relation("PublicationLastEditedBy", fields: [lastEditedByUserId], references: [id])
+  lastEditedAt       DateTime @default(now())
+  createdAt          DateTime @default(now())
+
+  // V4.0 E6 — see StudentProfile.searchVector's doc comment; same pattern, over `title`.
+  searchVector Unsupported("tsvector")?
+
+  versions PublicationVersion[]
+  exports  PublicationExport[]
+
+  @@index([status])
+  @@index([type])
+  @@map("publications")
+}
+
+// Append-only — written on every Publish action (§13.4). Never updated or
+// deleted; a restore creates a NEW draft state from an old snapshot, it does
+// not rewrite history.
+model PublicationVersion {
+  id                  String      @id @default(uuid()) @db.Uuid
+  publicationId       String      @db.Uuid
+  publication         Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  versionNumber       Int
+  contentJsonSnapshot Json
+  label               String?
+  createdByUserId     String      @db.Uuid
+  createdBy           User        @relation("PublicationVersionCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt           DateTime    @default(now())
+
+  @@unique([publicationId, versionNumber])
+  @@index([publicationId])
+  @@map("publication_versions")
+}
+
+// Each export is a background-job-produced, FileAsset-backed artifact (§13.4,
+// §19) — never generated inline in a request. status tracks the job's own
+// progress the same way Notification.status tracks SEND_NOTIFICATION's.
+model PublicationExport {
+  id                String                  @id @default(uuid()) @db.Uuid
+  publicationId     String                  @db.Uuid
+  publication       Publication             @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  format            PublicationExportFormat
+  status            PublicationExportStatus @default(PENDING)
+  fileId            String?                 @unique @db.Uuid
+  file              FileAsset?              @relation("PublicationExportFile", fields: [fileId], references: [id])
+  errorMessage      String?
+  generatedByUserId String                  @db.Uuid
+  generatedBy       User                    @relation("PublicationExportGeneratedBy", fields: [generatedByUserId], references: [id])
+  requestedAt       DateTime                @default(now())
+  completedAt       DateTime?
+
+  @@index([publicationId])
+  @@map("publication_exports")
 }

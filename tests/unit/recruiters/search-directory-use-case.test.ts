@@ -4,6 +4,9 @@ import type { RecruiterStudentProfileDTO } from "../../../src/modules/recruiters
 import { SearchDirectoryUseCase } from "../../../src/modules/recruiters/application/use-cases/search-directory";
 import { NotAuthorizedError } from "../../../src/lib/errors";
 import { InMemoryRecruiterDirectoryRepository } from "../../support/fakes/in-memory-recruiter-directory-repository";
+import { InMemoryRecruiterInteractionRepository } from "../../support/fakes/in-memory-recruiter-interaction-repository";
+import { InMemoryRecruiterInterestRepository } from "../../support/fakes/in-memory-recruiter-interest-repository";
+import { FakeRecruiterSelfLookup } from "../../support/fakes/fake-recruiter-self-lookup";
 
 const recruiter: AuthenticatedActor = { userId: "rec-1", role: "RECRUITER" };
 const secretary: AuthenticatedActor = { userId: "sec-1", role: "SECRETARY" };
@@ -25,6 +28,9 @@ function profile(overrides: Partial<RecruiterStudentProfileDTO>): RecruiterStude
     internships: [],
     hasResume: true,
     profilePhotoUrl: null,
+    isSaved: false,
+    isShortlisted: false,
+    interestStatus: null,
     ...overrides,
   };
 }
@@ -35,7 +41,12 @@ describe("SearchDirectoryUseCase", () => {
 
   beforeEach(() => {
     repo = new InMemoryRecruiterDirectoryRepository();
-    useCase = new SearchDirectoryUseCase({ directoryRepository: repo });
+    useCase = new SearchDirectoryUseCase({
+      directoryRepository: repo,
+      interactionRepository: new InMemoryRecruiterInteractionRepository(),
+      interestRepository: new InMemoryRecruiterInterestRepository(),
+      recruiterSelfLookup: new FakeRecruiterSelfLookup(),
+    });
 
     repo.seedApproved(profile({ studentId: "s1", fullName: "Alice Architect", batchId: "batch-a", skills: ["Rendering"], software: ["Rhino"] }));
     repo.seedApproved(
@@ -125,5 +136,31 @@ describe("SearchDirectoryUseCase", () => {
   it("free-text search matches certifications", async () => {
     const results = await useCase.execute({ actor: recruiter, filters: { query: "green associate" } });
     expect(results.map((r) => r.fullName)).toEqual(["Carol Craftsperson"]);
+  });
+
+  it("merges the requesting recruiter's own save/shortlist state onto each result (V4.0 C1)", async () => {
+    const interactionRepository = new InMemoryRecruiterInteractionRepository();
+    const recruiterSelfLookup = new FakeRecruiterSelfLookup();
+    recruiterSelfLookup.seed("rec-1", "recruiter-profile-1");
+    interactionRepository.seed("recruiter-profile-1", { studentProfileId: "s1", isSaved: true, isShortlisted: true });
+    const scopedUseCase = new SearchDirectoryUseCase({
+      directoryRepository: repo,
+      interactionRepository,
+      interestRepository: new InMemoryRecruiterInterestRepository(),
+      recruiterSelfLookup,
+    });
+
+    const results = await scopedUseCase.execute({ actor: recruiter, filters: {} });
+    const alice = results.find((r) => r.studentId === "s1")!;
+    const bob = results.find((r) => r.studentId === "s2")!;
+    expect(alice.isSaved).toBe(true);
+    expect(alice.isShortlisted).toBe(true);
+    expect(bob.isSaved).toBe(false);
+    expect(bob.isShortlisted).toBe(false);
+  });
+
+  it("defaults isSaved/isShortlisted to false for a recruiter with no RecruiterProfile row resolvable (defensive, should not happen in practice)", async () => {
+    const results = await useCase.execute({ actor: recruiter, filters: {} });
+    expect(results.every((r) => r.isSaved === false && r.isShortlisted === false)).toBe(true);
   });
 });

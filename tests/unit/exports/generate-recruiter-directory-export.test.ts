@@ -21,7 +21,7 @@ describe("GenerateRecruiterDirectoryExportUseCase — Secretary-only (no batch d
       company: "Studio Example",
       contactPerson: "Jordan Recruiter",
       officialEmail: "jordan@studio-example.com",
-      activeDrives: 0,
+      activeDrives: 2,
     });
   });
 
@@ -43,9 +43,9 @@ describe("GenerateRecruiterDirectoryExportUseCase — Secretary-only (no batch d
     await expect(useCase.execute({ actor: student })).rejects.toBeInstanceOf(NotAuthorizedError);
   });
 
-  it("always reports activeDrives as 0 (PlacementDrive does not exist in the Phase 1 schema)", async () => {
+  it("passes through the repository's computed activeDrives count unchanged (V4.0 E7 — real aggregation lives in PrismaRecruiterDirectoryExportRepository)", async () => {
     const rows = await useCase.execute({ actor: secretary });
-    expect(rows[0]!.activeDrives).toBe(0);
+    expect(rows[0]!.activeDrives).toBe(2);
   });
 
   it("handles an empty dataset without error", async () => {

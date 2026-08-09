@@ -31,15 +31,43 @@ export interface RecruiterStudentProfileDTO {
   readonly certifications: readonly CertificationEntry[];
   readonly internships: readonly InternshipEntry[];
   readonly hasResume: boolean;
-  /**
-   * No photo field exists anywhere in the frozen schema
-   * (docs/database/08_Database_Design.md's StudentPublicProfile has no
-   * image/photo column) — always null today. Present on the DTO now so the
-   * card UI has a stable field to render a placeholder against, and so a
-   * future schema addition has an obvious, single place to wire through
-   * rather than inventing the DTO field at that time under time pressure.
-   */
+  /** V4.0 A5/C1: resolves User.avatarFileId → /api/files/{id}, the same reused avatar mechanism the public directory (B4) uses — null only when the student never uploaded one. */
   readonly profilePhotoUrl: string | null;
+  /** V4.0 C1 — private to the requesting recruiter; never visible to the student or any other recruiter (§8). False for an unauthenticated-style default when no interaction row exists yet. */
+  readonly isSaved: boolean;
+  readonly isShortlisted: boolean;
+  /** V4.0 C2 — null when this recruiter has never expressed interest in this student; otherwise the current lifecycle state (§8 step 4 — a second Express Interest attempt just re-shows this, never a new row). */
+  readonly interestStatus: RecruiterInterestRequestStatus | null;
+}
+
+export type RecruiterInterestRequestStatus = "SENT" | "ACCEPTED" | "DECLINED" | "COMPLETED";
+
+export interface RecruiterInterestRequestRecord {
+  readonly id: string;
+  readonly recruiterProfileId: string;
+  readonly studentProfileId: string;
+  readonly message: string | null;
+  readonly status: RecruiterInterestRequestStatus;
+  readonly sentAt: Date;
+  readonly respondedAt: Date | null;
+  readonly completedAt: Date | null;
+}
+
+/**
+ * V4.0 C3 — the student's own view of an interest request. Deliberately
+ * NOT RecruiterInterestRequestRecord reused as-is: a student sees the
+ * recruiter's company name (for deciding whether to accept), never the
+ * recruiter's personal email/phone — symmetric with recruiters never
+ * receiving a student's private contact info (§7 step 7's "no direct
+ * contact info exchange" — the Secretary is always the intermediary).
+ */
+export interface StudentInterestDTO {
+  readonly id: string;
+  readonly companyName: string;
+  readonly message: string | null;
+  readonly status: RecruiterInterestRequestStatus;
+  readonly sentAt: Date;
+  readonly respondedAt: Date | null;
 }
 
 export interface RecruiterSearchFilters {
@@ -58,6 +86,37 @@ export interface RecruiterDashboardStats {
   readonly totalAvailableStudents: number;
   readonly graduationBatchesAvailable: number;
   readonly skillsRepresented: number;
+}
+
+/**
+ * V4.0 C4 — the recruiter-specific counters shown on the new /recruiter
+ * dashboard, consolidating C1–C3 data. Deliberately separate from
+ * RecruiterDashboardStats above, which is directory-wide (every recruiter
+ * sees the same numbers); these are private to the requesting recruiter.
+ */
+export interface RecruiterOverviewStats {
+  readonly companyName: string;
+  readonly savedCount: number;
+  readonly shortlistedCount: number;
+  readonly interestsSentCount: number;
+  readonly interestsAcceptedCount: number;
+}
+
+/**
+ * V4.0 C4 — one row of the recruiter's own /recruiter/interests list. Named
+ * distinctly from StudentInterestDTO (the mirror-image view from the
+ * student's side): this one carries the student's name/batch for the
+ * recruiter's own sent-interests view, never the recruiter's own identity.
+ */
+export interface RecruiterSentInterestDTO {
+  readonly id: string;
+  readonly studentId: string;
+  readonly studentName: string;
+  readonly batchName: string;
+  readonly message: string | null;
+  readonly status: RecruiterInterestRequestStatus;
+  readonly sentAt: Date;
+  readonly respondedAt: Date | null;
 }
 
 export interface ResumeReference {

@@ -15,6 +15,7 @@ function record(id: string): CoordinatorRecord {
     email: `${id}@tnparch.in`,
     fullName: `Coordinator ${id}`,
     isActive: true,
+    position: null,
     batchIds: [],
     createdAt: new Date(),
   };

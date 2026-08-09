@@ -24,6 +24,9 @@ const APPROVED_WITH_RESUME: RecruiterStudentProfileDTO = {
   internships: [],
   hasResume: true,
   profilePhotoUrl: null,
+  isSaved: false,
+  isShortlisted: false,
+  interestStatus: null,
 };
 
 const APPROVED_NO_RESUME: RecruiterStudentProfileDTO = { ...APPROVED_WITH_RESUME, studentId: "s2", hasResume: false };

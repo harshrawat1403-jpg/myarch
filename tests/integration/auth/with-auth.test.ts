@@ -13,6 +13,7 @@ import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 import { createAuthMiddleware } from "../../../src/modules/auth/presentation/with-auth";
 import { JwtTokenService } from "../../../src/modules/auth/infrastructure/jwt-token-service";
+import { InMemoryRateLimiter } from "../../support/fakes/in-memory-rate-limiter";
 
 const tokenService = new JwtTokenService({
   accessSecret: "a".repeat(32),
@@ -164,6 +165,60 @@ describe("withAuth — Recruiter access restrictions", () => {
     const token = tokenService.signAccessToken({ sub: "rec-1", role: "RECRUITER" });
     const response = await openHandler(requestWithToken(token));
     expect(response.status).toBe(200);
+  });
+});
+
+describe("withAuth — rate limiting (V4.0 A2)", () => {
+  it("denies with 429 once the limiter's capacity is exhausted, without invoking the wrapped handler", async () => {
+    let handlerCalls = 0;
+    const limiter = new InMemoryRateLimiter({ capacity: 2, refillRatePerSecond: 0.001 });
+    const handler = withAuth(
+      async () => {
+        handlerCalls++;
+        return Response.json({ ok: true });
+      },
+      { rateLimit: { limiter, key: (actor) => `test:${actor.userId}` } },
+    );
+    const token = tokenService.signAccessToken({ sub: "rec-1", role: "RECRUITER" });
+
+    expect((await handler(requestWithToken(token))).status).toBe(200);
+    expect((await handler(requestWithToken(token))).status).toBe(200);
+    const blocked = await handler(requestWithToken(token));
+    expect(blocked.status).toBe(429);
+    expect(await jsonOf(blocked)).toMatchObject({ error: { code: "RATE_LIMITED" } });
+    expect(handlerCalls).toBe(2);
+  });
+
+  it("keys are isolated per actor — one user's exhausted limit never blocks another", async () => {
+    const limiter = new InMemoryRateLimiter({ capacity: 1, refillRatePerSecond: 0.001 });
+    const handler = withAuth(async () => Response.json({ ok: true }), {
+      rateLimit: { limiter, key: (actor) => `test:${actor.userId}` },
+    });
+    const tokenA = tokenService.signAccessToken({ sub: "rec-a", role: "RECRUITER" });
+    const tokenB = tokenService.signAccessToken({ sub: "rec-b", role: "RECRUITER" });
+
+    expect((await handler(requestWithToken(tokenA))).status).toBe(200);
+    expect((await handler(requestWithToken(tokenA))).status).toBe(429);
+    expect((await handler(requestWithToken(tokenB))).status).toBe(200);
+  });
+
+  it("runs after role validation — a role-denied request never touches the limiter", async () => {
+    let consumeCalls = 0;
+    const limiter: import("../../../src/lib/rate-limit").RateLimiter = {
+      async consume() {
+        consumeCalls++;
+        return { allowed: true };
+      },
+    };
+    const handler = withAuth(async () => Response.json({ ok: true }), {
+      roles: ["SECRETARY"],
+      rateLimit: { limiter, key: (actor) => actor.userId },
+    });
+    const token = tokenService.signAccessToken({ sub: "stu-1", role: "STUDENT" });
+
+    const response = await handler(requestWithToken(token));
+    expect(response.status).toBe(403);
+    expect(consumeCalls).toBe(0);
   });
 });
 

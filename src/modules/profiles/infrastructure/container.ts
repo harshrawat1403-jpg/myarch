@@ -8,6 +8,7 @@ import { RequestChangesUseCase } from "../application/use-cases/request-changes"
 import { GetDraftUseCase } from "../application/use-cases/get-draft";
 import { ListApprovalQueueUseCase } from "../application/use-cases/list-approval-queue";
 import { GetPublishedProfileUseCase } from "../application/use-cases/get-published-profile";
+import { UpdateProfileVisibilityUseCase } from "../application/use-cases/update-profile-visibility";
 import { PrismaProfileDraftRepository } from "./prisma-profile-draft-repository";
 import { PrismaPublishedProfileRepository } from "./prisma-published-profile-repository";
 import { PrismaStudentLookup } from "./prisma-student-lookup";
@@ -36,6 +37,10 @@ export const requestChangesUseCase = new RequestChangesUseCase({
 export const getDraftUseCase = new GetDraftUseCase({ profileDraftRepository, studentLookup });
 export const listApprovalQueueUseCase = new ListApprovalQueueUseCase({ profileDraftRepository });
 export const getPublishedProfileUseCase = new GetPublishedProfileUseCase({
+  publishedProfileRepository,
+  studentLookup,
+});
+export const updateProfileVisibilityUseCase = new UpdateProfileVisibilityUseCase({
   publishedProfileRepository,
   studentLookup,
 });

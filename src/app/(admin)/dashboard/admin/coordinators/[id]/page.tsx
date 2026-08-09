@@ -7,9 +7,10 @@ import { ChevronLeft, History, KeyRound, Layers, Plus, X } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { formatAuditAction } from "@/lib/format-audit-action";
-import type { CoordinatorRecord } from "@/modules/coordinators";
+import type { CoordinatorPosition, CoordinatorRecord } from "@/modules/coordinators";
 import type { Batch } from "@/modules/batches";
 import type { AuditLogEntry } from "@/lib/audit";
+import { COORDINATOR_POSITION_OPTIONS } from "@/lib/coordinator-position";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
@@ -32,6 +33,7 @@ export default function CoordinatorDetailPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [activity, setActivity] = useState<AuditLogEntry[]>([]);
   const [fullName, setFullName] = useState("");
+  const [position, setPosition] = useState<CoordinatorPosition | "">("");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedNewBatchId, setSelectedNewBatchId] = useState("");
@@ -51,6 +53,7 @@ export default function CoordinatorDetailPage() {
       ]);
       setCoordinator(record);
       setFullName(record.fullName);
+      setPosition(record.position ?? "");
       setBatches(batchList);
       setActivity(activityEntries);
     } catch (err) {
@@ -63,17 +66,17 @@ export default function CoordinatorDetailPage() {
     void load();
   }, [load]);
 
-  async function handleSaveName(event: FormEvent<HTMLFormElement>) {
+  async function handleSaveDetails(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!coordinator || !accessToken) return;
     setIsSaving(true);
     setError(null);
     try {
-      await apiClient.patch(`/api/coordinators/${coordinator.id}`, { fullName }, accessToken);
-      toast.success("Name updated.");
+      await apiClient.patch(`/api/coordinators/${coordinator.id}`, { fullName, position: position || null }, accessToken);
+      toast.success("Details updated.");
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Unable to update name.");
+      setError(err instanceof ApiError ? err.message : "Unable to update details.");
     } finally {
       setIsSaving(false);
     }
@@ -178,14 +181,33 @@ export default function CoordinatorDetailPage() {
       {error && <p className="text-sm text-(--color-danger)">{error}</p>}
 
       <Card>
-        <form onSubmit={handleSaveName} className="space-y-4">
+        <form onSubmit={handleSaveDetails} className="space-y-4">
           <div>
             <Label htmlFor="fullName">Name</Label>
             <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} />
           </div>
+          <div>
+            <Label htmlFor="position">Position</Label>
+            <Select
+              id="position"
+              value={position}
+              onChange={(e) => setPosition(e.target.value as CoordinatorPosition | "")}
+            >
+              <option value="">Unspecified</option>
+              {COORDINATOR_POSITION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </div>
           <div className="border-t border-(--color-border) pt-4">
-            <Button type="submit" variant="secondary" disabled={isSaving || fullName.trim() === coordinator.fullName}>
-              {isSaving ? "Saving…" : "Save name"}
+            <Button
+              type="submit"
+              variant="secondary"
+              disabled={isSaving || (fullName.trim() === coordinator.fullName && position === (coordinator.position ?? ""))}
+            >
+              {isSaving ? "Saving…" : "Save details"}
             </Button>
           </div>
         </form>

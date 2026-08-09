@@ -19,4 +19,6 @@ export interface RecruiterDirectoryRepository {
   findByStudentId(studentId: string): Promise<RecruiterStudentProfileDTO | null>;
   getDashboardStats(): Promise<RecruiterDashboardStats>;
   getResumeReference(studentId: string): Promise<ResumeReference | null>;
+  /** V4.0 C4 — batched lookup for /recruiter/saved and /recruiter/interests, which start from interaction/interest rows (student ids) rather than a search filter. */
+  findManyByIds(studentIds: readonly string[]): Promise<RecruiterStudentProfileDTO[]>;
 }

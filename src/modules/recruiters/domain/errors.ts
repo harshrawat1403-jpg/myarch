@@ -17,6 +17,38 @@ export class ResumeNotAvailableError extends Error {
   }
 }
 
+/** V4.0 C1 — the acting Recruiter's own RecruiterProfile row is missing; should not happen in practice for a real Recruiter-role actor, but defensive rather than assumed. */
+export class RecruiterProfileNotFoundError extends Error {
+  constructor() {
+    super("Recruiter profile not found");
+    this.name = "RecruiterProfileNotFoundError";
+  }
+}
+
+/** V4.0 C1 — SetShortlistedUseCase's own rule: a student must already be saved before being shortlisted (§8 step 3 — "promotes an already-saved student"). */
+export class StudentNotSavedError extends Error {
+  constructor() {
+    super("Save this student before shortlisting them");
+    this.name = "StudentNotSavedError";
+  }
+}
+
+/** V4.0 C3 — RespondToInterestUseCase: no RecruiterInterestRequest row exists with the given id. */
+export class InterestRequestNotFoundError extends Error {
+  constructor() {
+    super("Interest request not found");
+    this.name = "InterestRequestNotFoundError";
+  }
+}
+
+/** V4.0 C3 — a student may only accept/decline a request while it is still SENT; a second response attempt (or responding to an already-COMPLETED request) is rejected rather than silently overwriting the first decision. */
+export class InterestRequestAlreadyRespondedError extends Error {
+  constructor() {
+    super("This interest request has already been responded to");
+    this.name = "InterestRequestAlreadyRespondedError";
+  }
+}
+
 // V3.0 Administration Platform — admin-side recruiter account management errors.
 
 export class RecruiterAccountNotFoundError extends Error {

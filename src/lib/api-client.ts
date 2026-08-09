@@ -23,6 +23,8 @@ export class ApiError extends Error {
 interface RequestOptions {
   accessToken?: string;
   body?: unknown;
+  /** Lets a caller cancel an in-flight request (e.g. AuthProvider's mount-time refresh, which must not let React Strict Mode's dev-only double-invoke send two real requests against a single-use, rotating refresh-token cookie). */
+  signal?: AbortSignal;
 }
 
 async function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
@@ -37,6 +39,7 @@ async function request<T>(method: string, path: string, options: RequestOptions 
     // Only /api/auth/{refresh,logout} actually rely on the httpOnly cookie;
     // including credentials on every request is harmless for the rest.
     credentials: "include",
+    signal: options.signal,
   });
 
   const json: unknown = await response.json().catch(() => null);
@@ -107,8 +110,8 @@ async function upload<T>(path: string, formData: FormData, accessToken?: string)
 
 export const apiClient = {
   get: <T>(path: string, accessToken?: string) => request<T>("GET", path, { accessToken }),
-  post: <T>(path: string, body?: unknown, accessToken?: string) =>
-    request<T>("POST", path, { accessToken, body }),
+  post: <T>(path: string, body?: unknown, accessToken?: string, signal?: AbortSignal) =>
+    request<T>("POST", path, { accessToken, body, signal }),
   patch: <T>(path: string, body?: unknown, accessToken?: string) =>
     request<T>("PATCH", path, { accessToken, body }),
   put: <T>(path: string, body?: unknown, accessToken?: string) =>

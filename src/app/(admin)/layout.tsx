@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Users, Layers, ClipboardCheck, History, Download, Settings, UserCog, Building2, IdCard, CalendarClock } from "lucide-react";
+import { LayoutDashboard, Users, Layers, ClipboardCheck, ClipboardList, History, Download, Settings, UserCog, Building2, IdCard, CalendarClock, Briefcase, GraduationCap, Target, Contact, BookOpen } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { useRequireRole } from "@/lib/use-require-role";
 import { SheetLayout, type NavItem } from "@/components/sheet-layout";
@@ -11,12 +11,48 @@ const BASE_NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/students", label: "Students", icon: Users, group: "Management" },
   { href: "/dashboard/batches", label: "Batches", icon: Layers, group: "Management" },
   { href: "/dashboard/approvals", label: "Approvals", icon: ClipboardCheck, group: "Workflow" },
+  // V4.0 B2: visible to both roles — Coordinator can comment/mark, Secretary
+  // additionally decides (B3). Matches its own route handlers' shared
+  // { roles: ["SECRETARY", "COORDINATOR"] } gate.
+  { href: "/dashboard/registrations", label: "Registrations", icon: ClipboardList, group: "Workflow" },
   { href: "/dashboard/audit", label: "Audit", icon: History, group: "Workflow" },
-  { href: "/dashboard/exports", label: "Exports", icon: Download, group: "Resources" },
+  // V4.0 E7 (§2, §3, §16): rename/extend "Exports" → "Reports" — the route
+  // itself moves from /dashboard/exports to /dashboard/reports (a
+  // rename-and-extend of the same page, not a new parallel system).
+  { href: "/dashboard/reports", label: "Reports", icon: Download, group: "Resources" },
+  // V4.0 §3: "**Placement**: + Companies, Placement Drives, Internships" —
+  // Company moved here from "Administration" to match the approved nav
+  // grouping now that Placement Drives/Internships exist alongside it.
+  // Company is Secretary-managed, Coordinator-viewable; write actions
+  // inside each page are gated on role, not the nav entry itself. Placed
+  // BEFORE the Administration group below, not after: SheetLayout's
+  // renderNavLinks only inserts one group header per *contiguous* run of
+  // matching `group` values, and SECRETARY_ONLY_NAV_ITEMS appends three
+  // more "Administration" items straight after BASE_NAV_ITEMS — inserting
+  // "Placement" between Directory and that run would split "Administration"
+  // into two non-adjacent chunks and duplicate its header (React duplicate-
+  // key warning, caught by admin-layout.test.tsx).
+  { href: "/dashboard/companies", label: "Companies", icon: Briefcase, group: "Placement" },
+  // V4.0 D2 — Internships is the SAME PlacementDrive model filtered to
+  // type=INTERNSHIP (§0's "type variant, not a parallel entity"), never a
+  // separate feature; both routes share PlacementDriveListPage.
+  { href: "/dashboard/placement-drives", label: "Placement Drives", icon: Target, group: "Placement" },
+  { href: "/dashboard/internships", label: "Internships", icon: GraduationCap, group: "Placement" },
+  // V4.0 D5 (§3): "**People**: + Alumni." Full CRUD for both roles — no
+  // role-gated write UI on this page at all, unlike Companies.
+  { href: "/dashboard/alumni", label: "Alumni", icon: Contact, group: "People" },
+  // V4.0 E3-E5 (§13) — full access for both Coordinator positions, identical
+  // to the Secretary (never role-gated beyond the shared route-handler
+  // { roles: ["SECRETARY", "COORDINATOR"] } gate) — its own contiguous group,
+  // same contiguity rule as "Placement" above: placed before Directory so it
+  // never splits an existing group's concatenation-adjacent chunks.
+  { href: "/dashboard/publications", label: "Publications", icon: BookOpen, group: "Publications" },
   // Directory is visible to both roles (matches its own route handler's
   // { roles: ["SECRETARY", "COORDINATOR"] } gate) — placed in BASE_NAV_ITEMS,
   // not SECRETARY_ONLY_NAV_ITEMS, even though it shares the "Administration"
-  // group label with Coordinators/Recruiters below.
+  // group label with Coordinators/Recruiters below. Must stay the LAST
+  // BASE_NAV_ITEMS entry so its "Administration" group is adjacent to
+  // SECRETARY_ONLY_NAV_ITEMS's own "Administration" items once concatenated.
   { href: "/dashboard/admin/directory", label: "Directory", icon: IdCard, group: "Administration" },
 ];
 

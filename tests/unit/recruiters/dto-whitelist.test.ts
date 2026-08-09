@@ -29,6 +29,9 @@ const EXPECTED_DTO_KEYS = [
   "internships",
   "hasResume",
   "profilePhotoUrl",
+  "isSaved",
+  "isShortlisted",
+  "interestStatus",
 ].sort();
 
 const FORBIDDEN_PRIVATE_FIELD_NAMES = [
@@ -73,6 +76,11 @@ function buildRowWithLeakedPrivateFields() {
         status: "ACTIVE",
         createdAt: new Date(),
         updatedAt: new Date(),
+      },
+      user: {
+        id: "user-1",
+        email: "alice@vnit.ac.in",
+        avatarFileId: null,
       },
       // Simulates a hypothetical future regression: a widened `include`
       // that accidentally pulls the private profile alongside identity data.
@@ -138,7 +146,16 @@ describe("recruiters toDTO — whitelist enforcement (regression)", () => {
       internships: [],
       hasResume: true,
       profilePhotoUrl: null,
+      isSaved: false,
+      isShortlisted: false,
+      interestStatus: null,
     });
+  });
+
+  it("resolves profilePhotoUrl from the reused User.avatarFileId (A5), null when unset", () => {
+    const row = buildRowWithLeakedPrivateFields() as any;
+    row.studentProfile.user.avatarFileId = "file-99";
+    expect(toDTO(row).profilePhotoUrl).toBe("/api/files/file-99");
   });
 
   it("sets hasResume to false when resumeFileId is null, without exposing the file field itself", () => {

@@ -21,6 +21,7 @@ export class InMemoryCoordinatorRepository implements CoordinatorRepository {
       email: `seeded-${data.userId}@example.edu`,
       fullName: data.fullName,
       isActive: true,
+      position: data.position ?? null,
       batchIds: [],
       createdAt: new Date(),
     };
@@ -42,7 +43,11 @@ export class InMemoryCoordinatorRepository implements CoordinatorRepository {
   async update(id: string, data: UpdateCoordinatorData): Promise<CoordinatorRecord> {
     const existing = this.byId.get(id);
     if (!existing) throw new Error("not found");
-    const updated = { ...existing, fullName: data.fullName ?? existing.fullName };
+    const updated = {
+      ...existing,
+      fullName: data.fullName ?? existing.fullName,
+      position: data.position !== undefined ? data.position : existing.position,
+    };
     this.byId.set(id, updated);
     return updated;
   }
@@ -60,6 +65,7 @@ export class InMemoryCoordinatorRepository implements CoordinatorRepository {
       if (!filters.includeInactive && !record.isActive) return false;
       if (filters.name && !record.fullName.toLowerCase().includes(filters.name.toLowerCase())) return false;
       if (filters.email && !record.email.toLowerCase().includes(filters.email.toLowerCase())) return false;
+      if (filters.position && record.position !== filters.position) return false;
       return true;
     });
   }

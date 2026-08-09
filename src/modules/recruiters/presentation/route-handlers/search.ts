@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/modules/auth";
 import { badRequest, forbidden } from "@/lib/http-errors";
 import { NotAuthorizedError } from "@/lib/errors";
+import { recruiterDiscoveryRateLimiter } from "@/lib/rate-limiters";
 import { searchDirectoryUseCase } from "../../infrastructure/container";
 import { RecruiterSearchQuerySchema } from "../validation";
 
@@ -21,5 +22,12 @@ export const searchDirectoryRouteHandler = withAuth(
       throw err;
     }
   },
-  { roles: ["RECRUITER"] },
+  {
+    roles: ["RECRUITER"],
+    rateLimit: {
+      limiter: recruiterDiscoveryRateLimiter,
+      key: (actor) => `recruiter-discovery:${actor.userId}`,
+      message: "Too many directory searches. Please slow down and try again shortly.",
+    },
+  },
 );

@@ -23,6 +23,8 @@ import { PrismaNotificationRepository } from "./prisma-notification-repository";
 import { PrismaNotificationRecipientLookup } from "./prisma-notification-recipient-lookup";
 import { createEmailProvider } from "./email-provider-factory";
 import { NotificationJobHandler } from "./notification-job-handler";
+import { ListMyNotificationsUseCase } from "../application/use-cases/list-my-notifications";
+import { MarkNotificationReadUseCase } from "../application/use-cases/mark-notification-read";
 
 // No secrets required — safe to construct eagerly.
 const notificationRepository = new PrismaNotificationRepository(prisma);
@@ -33,6 +35,10 @@ export const notificationService: NotificationService = new DefaultNotificationS
   jobDispatcher,
   notificationRepository,
 });
+
+// V4.0 E1 — the notification center's own two use cases.
+export const listMyNotificationsUseCase = new ListMyNotificationsUseCase({ notificationRepository });
+export const markNotificationReadUseCase = new MarkNotificationReadUseCase({ notificationRepository });
 
 /**
  * Registers this module's SEND_NOTIFICATION handler into the shared
@@ -54,4 +60,21 @@ export function registerJobHandlers(): void {
       repository: notificationRepository,
     }),
   );
+}
+
+// V4.0 B3: a registration-request rejection has no User account to attach a
+// userId-keyed Notification to (NotificationRequest.recipientUserId is
+// required, by design — see domain/entities.ts). This is the one legitimate
+// exception: a direct, best-effort send straight to EmailProvider, bypassing
+// the persisted Notification/Job retry machinery entirely. Not a general
+// escape hatch — every other notification in this codebase has a real
+// account and must keep going through `notificationService.notify()`.
+// Lazily cached (not eager) for the same reason EmailProvider construction
+// is deferred to registerJobHandlers() above: importing this module must
+// never force EMAIL_PROVIDER env validation on a request path that doesn't
+// need it.
+let cachedDirectEmailProvider: ReturnType<typeof createEmailProvider> | undefined;
+export async function sendDirectEmail(message: { to: string; subject: string; text: string; html: string }): Promise<void> {
+  cachedDirectEmailProvider ??= createEmailProvider(getEnv());
+  await cachedDirectEmailProvider.send(message);
 }

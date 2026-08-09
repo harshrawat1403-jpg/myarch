@@ -4,9 +4,13 @@ import { StudentNotFoundError } from "@/modules/students";
 import { extractRouteParam } from "@/lib/route-params";
 import { badRequest, forbidden, notFound } from "@/lib/http-errors";
 import { NotAuthorizedError } from "@/lib/errors";
-import { approveDraftUseCase, findStudentBatchId } from "../../infrastructure/container";
+import { approveDraftUseCase } from "../../infrastructure/container";
 import { DraftNotFoundError, InvalidDraftTransitionError } from "../../domain/errors";
 
+// V4.0 (Q1): final profile-draft approval is Secretary-only — narrowed from
+// ["SECRETARY", "COORDINATOR"], matching canApprovePublicProfile. No
+// getRequiredBatchId here since Secretary is unscoped by design and is now
+// the only role that can ever reach this handler.
 export const approveDraftRouteHandler = withAuth(
   async (_req, { actor }, routeContext) => {
     const studentId = await extractRouteParam(routeContext, "id");
@@ -23,11 +27,5 @@ export const approveDraftRouteHandler = withAuth(
       throw err;
     }
   },
-  {
-    roles: ["SECRETARY", "COORDINATOR"],
-    getRequiredBatchId: async (_req, routeContext) => {
-      const studentId = await extractRouteParam(routeContext, "id");
-      return studentId ? findStudentBatchId(studentId) : undefined;
-    },
-  },
+  { roles: ["SECRETARY"] },
 );

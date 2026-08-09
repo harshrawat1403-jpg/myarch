@@ -42,12 +42,37 @@ const AUDIT_ENTRIES = [
   },
 ];
 
-function mockFetchWith(overrides: Partial<{ students: unknown; batches: unknown; approvalQueue: unknown; audit: unknown }>) {
+const PENDING_REGISTRATIONS = [
+  { id: "r1", email: "new@vnit.ac.in", fullName: "New Applicant", rollNumber: "BA2026099", batchId: "b1", status: "SUBMITTED", createdAt: "2026-01-01" },
+];
+
+// Deliberately distinct from every other number rendered on this page (student/batch
+// counts, badges) — this page renders many small numbers, so incidental collisions
+// between unrelated fixtures make `getByText` assertions ambiguous.
+const PLACEMENT_FUNNEL = {
+  type: "PLACEMENT",
+  applied: 41,
+  reachedShortlisted: 33,
+  reachedInterview: 27,
+  reachedOffer: 19,
+  reachedAccepted: 13,
+  placed: 13,
+  interviewsScheduled: 22,
+  currentStatusBreakdown: [],
+  companiesRecruited: [],
+  filters: { type: "PLACEMENT" },
+};
+
+function mockFetchWith(
+  overrides: Partial<{ students: unknown; batches: unknown; approvalQueue: unknown; audit: unknown; registrations: unknown; placementFunnel: unknown }>,
+) {
   fetchMock.mockImplementation((url: string) => {
     if (url.includes("/api/students")) return Promise.resolve(jsonResponse(overrides.students ?? STUDENTS));
     if (url.includes("/api/batches")) return Promise.resolve(jsonResponse(overrides.batches ?? BATCHES));
     if (url.includes("/api/profiles/approval-queue")) return Promise.resolve(jsonResponse(overrides.approvalQueue ?? APPROVAL_QUEUE));
     if (url.includes("/api/audit/recent")) return Promise.resolve(jsonResponse(overrides.audit ?? AUDIT_ENTRIES));
+    if (url.includes("/api/registration")) return Promise.resolve(jsonResponse(overrides.registrations ?? PENDING_REGISTRATIONS));
+    if (url.includes("/api/reports/placements")) return Promise.resolve(jsonResponse(overrides.placementFunnel ?? PLACEMENT_FUNNEL));
     throw new Error(`Unexpected fetch: ${url}`);
   });
 }
@@ -77,12 +102,12 @@ describe("Dashboard Overview page — operational control center", () => {
     expect(screen.getByText("Of 2 total")).toBeInTheDocument(); // 1 ACTIVE of 2 batches total
   });
 
-  it("renders all four quick action links", async () => {
+  it("renders the quick action links (V4.0 E8 — Registrations, Placement Drives, and Publications join the existing four)", async () => {
     mockFetchWith({});
     render(<DashboardOverviewPage />);
     await screen.findByText("Total Students");
 
-    for (const label of ["Review Approvals", "Manage Batches", "View Students", "View Audit Log"]) {
+    for (const label of ["Review Approvals", "Registrations", "Placement Drives", "Manage Batches", "View Students", "Publications"]) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }
   });
@@ -92,7 +117,8 @@ describe("Dashboard Overview page — operational control center", () => {
     render(<DashboardOverviewPage />);
 
     expect(await screen.findByText("Alice Architect")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Review" })).toHaveAttribute("href", "/dashboard/approvals/sp1");
+    const reviewLinks = screen.getAllByRole("link", { name: "Review" });
+    expect(reviewLinks.some((link) => link.getAttribute("href") === "/dashboard/approvals/sp1")).toBe(true);
   });
 
   it("shows an empty state when there are no pending approvals", async () => {
@@ -125,23 +151,37 @@ describe("Dashboard Overview page — operational control center", () => {
     expect(screen.getByText("GRADUATED")).toBeInTheDocument();
   });
 
-  it("shows the Recruiter Directory export shortcut and recruiter-activity link for a Secretary", async () => {
+  it("V4.0 E8: renders Pending Registrations, reusing the same real endpoint the Registrations page uses", async () => {
     mockFetchWith({});
     render(<DashboardOverviewPage />);
 
-    await screen.findByText("Total Students");
-    expect(screen.getByText("Recruiter Directory")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /recruiter directory export/i })).toHaveAttribute("href", "/dashboard/exports");
+    expect(await screen.findByText("New Applicant")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Review" }).length).toBeGreaterThanOrEqual(1);
   });
 
-  it("hides the Secretary-only export shortcut and recruiter-activity link for a Coordinator", async () => {
-    mockAuthState = { accessToken: "test-access-token", role: "COORDINATOR" };
+  it("shows an empty state when there are no pending registrations", async () => {
+    mockFetchWith({ registrations: [] });
+    render(<DashboardOverviewPage />);
+
+    expect(await screen.findByText("No registration requests awaiting review.")).toBeInTheDocument();
+  });
+
+  it("V4.0 E8: renders the Placement Pipeline panel from the real E7 Reports API, not a re-derived computation", async () => {
     mockFetchWith({});
     render(<DashboardOverviewPage />);
 
     await screen.findByText("Total Students");
-    expect(screen.queryByText("Recruiter Directory")).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /recruiter directory export/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Placement Pipeline")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Full Report" })).toHaveAttribute("href", "/dashboard/reports/placements");
+    // fetched from /api/reports/placements — asserts the panel is wired to the real E7 endpoint, not a duplicate aggregation.
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/api/reports/placements?type=PLACEMENT"))).toBe(true);
+  });
+
+  it("shows an empty state when there is no placement activity yet", async () => {
+    mockFetchWith({ placementFunnel: { ...PLACEMENT_FUNNEL, applied: 0 } });
+    render(<DashboardOverviewPage />);
+
+    expect(await screen.findByText("No placement applications yet this cycle.")).toBeInTheDocument();
   });
 
   it("shows an error message if any dashboard fetch fails", async () => {

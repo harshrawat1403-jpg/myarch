@@ -196,7 +196,7 @@ describe("Student Management page", () => {
     renderPage();
     await screen.findAllByText("Alice Architect");
 
-    expect(screen.getByRole("link", { name: "Export Student Directory" })).toHaveAttribute("href", "/dashboard/exports");
+    expect(screen.getByRole("link", { name: "Export Student Directory" })).toHaveAttribute("href", "/dashboard/reports");
   });
 
   it("does not let the Bulk Import form reappear if the first status poll fails, preventing a duplicate submission", async () => {

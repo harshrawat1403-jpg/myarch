@@ -14,9 +14,16 @@ export class PrismaProfileNameRepository implements ProfileNameRepository {
       await this.prisma.coordinatorProfile.update({ where: { userId }, data: { fullName } });
       return;
     }
-    // Account Settings (M3) only serves Secretary/Coordinator today (it's
-    // reached only from the (admin) shell) — Student/Recruiter display
-    // names aren't editable through this path.
+    if (role === "STUDENT") {
+      // V4.0 A3: Students get the same self-service Account Settings page —
+      // StudentProfile.fullName is the same "duplicated intentionally for
+      // non-sensitive identification" field the rest of the app already
+      // reads for display (docs/database/08_Database_Design.md).
+      await this.prisma.studentProfile.update({ where: { userId }, data: { fullName } });
+      return;
+    }
+    // Recruiter self-service settings aren't part of this path yet — no
+    // route reaches here for that role today.
     throw new Error(`No editable display name for role ${role}`);
   }
 
@@ -27,6 +34,10 @@ export class PrismaProfileNameRepository implements ProfileNameRepository {
     }
     if (role === "COORDINATOR") {
       const profile = await this.prisma.coordinatorProfile.findUnique({ where: { userId } });
+      return profile?.fullName ?? null;
+    }
+    if (role === "STUDENT") {
+      const profile = await this.prisma.studentProfile.findUnique({ where: { userId } });
       return profile?.fullName ?? null;
     }
     return null;

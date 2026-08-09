@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
-import type { NotificationChannel, NotificationTemplateId } from "../domain/entities";
+import type { NotificationChannel, NotificationRecord, NotificationTemplateId } from "../domain/entities";
 import type { NotificationRepository } from "../application/ports/notification-repository";
 
 export class PrismaNotificationRepository implements NotificationRepository {
@@ -37,5 +37,33 @@ export class PrismaNotificationRepository implements NotificationRepository {
       where: { id },
       data: { status: "FAILED" },
     });
+  }
+
+  async listInAppForRecipient(recipientUserId: string, limit: number): Promise<NotificationRecord[]> {
+    const rows = await this.prisma.notification.findMany({
+      where: { recipientUserId, channel: "IN_APP" },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      template: row.template as NotificationTemplateId,
+      payload: row.payload as Record<string, unknown>,
+      createdAt: row.createdAt,
+      readAt: row.readAt,
+    }));
+  }
+
+  async markRead(id: string, recipientUserId: string): Promise<boolean> {
+    const result = await this.prisma.notification.updateMany({
+      where: { id, recipientUserId, readAt: null },
+      data: { readAt: new Date() },
+    });
+    if (result.count > 0) return true;
+    // Either truly not found/not owned, or already read — either way this
+    // recipient's own row exists and is already marked read counts as
+    // success (idempotent "mark as read", not an error).
+    const existing = await this.prisma.notification.findFirst({ where: { id, recipientUserId }, select: { id: true } });
+    return existing !== null;
   }
 }

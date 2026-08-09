@@ -1,281 +1,169 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Layers, Sparkles, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BarChart3, Bookmark, CheckCircle2, Clock, Mail, Search, Star, Users, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { apiClient, ApiError } from "@/lib/api-client";
-import type { RecruiterDashboardStats, RecruiterStudentProfileDTO } from "@/modules/recruiters";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input, Label } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { CardTitle, DataLabel } from "@/components/ui/typography";
-import { StatPanel } from "@/components/ui/stat-panel";
+import type { RecruiterOverviewStats, RecruiterSentInterestDTO, RecruiterStudentProfileDTO } from "@/modules/recruiters";
+import { DashboardPanel } from "@/components/dashboard-panel";
 import { EmptyState } from "@/components/empty-state";
+import { StatPanel } from "@/components/ui/stat-panel";
+import { Badge, type BadgeVariant } from "@/components/ui/badge";
 
-interface Filters {
-  query: string;
-  batchId: string;
-  skills: string;
-  software: string;
-  internshipKeyword: string;
-  certificationKeyword: string;
-  hasInternshipExperience: boolean;
-  hasCertification: boolean;
-}
+const QUICK_ACTIONS: { label: string; href: string; icon: LucideIcon }[] = [
+  { label: "Browse Directory", href: "/recruiter/directory", icon: Search },
+  { label: "Saved Students", href: "/recruiter/saved", icon: Bookmark },
+  { label: "Sent Interests", href: "/recruiter/interests", icon: Mail },
+  { label: "My Reports", href: "/recruiter/reports", icon: BarChart3 },
+];
 
-const EMPTY_FILTERS: Filters = {
-  query: "",
-  batchId: "",
-  skills: "",
-  software: "",
-  internshipKeyword: "",
-  certificationKeyword: "",
-  hasInternshipExperience: false,
-  hasCertification: false,
-};
-
-function buildQuery(filters: Filters): string {
-  const params = new URLSearchParams();
-  if (filters.query) params.set("query", filters.query);
-  if (filters.batchId) params.set("batchId", filters.batchId);
-  if (filters.skills) params.set("skills", filters.skills);
-  if (filters.software) params.set("software", filters.software);
-  if (filters.internshipKeyword) params.set("internshipKeyword", filters.internshipKeyword);
-  if (filters.certificationKeyword) params.set("certificationKeyword", filters.certificationKeyword);
-  if (filters.hasInternshipExperience) params.set("hasInternshipExperience", "true");
-  if (filters.hasCertification) params.set("hasCertification", "true");
-  return params.toString();
+function interestStatusBadgeVariant(status: RecruiterSentInterestDTO["status"]): BadgeVariant {
+  switch (status) {
+    case "SENT":
+      return "pending";
+    case "ACCEPTED":
+    case "COMPLETED":
+      return "approved";
+    case "DECLINED":
+      return "rejected";
+  }
 }
 
 /**
- * Module 13 — the recruiter's talent-discovery workspace. All fetch calls,
- * the exact query-string built from filters, and the directory endpoint
- * itself are unchanged from before (confirmed by the pre-existing
- * `recruiter-portal-page.test.tsx` suite passing unmodified). Presentation
- * only: `StatTile` migrated to the shared `StatPanel` (the same StatCard→
- * StatPanel migration Milestone 9 did for the admin dashboard — this is
- * the second, final call site the original spec named), raw checkboxes
- * migrated to `Checkbox`, and each directory entry is now a `Card` inside
- * its own `Link` — a talent profile, not an admin table row.
+ * V4.0 C4 (Q2, PRD §2/§3/§17) — /recruiter is now the dashboard; the
+ * search/filter card grid this page used to be lives at /recruiter/directory.
+ * Consolidates C1–C3 data (saved/shortlisted/interests) into one landing
+ * view — no drives overview yet, since PlacementDrive doesn't exist until
+ * Phase D.
  */
-export default function RecruiterPortalPage() {
+export default function RecruiterDashboardPage() {
   const { accessToken } = useAuth();
-  const [stats, setStats] = useState<RecruiterDashboardStats | null>(null);
-  const [students, setStudents] = useState<RecruiterStudentProfileDTO[]>([]);
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [overview, setOverview] = useState<RecruiterOverviewStats | null>(null);
+  const [recentSaved, setRecentSaved] = useState<RecruiterStudentProfileDTO[]>([]);
+  const [recentInterests, setRecentInterests] = useState<RecruiterSentInterestDTO[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const runSearch = useCallback(
-    async (nextFilters: Filters) => {
-      if (!accessToken) return;
-      setIsLoading(true);
-      setError(null);
-      try {
-        const q = buildQuery(nextFilters);
-        const results = await apiClient.get<RecruiterStudentProfileDTO[]>(
-          `/api/recruiters/students${q ? `?${q}` : ""}`,
-          accessToken,
-        );
-        setStudents(results);
-      } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Unable to load the student directory.");
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [accessToken],
-  );
-
   useEffect(() => {
     if (!accessToken) return;
-    apiClient
-      .get<RecruiterDashboardStats>("/api/recruiters/dashboard", accessToken)
-      .then(setStats)
-      .catch(() => {});
-    // load() equivalent — runSearch only sets state after its own awaited
-    // fetch resolves (see docs/planning's Day 7 CHANGELOG entry for the
-    // same justified pattern).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    runSearch(EMPTY_FILTERS).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const [overviewStats, saved, interests] = await Promise.all([
+          apiClient.get<RecruiterOverviewStats>("/api/recruiters/overview", accessToken),
+          apiClient.get<RecruiterStudentProfileDTO[]>("/api/recruiters/saved", accessToken),
+          apiClient.get<RecruiterSentInterestDTO[]>("/api/recruiters/interests", accessToken),
+        ]);
+        if (cancelled) return;
+        setOverview(overviewStats);
+        setRecentSaved(saved.slice(0, 5));
+        setRecentInterests(interests.slice(0, 5));
+      } catch (err) {
+        if (!cancelled) setError(err instanceof ApiError ? err.message : "Unable to load your dashboard.");
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [accessToken]);
-
-  const batchOptions = useMemo(() => {
-    const byId = new Map<string, string>();
-    for (const student of students) byId.set(student.batchId, student.batchName);
-    return [...byId.entries()];
-  }, [students]);
-
-  const hasActiveFilters = Object.entries(filters).some(([key, value]) =>
-    key === "hasInternshipExperience" || key === "hasCertification" ? value === true : Boolean(value),
-  );
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    void runSearch(filters);
-  }
-
-  function handleReset() {
-    setFilters(EMPTY_FILTERS);
-    void runSearch(EMPTY_FILTERS);
-  }
 
   return (
     <div className="space-y-8">
       <div>
-        <DataLabel>Welcome</DataLabel>
-        <h1 className="mt-1 font-[family-name:var(--font-display)] text-2xl font-semibold text-(--color-text-primary)">
-          Architecture &amp; Planning Talent Directory
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-(--color-text-primary)">
+          Dashboard
         </h1>
-        <p className="mt-1 text-sm text-(--color-text-secondary)">Approved student portfolios, VNIT Nagpur.</p>
+        <p className="mt-1 text-sm text-(--color-text-secondary)">
+          {overview?.companyName ? `${overview.companyName} — your saved students and sent interests.` : "Your saved students and sent interests, VNIT Nagpur."}
+        </p>
       </div>
 
-      {stats && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StatPanel compact icon={Users} label="Available Students" value={stats.totalAvailableStudents} scope="All available students" />
-          <StatPanel compact icon={Layers} label="Graduation Batches" value={stats.graduationBatchesAvailable} scope="All available students" />
-          <StatPanel compact icon={Sparkles} label="Skills Represented" value={stats.skillsRepresented} scope="All available students" />
-        </div>
-      )}
-
-      <Card>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="query">Search</Label>
-            <Input
-              id="query"
-              placeholder="Search by name, skill, software, certification, or internship"
-              value={filters.query}
-              onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <Label htmlFor="batchId">Graduation Batch</Label>
-              <Select
-                id="batchId"
-                value={filters.batchId}
-                onChange={(e) => setFilters((f) => ({ ...f, batchId: e.target.value }))}
-              >
-                <option value="">All batches</option>
-                {batchOptions.map(([id, name]) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="skills">Skills</Label>
-              <Input
-                id="skills"
-                placeholder="Rendering, Modeling"
-                value={filters.skills}
-                onChange={(e) => setFilters((f) => ({ ...f, skills: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="software">Software</Label>
-              <Input
-                id="software"
-                placeholder="Rhino, Revit"
-                value={filters.software}
-                onChange={(e) => setFilters((f) => ({ ...f, software: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="internshipKeyword">Internship keyword</Label>
-              <Input
-                id="internshipKeyword"
-                value={filters.internshipKeyword}
-                onChange={(e) => setFilters((f) => ({ ...f, internshipKeyword: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="certificationKeyword">Certification keyword</Label>
-              <Input
-                id="certificationKeyword"
-                value={filters.certificationKeyword}
-                onChange={(e) => setFilters((f) => ({ ...f, certificationKeyword: e.target.value }))}
-              />
-            </div>
-            <div className="flex items-end gap-4">
-              <Checkbox
-                id="hasInternshipExperience"
-                checked={filters.hasInternshipExperience}
-                onChange={(e) => setFilters((f) => ({ ...f, hasInternshipExperience: e.target.checked }))}
-                label="Has internship experience"
-              />
-              <Checkbox
-                id="hasCertification"
-                checked={filters.hasCertification}
-                onChange={(e) => setFilters((f) => ({ ...f, hasCertification: e.target.checked }))}
-                label="Has certification"
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 border-t border-(--color-border) pt-4">
-            <Button type="submit" variant="primary">
-              Search
-            </Button>
-            {hasActiveFilters && (
-              <Button type="button" variant="ghost" onClick={handleReset}>
-                Reset filters
-              </Button>
-            )}
-          </div>
-        </form>
-      </Card>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {QUICK_ACTIONS.map((action) => (
+          <Link
+            key={action.href}
+            href={action.href}
+            className="group flex items-center gap-3 rounded-2xl border border-(--color-border) bg-(--color-surface) p-4 shadow-sm transition-[border-color,box-shadow] duration-150 hover:border-(--color-accent) hover:shadow-md"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) text-(--color-accent)">
+              <action.icon aria-hidden="true" size={17} strokeWidth={1.75} />
+            </span>
+            <span className="text-sm font-medium text-(--color-text-primary)">{action.label}</span>
+          </Link>
+        ))}
+      </div>
 
       {error && <p className="text-sm text-(--color-danger)">{error}</p>}
-      {isLoading && <p className="text-sm text-(--color-text-secondary)">Loading directory…</p>}
+      {isLoading && <p className="text-sm text-(--color-text-secondary)">Loading dashboard…</p>}
 
-      {!isLoading && students.length === 0 && (
-        <Card>
-          <EmptyState icon={Users} message={hasActiveFilters ? "No students match the current filters." : "No matching students found."} />
-          {hasActiveFilters && (
-            <div className="flex justify-center">
-              <Button type="button" variant="ghost" onClick={handleReset}>
-                Clear filters
-              </Button>
-            </div>
-          )}
-        </Card>
-      )}
+      {overview && (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatPanel compact icon={Bookmark} label="Saved" value={overview.savedCount} scope="Your saved students" />
+            <StatPanel compact icon={Star} label="Shortlisted" value={overview.shortlistedCount} scope="Of your saved students" />
+            <StatPanel compact icon={Mail} label="Interests Sent" value={overview.interestsSentCount} scope="All time" />
+            <StatPanel compact icon={CheckCircle2} label="Interests Accepted" value={overview.interestsAcceptedCount} scope="All time" />
+          </div>
 
-      {!isLoading && students.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {students.map((student) => (
-            <Link key={student.studentId} href={`/recruiter/students/${student.studentId}`} className="block">
-              <Card className="h-full transition-[border-color,box-shadow] duration-150 hover:border-(--color-accent) hover:shadow-md">
-                <CardTitle>{student.fullName}</CardTitle>
-                <p className="text-sm text-(--color-text-secondary)">{student.batchName}</p>
-                {student.bio && <p className="mt-2 line-clamp-2 text-sm text-(--color-text-primary)">{student.bio}</p>}
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {student.skills.slice(0, 4).map((skill) => (
-                    <Badge key={skill} variant="neutral">
-                      {skill}
-                    </Badge>
+          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+            <DashboardPanel title="Recently Saved" icon={Bookmark} action={{ label: "View All", href: "/recruiter/saved" }}>
+              {recentSaved.length === 0 ? (
+                <EmptyState icon={Bookmark} message="You haven't saved any students yet." />
+              ) : (
+                <ul className="space-y-1">
+                  {recentSaved.map((student) => (
+                    <li
+                      key={student.studentId}
+                      className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm transition-colors duration-150 hover:bg-(--color-surface-muted)"
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) text-xs font-semibold text-(--color-accent)">
+                          {student.fullName.charAt(0).toUpperCase()}
+                        </span>
+                        <span className="truncate text-(--color-text-primary)">{student.fullName}</span>
+                      </span>
+                      <Link
+                        href={`/recruiter/students/${student.studentId}`}
+                        className="shrink-0 font-medium text-(--color-accent) hover:underline"
+                      >
+                        View
+                      </Link>
+                    </li>
                   ))}
-                </div>
-                <p className="mt-2 text-xs text-(--color-text-secondary)">{student.software.join(", ") || "No software listed"}</p>
-                <div className="mt-3 flex flex-wrap gap-1 border-t border-(--color-border) pt-3">
-                  <Badge variant={student.hasResume ? "active" : "neutral"}>
-                    {student.hasResume ? "Resume available" : "No resume"}
-                  </Badge>
-                  {student.portfolioLinks.length > 0 && <Badge variant="active">Portfolio linked</Badge>}
-                </div>
-              </Card>
-            </Link>
-          ))}
-        </div>
+                </ul>
+              )}
+            </DashboardPanel>
+
+            <DashboardPanel title="Recent Interests" icon={Mail} action={{ label: "View All", href: "/recruiter/interests" }}>
+              {recentInterests.length === 0 ? (
+                <EmptyState icon={Clock} message="You haven't expressed interest in any students yet." />
+              ) : (
+                <ul className="space-y-1">
+                  {recentInterests.map((interest) => (
+                    <li
+                      key={interest.id}
+                      className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm transition-colors duration-150 hover:bg-(--color-surface-muted)"
+                    >
+                      <span className="truncate text-(--color-text-primary)">{interest.studentName}</span>
+                      <Badge variant={interestStatusBadgeVariant(interest.status)}>{interest.status}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </DashboardPanel>
+          </div>
+
+          <DashboardPanel title="Explore More Students" icon={Users} action={{ label: "Open Directory", href: "/recruiter/directory" }}>
+            <p className="text-sm text-(--color-text-secondary)">
+              Browse the full approved student directory to find and save new candidates.
+            </p>
+          </DashboardPanel>
+        </>
       )}
     </div>
   );

@@ -15,7 +15,7 @@ export class PrismaCoordinatorRepository implements CoordinatorRepository {
 
   async create(data: CreateCoordinatorData): Promise<CoordinatorRecord> {
     const row = await this.prisma.coordinatorProfile.create({
-      data: { userId: data.userId, fullName: data.fullName },
+      data: { userId: data.userId, fullName: data.fullName, position: data.position },
       include: { user: true, batchScopes: true },
     });
     return toDomain(row);
@@ -40,7 +40,7 @@ export class PrismaCoordinatorRepository implements CoordinatorRepository {
   async update(id: string, data: UpdateCoordinatorData): Promise<CoordinatorRecord> {
     const row = await this.prisma.coordinatorProfile.update({
       where: { id },
-      data: { fullName: data.fullName },
+      data: { fullName: data.fullName, position: data.position },
       include: { user: true, batchScopes: true },
     });
     return toDomain(row);
@@ -68,6 +68,7 @@ export class PrismaCoordinatorRepository implements CoordinatorRepository {
       isActive: filters.includeInactive ? undefined : true,
       fullName: filters.name ? { contains: filters.name, mode: "insensitive" } : undefined,
       user: filters.email ? { email: { contains: filters.email, mode: "insensitive" } } : undefined,
+      position: filters.position,
     };
 
     const rows = await this.prisma.coordinatorProfile.findMany({
@@ -101,6 +102,7 @@ function toDomain(row: CoordinatorProfileWithUser): CoordinatorRecord {
     email: row.user.email,
     fullName: row.fullName,
     isActive: row.isActive,
+    position: row.position,
     batchIds: row.batchScopes.map((scope) => scope.batchId),
     createdAt: row.user.createdAt,
   };

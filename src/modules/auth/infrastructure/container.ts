@@ -19,7 +19,15 @@
 import { getEnv } from "@/config/env";
 import { prisma } from "@/lib/prisma";
 import { parseDurationMs } from "@/lib/duration";
-import { notificationService } from "@/modules/notifications";
+// V4.0 E1: imported from notifications' own infrastructure/container (not
+// the "@/modules/notifications" barrel) deliberately. The barrel now also
+// re-exports IN_APP-notification-center route handlers that import
+// `withAuth` from this very module — going through the barrel here would
+// make this file (loaded while @/modules/auth's own barrel is still
+// mid-initialization) require `withAuth` before auth finishes exporting it,
+// a genuine circular-import TDZ failure. This deep import needs only the
+// bound `notificationService` singleton, which has no dependency on auth.
+import { notificationService } from "@/modules/notifications/infrastructure/container";
 import { saveFile, deleteFile } from "@/lib/file-storage";
 import { LoginUseCase } from "../application/use-cases/login";
 import { LogoutUseCase } from "../application/use-cases/logout";
@@ -36,7 +44,6 @@ import { PrismaAuditRecorder } from "./prisma-audit-recorder";
 import { PrismaProfileNameRepository } from "./prisma-profile-name-repository";
 import { PrismaAvatarFileRepository } from "./prisma-avatar-file-repository";
 import { SystemClock } from "./system-clock";
-import { InMemoryRateLimiter } from "./rate-limiter";
 import { createAuthMiddleware } from "../presentation/with-auth";
 
 // No secrets required — safe to construct eagerly.
@@ -177,14 +184,6 @@ export function getUploadAvatarUseCase(): UploadAvatarUseCase {
     deleteFile,
   }));
 }
-
-// FR-AUTH-05 / NFR-SEC-07: 10 attempts per 15-minute window, keyed by
-// email+IP at the call site (docs/security/14_Security_Architecture.md).
-// No secrets involved — safe to construct eagerly.
-export const loginRateLimiter = new InMemoryRateLimiter({
-  windowMs: 15 * 60 * 1000,
-  maxAttempts: 10,
-});
 
 /**
  * Bound auth middleware — other modules import this via `@/modules/auth`.

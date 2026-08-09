@@ -6,9 +6,12 @@ import {
   CheckCircle2,
   Clock,
   ClipboardCheck,
-  Download,
+  ClipboardList,
   History,
   Layers,
+  BookOpen,
+  Target,
+  TrendingUp,
   UserCheck,
   Users,
   type LucideIcon,
@@ -21,9 +24,12 @@ import { EmptyState } from "@/components/empty-state";
 import { StatPanel } from "@/components/ui/stat-panel";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { CardTitle } from "@/components/ui/typography";
+import { MetricTile } from "@/components/reports/metric-tile";
 import type { Batch, BatchStatus } from "@/modules/batches";
 import type { ApprovalQueueItem } from "@/modules/profiles";
 import type { StudentSearchResultItem } from "@/modules/students";
+import type { RegistrationRequestRecord } from "@/modules/registration";
+import type { PlacementFunnelReport } from "@/modules/reports";
 import type { AuditLogEntry } from "@/lib/audit";
 
 interface OverviewData {
@@ -32,6 +38,8 @@ interface OverviewData {
   batches: Batch[];
   approvalQueue: ApprovalQueueItem[];
   recentActivity: AuditLogEntry[];
+  pendingRegistrations: RegistrationRequestRecord[];
+  placementFunnel: PlacementFunnelReport | null;
 }
 
 function batchStatusBadgeVariant(status: BatchStatus): BadgeVariant {
@@ -42,9 +50,11 @@ function batchStatusBadgeVariant(status: BatchStatus): BadgeVariant {
 
 const QUICK_ACTIONS: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Review Approvals", href: "/dashboard/approvals", icon: ClipboardCheck },
+  { label: "Registrations", href: "/dashboard/registrations", icon: ClipboardList },
+  { label: "Placement Drives", href: "/dashboard/placement-drives", icon: Target },
   { label: "Manage Batches", href: "/dashboard/batches", icon: Layers },
   { label: "View Students", href: "/dashboard/students", icon: Users },
-  { label: "View Audit Log", href: "/dashboard/audit", icon: History },
+  { label: "Publications", href: "/dashboard/publications", icon: BookOpen },
 ];
 
 /**
@@ -73,11 +83,19 @@ export default function DashboardOverviewPage() {
 
     (async () => {
       try {
-        const [students, batches, approvalQueue, recentActivity] = await Promise.all([
+        const [students, batches, approvalQueue, recentActivity, pendingRegistrations, placementFunnel] = await Promise.all([
           apiClient.get<StudentSearchResultItem[]>("/api/students?includeInactive=true", accessToken),
           apiClient.get<Batch[]>("/api/batches", accessToken),
           apiClient.get<ApprovalQueueItem[]>("/api/profiles/approval-queue", accessToken),
           apiClient.get<AuditLogEntry[]>("/api/audit/recent", accessToken),
+          // V4.0 E8: reuses the exact same registration search endpoint the
+          // Registrations page itself uses (Coordinator batch-scoping is
+          // already enforced server-side by that use case) — no duplicate
+          // query logic here.
+          apiClient.get<RegistrationRequestRecord[]>("/api/registration?status=SUBMITTED", accessToken),
+          // V4.0 E8: reuses E7's own Placement Report use case/API — the
+          // dashboard never recomputes the funnel itself.
+          apiClient.get<PlacementFunnelReport>("/api/reports/placements?type=PLACEMENT", accessToken),
         ]);
 
         if (cancelled) return;
@@ -87,6 +105,8 @@ export default function DashboardOverviewPage() {
           batches,
           approvalQueue,
           recentActivity,
+          pendingRegistrations,
+          placementFunnel,
         });
       } catch (err) {
         if (!cancelled) setError(err instanceof ApiError ? err.message : "Unable to load dashboard statistics.");
@@ -212,29 +232,47 @@ export default function DashboardOverviewPage() {
           </DashboardPanel>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <DashboardPanel title="Export Shortcuts" icon={Download} action={{ label: "Open Exports", href: "/dashboard/exports" }}>
-              <ul className="space-y-2 text-sm text-(--color-text-secondary)">
-                <li>Student Directory</li>
-                <li>Batch Report</li>
-                <li>Public Placement Dataset</li>
-                {role === "SECRETARY" && <li>Recruiter Directory</li>}
-              </ul>
+            <DashboardPanel title="Pending Registrations" icon={ClipboardList} action={{ label: "View All", href: "/dashboard/registrations" }}>
+              {data.pendingRegistrations.length === 0 ? (
+                <EmptyState icon={CheckCircle2} message="No registration requests awaiting review." />
+              ) : (
+                <ul className="space-y-1">
+                  {data.pendingRegistrations.slice(0, 5).map((item) => (
+                    <li
+                      key={item.id}
+                      className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm transition-colors duration-150 hover:bg-(--color-surface-muted)"
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) text-xs font-semibold text-(--color-accent)">
+                          {item.fullName.charAt(0).toUpperCase()}
+                        </span>
+                        <span className="truncate text-(--color-text-primary)">{item.fullName}</span>
+                      </span>
+                      <Link href="/dashboard/registrations" className="shrink-0 font-medium text-(--color-accent) hover:underline">
+                        Review
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </DashboardPanel>
 
-            <DashboardPanel title="Recruiter Activity" icon={Users}>
-              <p className="text-sm text-(--color-text-secondary)">
-                Recruiter-side activity isn&rsquo;t surfaced in this dashboard yet.
-                {role === "SECRETARY" && (
-                  <>
-                    {" "}
-                    See the{" "}
-                    <Link href="/dashboard/exports" className="text-(--color-accent) hover:underline">
-                      Recruiter Directory export
-                    </Link>{" "}
-                    for the current recruiter list.
-                  </>
-                )}
-              </p>
+            <DashboardPanel title="Placement Pipeline" icon={TrendingUp} action={{ label: "Full Report", href: "/dashboard/reports/placements" }}>
+              {!data.placementFunnel || data.placementFunnel.applied === 0 ? (
+                <EmptyState icon={Target} message="No placement applications yet this cycle." />
+              ) : (
+                // A fixed 2x2 grid, not the report page's own MetricGrid —
+                // that component's `lg:grid-cols-4` targets viewport width,
+                // not this panel's actual (half-width, two-column-layout)
+                // rendered width, which would cram 4 tiles into ~50% of the
+                // screen at the lg breakpoint.
+                <div className="grid grid-cols-2 gap-3">
+                  <MetricTile label="Applied" value={data.placementFunnel.applied} />
+                  <MetricTile label="Interviews" value={data.placementFunnel.reachedInterview} />
+                  <MetricTile label="Offers" value={data.placementFunnel.reachedOffer} />
+                  <MetricTile label="Placed" value={data.placementFunnel.placed} />
+                </div>
+              )}
             </DashboardPanel>
           </div>
         </>

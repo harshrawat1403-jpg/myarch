@@ -28,3 +28,4 @@ export { approveDraftRouteHandler } from "./presentation/route-handlers/approve-
 export { requestChangesRouteHandler } from "./presentation/route-handlers/request-changes";
 export { approvalQueueRouteHandler } from "./presentation/route-handlers/approval-queue";
 export { getPublishedProfileRouteHandler } from "./presentation/route-handlers/get-published-profile";
+export { updateProfileVisibilityRouteHandler } from "./presentation/route-handlers/update-profile-visibility";

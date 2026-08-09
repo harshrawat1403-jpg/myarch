@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/modules/auth";
 import { forbidden } from "@/lib/http-errors";
 import { NotAuthorizedError } from "@/lib/errors";
+import { recruiterDiscoveryRateLimiter } from "@/lib/rate-limiters";
 import { getDashboardStatsUseCase } from "../../infrastructure/container";
 
 export const recruiterDashboardStatsRouteHandler = withAuth(
@@ -14,5 +15,12 @@ export const recruiterDashboardStatsRouteHandler = withAuth(
       throw err;
     }
   },
-  { roles: ["RECRUITER"] },
+  {
+    roles: ["RECRUITER"],
+    rateLimit: {
+      limiter: recruiterDiscoveryRateLimiter,
+      key: (actor) => `recruiter-discovery:${actor.userId}`,
+      message: "Too many requests. Please slow down and try again shortly.",
+    },
+  },
 );

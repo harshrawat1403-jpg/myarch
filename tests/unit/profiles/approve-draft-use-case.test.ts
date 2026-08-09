@@ -91,15 +91,16 @@ describe("ApproveDraftUseCase", () => {
     expect(publishedKeys).not.toContain("personalEmail");
   });
 
-  it("allows an in-scope Coordinator to approve", async () => {
+  it("denies an in-scope Coordinator from approving (V4.0 Q1: Secretary is the sole final approval authority)", async () => {
     const draft = await ctx.draftRepository.create(STUDENT_ID);
     await ctx.draftRepository.updateContent(draft.id, { bio: "x" }, "PENDING_REVIEW");
 
-    const published = await ctx.useCase.execute({ actor: coordinatorInScope, studentId: STUDENT_ID });
-    expect(published.publishedByUserId).toBe("coord-1");
+    await expect(
+      ctx.useCase.execute({ actor: coordinatorInScope, studentId: STUDENT_ID }),
+    ).rejects.toBeInstanceOf(NotAuthorizedError);
   });
 
-  it("denies an out-of-scope Coordinator (brief's named boundary)", async () => {
+  it("denies an out-of-scope Coordinator too", async () => {
     const draft = await ctx.draftRepository.create(STUDENT_ID);
     await ctx.draftRepository.updateContent(draft.id, { bio: "x" }, "PENDING_REVIEW");
 

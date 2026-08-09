@@ -26,11 +26,19 @@ import { createJobWorker } from "@/modules/jobs";
 import { registerJobHandlers as registerNotificationJobHandlers } from "@/modules/notifications";
 import { registerBulkImportJobHandlers } from "@/modules/students";
 import { registerAcademicYearJobHandlers } from "@/modules/academic-year";
+// Deliberately a direct path, not the `@/modules/publications` barrel — see
+// that module's infrastructure/register-job-handlers.ts for why: this is
+// the one place in the whole app allowed to pull in the Playwright/
+// pptxgenjs export-rendering stack, and scripts/ is outside src/, so this
+// import isn't subject to the module-boundary ESLint rule either (the same
+// exception prisma/seed.ts already relies on).
+import { registerPublicationJobHandlers } from "@/modules/publications/infrastructure/register-job-handlers";
 
 function registerAllJobHandlers(): void {
   registerNotificationJobHandlers();
   registerBulkImportJobHandlers();
   registerAcademicYearJobHandlers();
+  registerPublicationJobHandlers();
   // Future modules with background jobs register here too, e.g.:
   // registerCleanupJobHandlers();
 }

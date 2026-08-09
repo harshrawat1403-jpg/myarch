@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DataLabel } from "@/components/ui/typography";
+import { ExpressInterestControl, SaveShortlistButtons } from "@/components/recruiter/save-shortlist-buttons";
 
 /**
  * Module 13 — the recruiter's single-candidate view. Fetch call, the
@@ -68,7 +69,7 @@ export default function RecruiterStudentProfilePage() {
     return (
       <div className="space-y-4">
         <p className="text-sm text-(--color-danger)">{error}</p>
-        <Button variant="secondary" onClick={() => router.push("/recruiter")}>
+        <Button variant="secondary" onClick={() => router.push("/recruiter/directory")}>
           Back to directory
         </Button>
       </div>
@@ -81,7 +82,7 @@ export default function RecruiterStudentProfilePage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <Link href="/recruiter" className="inline-flex items-center gap-1 text-sm font-medium text-(--color-accent) hover:underline">
+      <Link href="/recruiter/directory" className="inline-flex items-center gap-1 text-sm font-medium text-(--color-accent) hover:underline">
         <ChevronLeft aria-hidden="true" size={16} strokeWidth={2} />
         Back to Directory
       </Link>
@@ -93,11 +94,25 @@ export default function RecruiterStudentProfilePage() {
           </h1>
           <p className="text-sm text-(--color-text-secondary)">{profile.batchName}</p>
         </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-1">
-          <Badge variant={profile.hasResume ? "active" : "neutral"}>
-            {profile.hasResume ? "Resume available" : "No resume"}
-          </Badge>
-          {profile.portfolioLinks.length > 0 && <Badge variant="active">Portfolio linked</Badge>}
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <div className="flex flex-wrap justify-end gap-1">
+            <Badge variant={profile.hasResume ? "active" : "neutral"}>
+              {profile.hasResume ? "Resume available" : "No resume"}
+            </Badge>
+            {profile.portfolioLinks.length > 0 && <Badge variant="active">Portfolio linked</Badge>}
+          </div>
+          <SaveShortlistButtons
+            studentId={profile.studentId}
+            state={{ isSaved: profile.isSaved, isShortlisted: profile.isShortlisted }}
+            accessToken={accessToken}
+            onChange={(next) => setProfile((current) => (current ? { ...current, ...next } : current))}
+          />
+          <ExpressInterestControl
+            studentId={profile.studentId}
+            interestStatus={profile.interestStatus}
+            accessToken={accessToken}
+            onChange={(status) => setProfile((current) => (current ? { ...current, interestStatus: status } : current))}
+          />
         </div>
       </div>
 

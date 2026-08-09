@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { InvalidCredentialsError } from "../../domain/errors";
-import { getLoginUseCase, loginRateLimiter } from "../../infrastructure/container";
+import { getLoginUseCase } from "../../infrastructure/container";
 import { setRefreshTokenCookie } from "../cookies";
 import { badRequest, tooManyRequests, unauthorized } from "@/lib/http-errors";
+import { loginRateLimiter } from "@/lib/rate-limiters";
+import { clientIp } from "@/lib/client-ip";
 
 const LoginRequestSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
-
-function clientIp(req: NextRequest): string {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-}
 
 export async function loginRouteHandler(req: NextRequest): Promise<Response> {
   const body: unknown = await req.json().catch(() => null);
@@ -29,8 +27,10 @@ export async function loginRouteHandler(req: NextRequest): Promise<Response> {
   // of which one trips first.
   const email = parsed.data.email.trim().toLowerCase();
   const ip = clientIp(req);
-  const emailLimit = loginRateLimiter.consume(`login:email:${email}`);
-  const ipLimit = loginRateLimiter.consume(`login:ip:${ip}`);
+  const [emailLimit, ipLimit] = await Promise.all([
+    loginRateLimiter.consume(`login:email:${email}`),
+    loginRateLimiter.consume(`login:ip:${ip}`),
+  ]);
   if (!emailLimit.allowed || !ipLimit.allowed) {
     const retryAfterMs = Math.max(emailLimit.retryAfterMs ?? 0, ipLimit.retryAfterMs ?? 0);
     return tooManyRequests("Too many login attempts. Please try again later.", retryAfterMs);

@@ -37,3 +37,12 @@ export const SaveDraftRequestSchema = z
 export const RequestChangesRequestSchema = z.object({
   reviewComment: z.string().trim().min(1, "A review comment is required").max(2000),
 });
+
+export const UpdateProfileVisibilityRequestSchema = z
+  .object({
+    isPubliclyDiscoverable: z.boolean().optional(),
+    showCgpa: z.boolean().optional(),
+  })
+  .refine((value) => value.isPubliclyDiscoverable !== undefined || value.showCgpa !== undefined, {
+    message: "At least one field must be provided",
+  });

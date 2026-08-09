@@ -15,6 +15,11 @@ import { FakeNotificationService } from "../../support/fakes/fake-notification-s
 
 const STUDENT_ID = "student-1";
 const secretary: AuthenticatedActor = { userId: "sec-1", role: "SECRETARY" };
+const coordinatorInScope: AuthenticatedActor = {
+  userId: "coord-1",
+  role: "COORDINATOR",
+  batchScope: ["batch-a"],
+};
 const coordinatorOutOfScope: AuthenticatedActor = {
   userId: "coord-2",
   role: "COORDINATOR",
@@ -68,6 +73,20 @@ describe("RequestChangesUseCase", () => {
     await expect(
       ctx.useCase.execute({ actor: secretary, studentId: STUDENT_ID, reviewComment: "   " }),
     ).rejects.toBeInstanceOf(MissingReviewCommentError);
+  });
+
+  it("allows an in-scope Coordinator (V4.0 Q1: Coordinators retain review/request-changes authority, never approval)", async () => {
+    const draft = await ctx.draftRepository.create(STUDENT_ID);
+    await ctx.draftRepository.updateContent(draft.id, { bio: "x" }, "PENDING_REVIEW");
+
+    const updated = await ctx.useCase.execute({
+      actor: coordinatorInScope,
+      studentId: STUDENT_ID,
+      reviewComment: "Add more portfolio detail.",
+    });
+
+    expect(updated.status).toBe("CHANGES_REQUESTED");
+    expect(updated.reviewedByUserId).toBe("coord-1");
   });
 
   it("denies an out-of-scope Coordinator", async () => {

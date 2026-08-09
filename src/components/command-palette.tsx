@@ -2,13 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { LayoutGrid, LogOut, Search } from "lucide-react";
+import { Briefcase, BookOpen, LayoutGrid, LogOut, Search, Target, Users } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { apiClient } from "@/lib/api-client";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import type { NavItem } from "@/components/sheet-layout";
-import type { StudentSearchResultItem } from "@/modules/students";
-import type { RecruiterStudentProfileDTO } from "@/modules/recruiters";
+import type { GlobalSearchResults } from "@/modules/search";
 import type { Batch } from "@/modules/batches";
 
 export interface CommandPaletteProps {
@@ -36,28 +35,31 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
+const EMPTY_SEARCH_RESULTS: GlobalSearchResults = { students: [], companies: [], drives: [], publications: [] };
+
 /**
  * The global Ctrl+K / Cmd+K command palette — one instance, mounted by
  * `SheetLayout` so every authenticated route (admin, recruiter, student)
  * gets the same shell. Navigation entries come from the same `navItems`
  * each layout already passes to `SheetLayout` (no second icon/label
- * language invented here). Search entries call the exact same endpoints
- * the Student Management and Recruiter Portal pages already use
- * (`/api/students`, `/api/recruiters/students`) — no new API surface, no
- * fabricated results. A Secretary/Coordinator additionally gets batches,
- * filtered client-side over the same `/api/batches` list the Batch
- * Management page fetches, since that endpoint has no query support.
- * Students have nothing to search (a one-page portal), so their palette is
- * navigation-and-sign-out only, which is intentionally sparse rather than
- * padded with fake actions.
+ * language invented here).
+ *
+ * V4.0 E6 (PRD §15) — search entries call the unified, full-text-search-backed
+ * `/api/search` endpoint, which is itself role-aware (GlobalSearchUseCase
+ * decides what each role may see) — this component only renders whatever
+ * comes back, it does not re-derive any visibility rule itself. A
+ * Secretary/Coordinator additionally gets batches, filtered client-side
+ * over the same `/api/batches` list the Batch Management page fetches,
+ * since that endpoint has no query support and batches aren't part of the
+ * tsvector-indexed entity set (§15 only lists Students/Companies/Drives/
+ * Publications).
  */
 export function CommandPalette({ isOpen, onClose, navItems, onLogout }: CommandPaletteProps) {
   const router = useRouter();
   const { role, accessToken } = useAuth();
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
-  const [students, setStudents] = useState<StudentSearchResultItem[]>([]);
-  const [recruiterStudents, setRecruiterStudents] = useState<RecruiterStudentProfileDTO[]>([]);
+  const [searchResults, setSearchResults] = useState<GlobalSearchResults>(EMPTY_SEARCH_RESULTS);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -75,8 +77,7 @@ export function CommandPalette({ isOpen, onClose, navItems, onLogout }: CommandP
     if (isOpen) {
       setQuery("");
       setActiveIndex(0);
-      setStudents([]);
-      setRecruiterStudents([]);
+      setSearchResults(EMPTY_SEARCH_RESULTS);
     }
   }
 
@@ -100,19 +101,8 @@ export function CommandPalette({ isOpen, onClose, navItems, onLogout }: CommandP
   async function search(cancelledRef: { current: boolean }) {
     setIsSearching(true);
     try {
-      if (role === "SECRETARY" || role === "COORDINATOR") {
-        const results = await apiClient.get<StudentSearchResultItem[]>(
-          `/api/students?name=${encodeURIComponent(debouncedQuery)}`,
-          accessToken ?? undefined,
-        );
-        if (!cancelledRef.current) setStudents(results);
-      } else if (role === "RECRUITER") {
-        const results = await apiClient.get<RecruiterStudentProfileDTO[]>(
-          `/api/recruiters/students?query=${encodeURIComponent(debouncedQuery)}`,
-          accessToken ?? undefined,
-        );
-        if (!cancelledRef.current) setRecruiterStudents(results);
-      }
+      const results = await apiClient.get<GlobalSearchResults>(`/api/search?q=${encodeURIComponent(debouncedQuery)}`, accessToken ?? undefined);
+      if (!cancelledRef.current) setSearchResults(results);
     } catch {
       // Palette search degrades gracefully — this keystroke simply yields no results.
     } finally {
@@ -155,23 +145,43 @@ export function CommandPalette({ isOpen, onClose, navItems, onLogout }: CommandP
     }
 
     if (lowerQuery) {
-      for (const student of students) {
+      for (const student of searchResults.students) {
         list.push({
           id: `student-${student.id}`,
           section: "Students",
           label: student.fullName,
-          hint: `${student.rollNumber} · ${student.batchName}`,
-          onSelect: () => router.push(`/dashboard/students/${student.id}`),
+          hint: student.rollNumber ? `${student.rollNumber} · ${student.batchName}` : student.batchName,
+          onSelect: () => router.push(role === "RECRUITER" ? `/recruiter/students/${student.id}` : `/dashboard/students/${student.id}`),
         });
       }
 
-      for (const student of recruiterStudents) {
+      for (const company of searchResults.companies) {
         list.push({
-          id: `recruiter-student-${student.studentId}`,
-          section: "Students",
-          label: student.fullName,
-          hint: student.batchName,
-          onSelect: () => router.push(`/recruiter/students/${student.studentId}`),
+          id: `company-${company.id}`,
+          section: "Companies",
+          label: company.name,
+          hint: company.sector ?? undefined,
+          onSelect: () => router.push("/dashboard/companies"),
+        });
+      }
+
+      for (const drive of searchResults.drives) {
+        list.push({
+          id: `drive-${drive.id}`,
+          section: "Placement Drives",
+          label: drive.title,
+          hint: `${drive.companyName} · ${drive.status}`,
+          onSelect: () => router.push(role === "STUDENT" ? "/student" : `/dashboard/placement-drives/${drive.id}`),
+        });
+      }
+
+      for (const publication of searchResults.publications) {
+        list.push({
+          id: `publication-${publication.id}`,
+          section: "Publications",
+          label: publication.title,
+          hint: publication.status,
+          onSelect: () => router.push(`/dashboard/publications/${publication.id}`),
         });
       }
 
@@ -188,7 +198,7 @@ export function CommandPalette({ isOpen, onClose, navItems, onLogout }: CommandP
     }
 
     return list;
-  }, [navItems, query, students, recruiterStudents, batches, onLogout, router]);
+  }, [navItems, query, searchResults, batches, role, onLogout, router]);
 
   const clampedActiveIndex = entries.length === 0 ? 0 : Math.min(activeIndex, entries.length - 1);
 
@@ -216,7 +226,8 @@ export function CommandPalette({ isOpen, onClose, navItems, onLogout }: CommandP
   if (!isOpen) return null;
 
   const sections = [...new Set(entries.map((entry) => entry.section))];
-  const canSearch = role === "SECRETARY" || role === "COORDINATOR" || role === "RECRUITER";
+  // V4.0 E6: Students can now search too (open Placement Drives) — the palette's own search box is no longer staff/recruiter-only.
+  const canSearch = role === "SECRETARY" || role === "COORDINATOR" || role === "RECRUITER" || role === "STUDENT";
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-(--color-text-primary)/40 px-4 pt-[12vh]" onClick={onClose}>
@@ -236,7 +247,7 @@ export function CommandPalette({ isOpen, onClose, navItems, onLogout }: CommandP
             type="text"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={canSearch ? "Search students, batches, or jump to a page…" : "Jump to a page…"}
+            placeholder={canSearch ? "Search students, companies, drives, publications, or jump to a page…" : "Jump to a page…"}
             aria-label="Command palette search"
             className="w-full bg-transparent text-sm text-(--color-text-primary) placeholder:text-(--color-text-secondary) focus:outline-none"
           />
@@ -281,6 +292,10 @@ export function CommandPalette({ isOpen, onClose, navItems, onLogout }: CommandP
                         {section === "Quick Actions" && (
                           <LogOut aria-hidden="true" size={15} strokeWidth={1.75} className="shrink-0" />
                         )}
+                        {section === "Students" && <Users aria-hidden="true" size={15} strokeWidth={1.75} className="shrink-0" />}
+                        {section === "Companies" && <Briefcase aria-hidden="true" size={15} strokeWidth={1.75} className="shrink-0" />}
+                        {section === "Placement Drives" && <Target aria-hidden="true" size={15} strokeWidth={1.75} className="shrink-0" />}
+                        {section === "Publications" && <BookOpen aria-hidden="true" size={15} strokeWidth={1.75} className="shrink-0" />}
                         <span className="truncate">{entry.label}</span>
                       </span>
                       {entry.hint && (

@@ -1,11 +1,22 @@
 "use client";
 
-import { UserCircle } from "lucide-react";
+import { BarChart3, Briefcase, LayoutDashboard, Mail, UserCircle } from "lucide-react";
 import { useRequireRole } from "@/lib/use-require-role";
 import { SheetLayout, type NavItem } from "@/components/sheet-layout";
 import { LoadingScreen } from "@/components/loading-screen";
 
-const NAV_ITEMS: NavItem[] = [{ href: "/student", label: "My Profile", icon: UserCircle }];
+// V4.0 D6 — "/student" reworks into the Career Hub dashboard; the previous
+// profile-editor content it used to render moves to its own "/student/profile"
+// route (§2 IA), so it gets its own nav entry alongside the dashboard.
+// V4.0 E7 (PRD §4 — Student Reports: "Own data only"): Reports joins as a
+// first-class destination too, own-applications only.
+const NAV_ITEMS: NavItem[] = [
+  { href: "/student", label: "Overview", icon: LayoutDashboard },
+  { href: "/student/applications", label: "Applications", icon: Briefcase },
+  { href: "/student/interests", label: "Interests", icon: Mail },
+  { href: "/student/reports", label: "My Reports", icon: BarChart3 },
+  { href: "/student/profile", label: "My Profile", icon: UserCircle },
+];
 
 /**
  * Route protection for the entire (student) segment — Student role only,
@@ -23,7 +34,12 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   }
 
   return (
-    <SheetLayout navItems={NAV_ITEMS} roleLabel="Student" onLogout={handleLogout}>
+    <SheetLayout
+      navItems={NAV_ITEMS}
+      roleLabel="Student"
+      accountSettingsHref="/student/account"
+      onLogout={handleLogout}
+    >
       {children}
     </SheetLayout>
   );

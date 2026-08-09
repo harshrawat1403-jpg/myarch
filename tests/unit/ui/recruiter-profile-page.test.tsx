@@ -16,6 +16,15 @@ vi.mock("@/modules/auth/client", () => ({
 }));
 
 import RecruiterStudentProfilePage from "../../../src/app/(recruiter)/recruiter/students/[id]/page";
+import { ToastProvider } from "../../../src/components/ui/toast";
+
+function renderPage() {
+  return render(
+    <ToastProvider>
+      <RecruiterStudentProfilePage />
+    </ToastProvider>,
+  );
+}
 
 function jsonResponse(body: unknown, ok = true, status = ok ? 200 : 404) {
   return { ok, status, json: async () => (ok ? { data: body } : { error: { code: "NOT_FOUND", message: body } }) };
@@ -35,6 +44,9 @@ const PROFILE = {
   internships: [{ company: "Studio X" }],
   hasResume: true,
   profilePhotoUrl: null,
+  isSaved: false,
+  isShortlisted: false,
+  interestStatus: null,
 };
 
 describe("Recruiter student profile page — approved public information only", () => {
@@ -46,7 +58,7 @@ describe("Recruiter student profile page — approved public information only", 
 
   it("renders only approved public fields", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(PROFILE));
-    render(<RecruiterStudentProfilePage />);
+    renderPage();
 
     expect(await screen.findByRole("heading", { name: "Alice Architect" })).toBeInTheDocument();
     expect(screen.getByText("Aspiring architect and researcher")).toBeInTheDocument();
@@ -57,7 +69,7 @@ describe("Recruiter student profile page — approved public information only", 
 
   it("never renders any forbidden private field", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(PROFILE));
-    render(<RecruiterStudentProfilePage />);
+    renderPage();
     await screen.findByRole("heading", { name: "Alice Architect" });
 
     for (const forbidden of [/cgpa/i, /internal remarks/i, /coordinator notes/i, /backlog/i, /approval history/i, /draft/i]) {
@@ -68,7 +80,7 @@ describe("Recruiter student profile page — approved public information only", 
   it("requests the resume reference when Download Resume is clicked", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(PROFILE));
     const user = userEvent.setup();
-    render(<RecruiterStudentProfilePage />);
+    renderPage();
     await screen.findByRole("heading", { name: "Alice Architect" });
 
     fetchMock.mockResolvedValueOnce(jsonResponse({ storageKey: "resumes/s1.pdf", mimeType: "application/pdf" }));
@@ -83,7 +95,7 @@ describe("Recruiter student profile page — approved public information only", 
 
   it("disables the resume button when the student has no resume available", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ ...PROFILE, hasResume: false }));
-    render(<RecruiterStudentProfilePage />);
+    renderPage();
 
     const button = await screen.findByRole("button", { name: /no resume available/i });
     expect(button).toBeDisabled();
@@ -91,7 +103,7 @@ describe("Recruiter student profile page — approved public information only", 
 
   it("shows an error and a way back to the directory when the profile cannot be loaded (e.g. not approved/archived)", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse("Profile not found", false, 404));
-    render(<RecruiterStudentProfilePage />);
+    renderPage();
 
     expect(await screen.findByText("Profile not found")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /back to directory/i })).toBeInTheDocument();
@@ -99,9 +111,55 @@ describe("Recruiter student profile page — approved public information only", 
 
   it("shows a persistent back-to-directory link once the profile has loaded", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(PROFILE));
-    render(<RecruiterStudentProfilePage />);
+    renderPage();
     await screen.findByRole("heading", { name: "Alice Architect" });
 
-    expect(screen.getByRole("link", { name: /back to directory/i })).toHaveAttribute("href", "/recruiter");
+    expect(screen.getByRole("link", { name: /back to directory/i })).toHaveAttribute("href", "/recruiter/directory");
+  });
+
+  it("saves the student and reflects the Saved state (V4.0 C1)", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(PROFILE));
+    fetchMock.mockResolvedValueOnce(jsonResponse({ studentProfileId: "s1", isSaved: true, isShortlisted: false }));
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("heading", { name: "Alice Architect" });
+
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    expect(await screen.findByRole("button", { name: /^saved$/i })).toBeInTheDocument();
+    const [url, init] = fetchMock.mock.calls[1]!;
+    expect(url).toBe("/api/recruiters/students/s1/save");
+    expect(JSON.parse(init.body)).toEqual({ saved: true });
+  });
+
+  it("expresses interest without a message and shows the confirmed state (V4.0 C2)", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(PROFILE));
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "int-1", status: "SENT" }));
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("heading", { name: "Alice Architect" });
+
+    await user.click(screen.getByRole("button", { name: /express interest/i }));
+    await user.click(screen.getByRole("button", { name: /^send$/i }));
+
+    expect(await screen.findByText(/interest sent/i)).toBeInTheDocument();
+    const [url, init] = fetchMock.mock.calls[1]!;
+    expect(url).toBe("/api/recruiters/students/s1/interest");
+    expect(JSON.parse(init.body)).toEqual({});
+  });
+
+  it("cancels the inline panel without sending", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(PROFILE));
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("heading", { name: "Alice Architect" });
+
+    await user.click(screen.getByRole("button", { name: /express interest/i }));
+    expect(screen.getByRole("button", { name: /^send$/i })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+    expect(screen.queryByRole("button", { name: /^send$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /express interest/i })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

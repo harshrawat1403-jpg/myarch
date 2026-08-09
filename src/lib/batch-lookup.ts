@@ -11,19 +11,22 @@ import type { BatchStatus } from "@/modules/batches";
  * decoupled from the others while still sharing the one underlying table.
  * Promoted here from students/application/ports/batch-lookup.ts once
  * coordinators/ needed the identical thing — the same "second use is the
- * signal" rule already applied to AuditRecorder.
+ * signal" rule already applied to AuditRecorder. V4.0 E2 adds `name` —
+ * SubmitRegistrationRequestUseCase's own real need (the REGISTRATION_SUBMITTED
+ * notification's context), purely additive so no existing caller that only
+ * reads `.id`/`.status` is affected.
  */
 export interface BatchLookup {
-  findById(id: string): Promise<{ id: string; status: BatchStatus } | null>;
+  findById(id: string): Promise<{ id: string; name: string; status: BatchStatus } | null>;
 }
 
 export class PrismaBatchLookup implements BatchLookup {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findById(id: string): Promise<{ id: string; status: BatchStatus } | null> {
+  async findById(id: string): Promise<{ id: string; name: string; status: BatchStatus } | null> {
     return this.prisma.batch.findUnique({
       where: { id },
-      select: { id: true, status: true },
+      select: { id: true, name: true, status: true },
     });
   }
 }

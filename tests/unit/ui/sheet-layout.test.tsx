@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 let mockPathname = "/dashboard";
 const pushMock = vi.fn();
+const fetchMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   usePathname: () => mockPathname,
@@ -22,7 +23,23 @@ const NAV_ITEMS = [
   { href: "/dashboard/students", label: "Students" },
 ] as const;
 
+function jsonResponse(body: unknown) {
+  return { ok: true, status: 200, json: async () => ({ data: body }) };
+}
+
 describe("SheetLayout — the authenticated application shell", () => {
+  beforeEach(() => {
+    // V4.0 E1 — NotificationBell (rendered inside SheetLayout's header)
+    // fetches /api/notifications on mount; every test here gets an empty
+    // inbox by default unless a test overrides this mock itself.
+    fetchMock.mockReset();
+    fetchMock.mockImplementation((url: string) => {
+      if (url.includes("/api/notifications")) return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
   it("renders every nav item, the role label, and the page content", () => {
     mockPathname = "/dashboard";
     render(
@@ -132,15 +149,50 @@ describe("SheetLayout — the authenticated application shell", () => {
     expect(onLogout).toHaveBeenCalledTimes(1);
   });
 
-  it("renders the notification placeholder as non-interactive (no dead button)", () => {
+  it("V4.0 E1 — renders a real, interactive notification bell that opens an empty inbox", async () => {
     mockPathname = "/dashboard";
+    const user = userEvent.setup();
     render(
       <SheetLayout navItems={NAV_ITEMS} roleLabel="Secretary" onLogout={vi.fn()}>
         content
       </SheetLayout>,
     );
 
-    expect(screen.getByText("Notifications")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /notification/i })).not.toBeInTheDocument();
+    const bell = await screen.findByRole("button", { name: /^notifications$/i });
+    await user.click(bell);
+
+    expect(await screen.findByText("No notifications yet.")).toBeInTheDocument();
+  });
+
+  it("V4.0 E1 — shows an unread indicator and marks a notification read on click", async () => {
+    mockPathname = "/dashboard";
+    fetchMock.mockImplementation((url: string) => {
+      if (url.includes("/api/notifications/notif-1/read")) return Promise.resolve(jsonResponse({ id: "notif-1" }));
+      if (url.includes("/api/notifications")) {
+        return Promise.resolve(
+          jsonResponse([
+            { id: "notif-1", title: "Profile approved", message: "Your profile is now visible.", isRead: false, createdAt: "2026-08-01T00:00:00.000Z" },
+          ]),
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    const user = userEvent.setup();
+    render(
+      <SheetLayout navItems={NAV_ITEMS} roleLabel="Secretary" onLogout={vi.fn()}>
+        content
+      </SheetLayout>,
+    );
+
+    const bell = await screen.findByRole("button", { name: /1 unread/i });
+    await user.click(bell);
+    await user.click(await screen.findByText("Profile approved"));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/notifications/notif-1/read",
+        expect.objectContaining({ method: "PATCH" }),
+      ),
+    );
   });
 });

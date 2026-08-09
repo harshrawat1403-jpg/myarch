@@ -1,4 +1,4 @@
-import type { EmailTemplateDefinition } from "../types";
+import type { EmailTemplateDefinition, InAppTemplateDefinition } from "../types";
 import { escapeHtml } from "../layout";
 
 /**
@@ -43,4 +43,12 @@ export const accountCredentialsIssuedTemplate: EmailTemplateDefinition = {
       "and you will be required to set a new password the first time you sign in.</p>"
     );
   },
+};
+
+export const accountCredentialsIssuedInAppTemplate: InAppTemplateDefinition = {
+  title: (context) => (context.reason === "password_reset" ? "Password reset" : "Account created"),
+  message: (context) =>
+    context.reason === "password_reset"
+      ? "Your account password was reset by a department administrator."
+      : "A TNPArch account has been created for you.",
 };

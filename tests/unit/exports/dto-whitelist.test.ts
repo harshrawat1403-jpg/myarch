@@ -195,7 +195,7 @@ describe("exports DTO whitelist — RecruiterDirectoryRow", () => {
       },
     };
 
-    const dto = toRecruiterDirectoryRow(row as any);
+    const dto = toRecruiterDirectoryRow(row as any, 0);
     expect(Object.keys(dto).sort()).toEqual(["company", "contactPerson", "officialEmail", "activeDrives"].sort());
   });
 
@@ -208,11 +208,11 @@ describe("exports DTO whitelist — RecruiterDirectoryRow", () => {
       user: { id: "user-1", email: "jordan@studio-example.com", passwordHash: "$2b$12$fakehash", role: "RECRUITER", isActive: true },
     };
 
-    const dto = toRecruiterDirectoryRow(row as any);
+    const dto = toRecruiterDirectoryRow(row as any, 0);
     expect(JSON.stringify(dto)).not.toContain("$2b$12$fakehash");
   });
 
-  it("always reports activeDrives as 0 (no PlacementDrive entity exists yet)", () => {
+  it("reports the real, computed activeDrives count passed in by the repository (V4.0 E7 — PlacementDrive now exists, via D1)", () => {
     const row = {
       id: "rp-1",
       userId: "user-1",
@@ -220,7 +220,7 @@ describe("exports DTO whitelist — RecruiterDirectoryRow", () => {
       companyName: "Studio Example",
       user: { id: "user-1", email: "jordan@studio-example.com", passwordHash: "x", role: "RECRUITER", isActive: true },
     };
-    const dto = toRecruiterDirectoryRow(row as any);
-    expect(dto.activeDrives).toBe(0);
+    expect(toRecruiterDirectoryRow(row as any, 3).activeDrives).toBe(3);
+    expect(toRecruiterDirectoryRow(row as any, 0).activeDrives).toBe(0);
   });
 });

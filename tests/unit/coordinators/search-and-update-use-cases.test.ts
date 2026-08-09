@@ -19,6 +19,7 @@ function record(overrides: Partial<CoordinatorRecord> = {}): CoordinatorRecord {
     email: overrides.email ?? "alice@tnparch.in",
     fullName: overrides.fullName ?? "Alice Coordinator",
     isActive: overrides.isActive ?? true,
+    position: overrides.position ?? null,
     batchIds: overrides.batchIds ?? [],
     createdAt: overrides.createdAt ?? new Date(),
   };
@@ -42,6 +43,16 @@ describe("SearchCoordinatorsUseCase", () => {
 
     const allResults = await useCase.execute({ actor: SECRETARY, filters: { includeInactive: true } });
     expect(allResults).toHaveLength(2);
+  });
+
+  it("filters by position (V4.0 A1: display/reporting label only)", async () => {
+    const coordinatorRepository = new InMemoryCoordinatorRepository();
+    coordinatorRepository.seed(record({ id: "tp-1", position: "T_AND_P" }));
+    coordinatorRepository.seed(record({ id: "alumni-1", position: "ALUMNI" }));
+    const useCase = new SearchCoordinatorsUseCase({ coordinatorRepository });
+
+    const tpResults = await useCase.execute({ actor: SECRETARY, filters: { position: "T_AND_P" } });
+    expect(tpResults.map((r) => r.id)).toEqual(["tp-1"]);
   });
 });
 
@@ -89,5 +100,16 @@ describe("UpdateCoordinatorUseCase", () => {
   it("records a COORDINATOR_UPDATED audit entry", async () => {
     await useCase.execute({ actor: SECRETARY, coordinatorId: "coord-record-1", fullName: "New Name" });
     expect(auditRecorder.entries).toContainEqual(expect.objectContaining({ action: "COORDINATOR_UPDATED" }));
+  });
+
+  it("sets the position (V4.0 A1: display/reporting label only)", async () => {
+    const result = await useCase.execute({ actor: SECRETARY, coordinatorId: "coord-record-1", position: "ALUMNI" });
+    expect(result.position).toBe("ALUMNI");
+  });
+
+  it("clears the position when explicitly set to null", async () => {
+    await useCase.execute({ actor: SECRETARY, coordinatorId: "coord-record-1", position: "T_AND_P" });
+    const result = await useCase.execute({ actor: SECRETARY, coordinatorId: "coord-record-1", position: null });
+    expect(result.position).toBeNull();
   });
 });

@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Bell, ChevronLeft, ChevronRight, Menu, Search, X, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Menu, Search, X, type LucideIcon } from "lucide-react";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { Breadcrumbs, type BreadcrumbItem } from "@/components/breadcrumbs";
 import { UserMenu } from "@/components/user-menu";
+import { NotificationBell } from "@/components/notification-bell";
 import { Logo } from "@/components/logo";
 import { CommandPalette } from "@/components/command-palette";
 
@@ -248,13 +249,7 @@ export function SheetLayout({ navItems, roleLabel, scopeLabel, accountSettingsHr
               </kbd>
             </button>
 
-            <span
-              title="Notifications are not yet available"
-              className="hidden h-9 w-9 items-center justify-center rounded-md text-(--color-text-secondary) sm:flex"
-            >
-              <Bell aria-hidden="true" size={18} strokeWidth={1.75} />
-              <span className="sr-only">Notifications</span>
-            </span>
+            <NotificationBell />
 
             <UserMenu
               roleLabel={roleLabel}

@@ -68,6 +68,13 @@ export class InMemoryRecruiterDirectoryRepository implements RecruiterDirectoryR
     return this.profiles.get(studentId) ?? null;
   }
 
+  async findManyByIds(studentIds: readonly string[]): Promise<RecruiterStudentProfileDTO[]> {
+    return studentIds
+      .map((id) => this.profiles.get(id))
+      .filter((p): p is RecruiterStudentProfileDTO => p !== undefined)
+      .sort((a, b) => a.fullName.localeCompare(b.fullName));
+  }
+
   async getDashboardStats(): Promise<RecruiterDashboardStats> {
     const batchIds = new Set<string>();
     const skills = new Set<string>();

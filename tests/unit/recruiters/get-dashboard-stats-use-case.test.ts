@@ -24,6 +24,9 @@ function profile(overrides: Partial<RecruiterStudentProfileDTO>): RecruiterStude
     internships: [],
     hasResume: false,
     profilePhotoUrl: null,
+    isSaved: false,
+    isShortlisted: false,
+    interestStatus: null,
     ...overrides,
   };
 }

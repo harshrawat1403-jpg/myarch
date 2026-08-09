@@ -17,6 +17,23 @@ export const RecruiterSearchQuerySchema = z.object({
   hasCertification: z.coerce.boolean().optional(),
 });
 
+export const SetSavedStudentRequestSchema = z.object({
+  saved: z.boolean(),
+});
+
+export const SetShortlistedStudentRequestSchema = z.object({
+  isShortlisted: z.boolean(),
+});
+
+export const ExpressInterestRequestSchema = z.object({
+  message: z.string().trim().max(1000).optional(),
+});
+
+// V4.0 C3 — student's accept/decline response to an interest request.
+export const RespondToInterestRequestSchema = z.object({
+  decision: z.enum(["ACCEPT", "DECLINE"]),
+});
+
 // V3.0 Administration Platform — admin-side recruiter account schemas.
 
 export const CreateRecruiterAccountRequestSchema = z.object({

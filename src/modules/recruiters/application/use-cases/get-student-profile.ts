@@ -4,6 +4,11 @@ import { NotAuthorizedError } from "@/lib/errors";
 import type { RecruiterStudentProfileDTO } from "../../domain/entities";
 import { ApprovedProfileNotFoundError } from "../../domain/errors";
 import type { RecruiterDirectoryRepository } from "../ports/recruiter-directory-repository";
+import type { RecruiterInteractionRepository } from "../ports/recruiter-interaction-repository";
+import type { RecruiterInterestRepository } from "../ports/recruiter-interest-repository";
+import type { RecruiterSelfLookup } from "../ports/recruiter-self-lookup";
+import { mergeInteractionState } from "./merge-interaction-state";
+import { mergeInterestState } from "./merge-interest-state";
 
 export interface GetRecruiterStudentProfileInput {
   actor: AuthenticatedActor;
@@ -11,7 +16,14 @@ export interface GetRecruiterStudentProfileInput {
 }
 
 export class GetRecruiterStudentProfileUseCase {
-  constructor(private readonly deps: { directoryRepository: RecruiterDirectoryRepository }) {}
+  constructor(
+    private readonly deps: {
+      directoryRepository: RecruiterDirectoryRepository;
+      interactionRepository: RecruiterInteractionRepository;
+      interestRepository: RecruiterInterestRepository;
+      recruiterSelfLookup: RecruiterSelfLookup;
+    },
+  ) {}
 
   async execute(input: GetRecruiterStudentProfileInput): Promise<RecruiterStudentProfileDTO> {
     if (!canAccessRecruiterDirectory(input.actor)) {
@@ -30,6 +42,14 @@ export class GetRecruiterStudentProfileUseCase {
       throw new ApprovedProfileNotFoundError();
     }
 
-    return profile;
+    const recruiter = await this.deps.recruiterSelfLookup.findByUserId(input.actor.userId);
+    if (!recruiter) return profile;
+
+    const [interaction, interest] = await Promise.all([
+      this.deps.interactionRepository.findOneForRecruiter(recruiter.id, profile.studentId),
+      this.deps.interestRepository.findByRecruiterAndStudent(recruiter.id, profile.studentId),
+    ]);
+    const withInteraction = mergeInteractionState([profile], interaction ? [interaction] : []);
+    return mergeInterestState(withInteraction, interest ? [interest] : [])[0]!;
   }
 }

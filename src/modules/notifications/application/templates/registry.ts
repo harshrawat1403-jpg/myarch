@@ -1,16 +1,107 @@
-import type { NotificationTemplateId } from "../../domain/entities";
-import type { EmailTemplateDefinition } from "./types";
-import { profileApprovedTemplate } from "./definitions/profile-approved";
-import { profileChangesRequestedTemplate } from "./definitions/profile-changes-requested";
-import { accountCredentialsIssuedTemplate } from "./definitions/account-credentials-issued";
+import type { NotificationChannel, NotificationTemplateId } from "../../domain/entities";
+import type { EmailTemplateDefinition, InAppTemplateDefinition } from "./types";
+import { profileApprovedTemplate, profileApprovedInAppTemplate } from "./definitions/profile-approved";
+import { profileChangesRequestedTemplate, profileChangesRequestedInAppTemplate } from "./definitions/profile-changes-requested";
+import { accountCredentialsIssuedTemplate, accountCredentialsIssuedInAppTemplate } from "./definitions/account-credentials-issued";
+import {
+  interestFacilitationRequiredTemplate,
+  interestFacilitationRequiredInAppTemplate,
+} from "./definitions/interest-facilitation-required";
+import { registrationSubmittedTemplate, registrationSubmittedInAppTemplate } from "./definitions/registration-submitted";
+import { registrationReviewedTemplate, registrationReviewedInAppTemplate } from "./definitions/registration-reviewed";
+import { registrationDecidedTemplate, registrationDecidedInAppTemplate } from "./definitions/registration-decided";
+import {
+  recruiterInterestReceivedTemplate,
+  recruiterInterestReceivedInAppTemplate,
+} from "./definitions/recruiter-interest-received";
+import {
+  recruiterInterestRespondedTemplate,
+  recruiterInterestRespondedInAppTemplate,
+} from "./definitions/recruiter-interest-responded";
+import { placementDriveAnnouncedTemplate, placementDriveAnnouncedInAppTemplate } from "./definitions/placement-drive-announced";
+import { applicationStatusChangedTemplate, applicationStatusChangedInAppTemplate } from "./definitions/application-status-changed";
 
 /**
  * Every known template, keyed by the id business use cases pass to
  * NotificationService.notify(). Adding a template is purely additive: a new
  * definition file plus one new entry here.
+ *
+ * V4.0 E2 note: §12 names ten new templates. Seven are wired in here and
+ * into their real use-case call sites this milestone. Three are
+ * deliberately NOT added yet, each for a structural reason rather than an
+ * oversight:
+ *   - DEADLINE_REMINDER needs a genuinely new scheduled-reminder subsystem
+ *     (compute a reminder time from PlacementDrive.applicationDeadline,
+ *     dispatch a delayed job via JobDispatcher's existing `scheduledFor`
+ *     support, then resolve "who hasn't applied yet and is eligible" at
+ *     fire-time) — a real feature in its own right, not a one-line notify()
+ *     call into an existing use case like the other seven.
+ *   - PUBLICATION_PUBLISHED has no real call site yet — Publication Studio
+ *     (E3-E5) hasn't been built. Wiring happens there, when
+ *     PublishPublicationUseCase exists.
+ *   - ANNOUNCEMENT_POSTED has no backing entity or use case anywhere in the
+ *     approved V4.0 schema (§5) — it appears only in this one template
+ *     list, nowhere else in the PRD. Building a real "Announcement" feature
+ *     to give this template something to fire from would be exactly the
+ *     kind of speculative, PRD-unauthorized feature this project's
+ *     standing instructions rule out.
  */
 export const EMAIL_TEMPLATE_REGISTRY: Record<NotificationTemplateId, EmailTemplateDefinition> = {
   PROFILE_APPROVED: profileApprovedTemplate,
   PROFILE_CHANGES_REQUESTED: profileChangesRequestedTemplate,
   ACCOUNT_CREDENTIALS_ISSUED: accountCredentialsIssuedTemplate,
+  INTEREST_FACILITATION_REQUIRED: interestFacilitationRequiredTemplate,
+  REGISTRATION_SUBMITTED: registrationSubmittedTemplate,
+  REGISTRATION_REVIEWED: registrationReviewedTemplate,
+  REGISTRATION_DECIDED: registrationDecidedTemplate,
+  RECRUITER_INTEREST_RECEIVED: recruiterInterestReceivedTemplate,
+  RECRUITER_INTEREST_RESPONDED: recruiterInterestRespondedTemplate,
+  PLACEMENT_DRIVE_ANNOUNCED: placementDriveAnnouncedTemplate,
+  APPLICATION_STATUS_CHANGED: applicationStatusChangedTemplate,
+};
+
+/** V4.0 E1 — the IN_APP counterpart to EMAIL_TEMPLATE_REGISTRY. */
+export const IN_APP_TEMPLATE_REGISTRY: Record<NotificationTemplateId, InAppTemplateDefinition> = {
+  PROFILE_APPROVED: profileApprovedInAppTemplate,
+  PROFILE_CHANGES_REQUESTED: profileChangesRequestedInAppTemplate,
+  ACCOUNT_CREDENTIALS_ISSUED: accountCredentialsIssuedInAppTemplate,
+  INTEREST_FACILITATION_REQUIRED: interestFacilitationRequiredInAppTemplate,
+  REGISTRATION_SUBMITTED: registrationSubmittedInAppTemplate,
+  REGISTRATION_REVIEWED: registrationReviewedInAppTemplate,
+  REGISTRATION_DECIDED: registrationDecidedInAppTemplate,
+  RECRUITER_INTEREST_RECEIVED: recruiterInterestReceivedInAppTemplate,
+  RECRUITER_INTEREST_RESPONDED: recruiterInterestRespondedInAppTemplate,
+  PLACEMENT_DRIVE_ANNOUNCED: placementDriveAnnouncedInAppTemplate,
+  APPLICATION_STATUS_CHANGED: applicationStatusChangedInAppTemplate,
+};
+
+/**
+ * V4.0 E1/§12 — "Delivery stays dual-channel per template (email for
+ * anything time-sensitive/off-platform-relevant like deadlines and
+ * decisions; in-app for everything, since the bell is now real)." Each of
+ * the four templates that predate E1 already sent EMAIL; this makes the
+ * bell real for them too rather than only for templates E2 adds. New
+ * templates (E2) declare their own channel list here — nothing else
+ * (DefaultNotificationService, the job handler) needs to change per
+ * template, only this map and a new definition file.
+ *
+ * E2's seven new templates follow §12's own two named examples literally:
+ * only REGISTRATION_DECIDED is a "decision" in that sense, so it's the one
+ * new template that's dual-channel; the rest are staff-to-staff or routine
+ * updates and stay IN_APP-only, keeping email volume down for
+ * higher-frequency events (a busy intake season could mean many
+ * REGISTRATION_SUBMITTED notifications, for example).
+ */
+export const NOTIFICATION_CHANNELS: Record<NotificationTemplateId, readonly NotificationChannel[]> = {
+  PROFILE_APPROVED: ["EMAIL", "IN_APP"],
+  PROFILE_CHANGES_REQUESTED: ["EMAIL", "IN_APP"],
+  ACCOUNT_CREDENTIALS_ISSUED: ["EMAIL", "IN_APP"],
+  INTEREST_FACILITATION_REQUIRED: ["EMAIL", "IN_APP"],
+  REGISTRATION_SUBMITTED: ["IN_APP"],
+  REGISTRATION_REVIEWED: ["IN_APP"],
+  REGISTRATION_DECIDED: ["EMAIL", "IN_APP"],
+  RECRUITER_INTEREST_RECEIVED: ["IN_APP"],
+  RECRUITER_INTEREST_RESPONDED: ["IN_APP"],
+  PLACEMENT_DRIVE_ANNOUNCED: ["IN_APP"],
+  APPLICATION_STATUS_CHANGED: ["IN_APP"],
 };

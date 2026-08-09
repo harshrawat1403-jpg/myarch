@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server";
 import type { AuthenticatedActor, Role } from "../domain/entities";
 import type { TokenService } from "../application/ports/token-service";
-import { forbidden, passwordChangeRequired, unauthorized } from "@/lib/http-errors";
+import type { RateLimiter } from "@/lib/rate-limit";
+import { forbidden, passwordChangeRequired, tooManyRequests, unauthorized } from "@/lib/http-errors";
 
 /**
  * The required request flow for every protected route
@@ -44,6 +45,20 @@ export interface AuthOptions {
    * below it.
    */
   allowMustChangePassword?: boolean;
+  /**
+   * V4.0 A2 (docs/planning/V4_0_PRD.md §18) — opt-in per-route rate
+   * limiting, checked after role/scope validation (so the key can be built
+   * from the resolved actor) and before the wrapped handler runs. Only the
+   * routes explicitly named in the PRD's five approved surfaces pass this;
+   * every other route is unaffected.
+   */
+  rateLimit?: {
+    limiter: RateLimiter;
+    /** Builds the bucket key — typically scoped to the authenticated actor, e.g. `recruiter-discovery:${actor.userId}`. */
+    key: (actor: AuthenticatedActor, req: NextRequest) => string;
+    cost?: number;
+    message?: string;
+  };
 }
 
 export type AuthenticatedHandler = (
@@ -115,6 +130,19 @@ export function createAuthMiddleware(tokenService: Pick<TokenService, "verifyAcc
           if (!inScope) {
             return forbidden("This batch is outside your assigned scope");
           }
+        }
+      }
+
+      // 4.5. Rate limiting (V4.0 A2) — opt-in, after the actor is resolved
+      // so the key can be actor-scoped.
+      if (options.rateLimit) {
+        const key = options.rateLimit.key(actor, req);
+        const result = await options.rateLimit.limiter.consume(key, options.rateLimit.cost ?? 1);
+        if (!result.allowed) {
+          return tooManyRequests(
+            options.rateLimit.message ?? "Too many requests. Please try again later.",
+            result.retryAfterMs,
+          );
         }
       }
 

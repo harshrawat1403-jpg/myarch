@@ -1,4 +1,4 @@
-import type { EmailTemplateDefinition } from "../types";
+import type { EmailTemplateDefinition, InAppTemplateDefinition } from "../types";
 import { escapeHtml } from "../layout";
 
 /** Context: { studentName: string; reviewComment: string } */
@@ -26,4 +26,9 @@ export const profileChangesRequestedTemplate: EmailTemplateDefinition = {
       "<p>Please log in to your TNPArch account, update your draft, and resubmit it for review.</p>"
     );
   },
+};
+
+export const profileChangesRequestedInAppTemplate: InAppTemplateDefinition = {
+  title: () => "Changes requested on your profile",
+  message: (context) => String(context.reviewComment ?? "A reviewer requested changes to your public profile draft."),
 };

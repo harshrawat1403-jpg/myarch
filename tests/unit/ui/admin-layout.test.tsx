@@ -70,4 +70,22 @@ describe("AdminLayout — dashboard authorization (UI-level route protection)", 
     expect(await screen.findByText("dashboard content")).toBeInTheDocument();
     expect(replaceMock).not.toHaveBeenCalled();
   });
+
+  it("links Companies, Placement Drives, and Internships (V4.0 D2)", async () => {
+    mockAuthState = { isLoading: false, isAuthenticated: true, role: "SECRETARY", logout: vi.fn() };
+    render(<AdminLayout>{"dashboard content"}</AdminLayout>);
+
+    await screen.findByText("dashboard content");
+    expect(screen.getByRole("link", { name: /companies/i })).toHaveAttribute("href", "/dashboard/companies");
+    expect(screen.getByRole("link", { name: /placement drives/i })).toHaveAttribute("href", "/dashboard/placement-drives");
+    expect(screen.getByRole("link", { name: /internships/i })).toHaveAttribute("href", "/dashboard/internships");
+  });
+
+  it("links Alumni for both Secretary and Coordinator (V4.0 D5 — identical access)", async () => {
+    mockAuthState = { isLoading: false, isAuthenticated: true, role: "COORDINATOR", logout: vi.fn() };
+    render(<AdminLayout>{"dashboard content"}</AdminLayout>);
+
+    await screen.findByText("dashboard content");
+    expect(screen.getByRole("link", { name: /^alumni$/i })).toHaveAttribute("href", "/dashboard/alumni");
+  });
 });
