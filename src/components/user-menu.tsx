@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, LogOut, Settings } from "lucide-react";
+import { ChevronDown, Globe, LogOut, Settings } from "lucide-react";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 
 export interface UserMenuProps {
@@ -17,11 +17,26 @@ export interface UserMenuProps {
 /**
  * The authenticated shell's account menu — role (plus an optional
  * Coordinator scope sub-label) as the trigger, a focus-trapped panel with
- * the one available action (Log out) when open. Reuses `useFocusTrap` and
- * the exact toggle/Escape-to-close interaction `PublicNav`'s mobile drawer
- * already established. Version 2.0: restyled with an avatar-initial
- * circle (matching the sidebar's own profile block) and a Lucide chevron
- * instead of the V1.1 ▲/▼ glyphs.
+ * its available actions (Visit Website, optionally Account Settings, Log
+ * out) when open. Reuses `useFocusTrap` and the exact toggle/Escape-to-close
+ * interaction `PublicNav`'s mobile drawer already established. Version 2.0:
+ * restyled with an avatar-initial circle (matching the sidebar's own
+ * profile block) and a Lucide chevron instead of the V1.1 ▲/▼ glyphs.
+ *
+ * V4.0 UX fix: "Visit Website" is the one place, common to all four
+ * authenticated roles, where a signed-in user can get back to the public
+ * marketing site — the sidebar brand-mark link intentionally still goes to
+ * the role's own portal home (an equally standard, already-tested
+ * convention), so this is additive, not a repurposing of it.
+ *
+ * Points at `/about`, not `/` — `/`'s own page component (see its doc
+ * comment) deliberately bounces any authenticated session straight back to
+ * its portal home, which is exactly right for someone who lands on the bare
+ * domain by accident but exactly wrong for a deliberate "let me see the
+ * public site" click: it would just flash and redirect right back. `/about`
+ * is a real, already-existing public page with no such guard, and from
+ * there the full public nav (including "Home") is available — no new page,
+ * no change to `/`'s own behavior.
  */
 export function UserMenu({ roleLabel, scopeLabel, accountSettingsHref, onLogout }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -79,6 +94,14 @@ export function UserMenu({ roleLabel, scopeLabel, accountSettingsHref, onLogout 
               Account Settings
             </Link>
           )}
+          <Link
+            href="/about"
+            onClick={() => setIsOpen(false)}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-(--color-text-secondary) transition-colors duration-150 hover:bg-(--color-surface-muted) hover:text-(--color-text-primary)"
+          >
+            <Globe aria-hidden="true" size={16} strokeWidth={1.75} />
+            Visit Website
+          </Link>
           <button
             type="button"
             onClick={() => {

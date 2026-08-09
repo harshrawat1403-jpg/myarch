@@ -37,7 +37,10 @@ describe("UserMenu — authenticated shell account menu", () => {
 
     await user.click(screen.getByRole("button", { name: /account menu/i }));
 
-    await waitFor(() => expect(screen.getByRole("button", { name: /log out/i })).toHaveFocus());
+    // "Visit Website" is now the first focusable item in the panel (Secretary
+    // gets no accountSettingsHref in this fixture) — see the V4.0 UX fix
+    // test below for why it's there at all.
+    await waitFor(() => expect(screen.getByRole("link", { name: /visit website/i })).toHaveFocus());
   });
 
   it("closes on Escape", async () => {
@@ -62,5 +65,27 @@ describe("UserMenu — authenticated shell account menu", () => {
 
     expect(onLogout).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("button", { name: /log out/i })).not.toBeInTheDocument();
+  });
+
+  it.each(["Secretary", "Coordinator", "Recruiter", "Student"])(
+    "V4.0 UX fix — offers a 'Visit Website' link back to the public site for %s",
+    async (roleLabel) => {
+      const user = userEvent.setup();
+      render(<UserMenu roleLabel={roleLabel} onLogout={vi.fn()} />);
+
+      await user.click(screen.getByRole("button", { name: /account menu/i }));
+
+      expect(screen.getByRole("link", { name: /visit website/i })).toHaveAttribute("href", "/about");
+    },
+  );
+
+  it("V4.0 UX fix — closes the menu after clicking 'Visit Website'", async () => {
+    const user = userEvent.setup();
+    render(<UserMenu roleLabel="Secretary" onLogout={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: /account menu/i }));
+    await user.click(screen.getByRole("link", { name: /visit website/i }));
+
+    expect(screen.queryByRole("link", { name: /visit website/i })).not.toBeInTheDocument();
   });
 });

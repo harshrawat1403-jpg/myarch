@@ -62,13 +62,20 @@ export interface NotificationRecord {
   readonly readAt: Date | null;
 }
 
-/** The notification center's actual read model — pre-rendered, ready to display. */
+/**
+ * The notification center's actual read model — pre-rendered, ready to
+ * display. `destination` is resolved at read time from the same raw
+ * `payload` context (see `resolveNotificationDestination`) — null for
+ * templates with no meaningful target, or for older rows whose payload
+ * predates a given template gaining a destination.
+ */
 export interface InAppNotificationDTO {
   readonly id: string;
   readonly title: string;
   readonly message: string;
   readonly isRead: boolean;
   readonly createdAt: Date;
+  readonly destination: string | null;
 }
 
 /**

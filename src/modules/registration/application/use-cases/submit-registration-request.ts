@@ -75,7 +75,7 @@ export class SubmitRegistrationRequestUseCase {
         this.deps.notificationService.notify({
           recipientUserId,
           template: "REGISTRATION_SUBMITTED",
-          context: { applicantName: created.fullName, batchName: batch.name },
+          context: { applicantName: created.fullName, batchName: batch.name, requestId: created.id },
         }),
       ),
     );

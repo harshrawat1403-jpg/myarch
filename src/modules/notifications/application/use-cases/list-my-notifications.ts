@@ -2,6 +2,7 @@ import type { AuthenticatedActor } from "@/modules/auth";
 import type { InAppNotificationDTO } from "../../domain/entities";
 import type { NotificationRepository } from "../ports/notification-repository";
 import { renderInAppTemplate } from "../templates/render";
+import { resolveNotificationDestination } from "../templates/destinations";
 
 const LIST_LIMIT = 50;
 
@@ -19,6 +20,7 @@ export class ListMyNotificationsUseCase {
         message,
         isRead: record.readAt !== null,
         createdAt: record.createdAt,
+        destination: resolveNotificationDestination(record.template, record.payload),
       };
     });
   }

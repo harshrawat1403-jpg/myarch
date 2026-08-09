@@ -71,7 +71,7 @@ export class MarkRegistrationRequestUseCase {
         this.deps.notificationService.notify({
           recipientUserId,
           template: "REGISTRATION_REVIEWED",
-          context: { applicantName: existing.fullName, status: input.status },
+          context: { applicantName: existing.fullName, status: input.status, requestId: existing.id },
         }),
       ),
     );

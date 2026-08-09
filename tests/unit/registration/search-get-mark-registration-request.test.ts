@@ -125,7 +125,7 @@ describe("MarkRegistrationRequestUseCase", () => {
       expect.objectContaining({
         recipientUserId: "sec-1",
         template: "REGISTRATION_REVIEWED",
-        context: { applicantName: "Priya New Student", status: "REVIEWED" },
+        context: { applicantName: "Priya New Student", status: "REVIEWED", requestId: "a1" },
       }),
     );
   });

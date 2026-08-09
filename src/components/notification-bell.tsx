@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, CheckCheck } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { useFocusTrap } from "@/lib/use-focus-trap";
+import { useClickOutside } from "@/lib/use-click-outside";
 import { EmptyState } from "@/components/empty-state";
 import type { InAppNotificationDTO } from "@/modules/notifications";
 
@@ -20,6 +22,13 @@ const POLL_INTERVAL_MS = 60_000;
  * new plumbing. Reuses `UserMenu`'s exact dropdown interaction contract
  * (`useFocusTrap`, Escape-to-close, `absolute right-0` panel) rather than
  * inventing a second dropdown pattern next to it in the same header.
+ *
+ * V4.0 UX fix: standard popover dismissal (outside click closes, inside
+ * click doesn't — see `useClickOutside`) and actionable rows — a
+ * notification with a `destination` (resolved server-side from the same
+ * template + context every row already carries, see
+ * `resolveNotificationDestination`) is a real `<Link>`, so it marks itself
+ * read, closes the panel, and navigates in one click.
  */
 export function NotificationBell() {
   const { accessToken } = useAuth();
@@ -28,8 +37,10 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<InAppNotificationDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const panelRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useFocusTrap(isOpen, panelRef);
+  useClickOutside(isOpen, [panelRef, buttonRef], () => setIsOpen(false));
 
   const load = useCallback(async () => {
     if (!accessToken) return;
@@ -85,15 +96,28 @@ export function NotificationBell() {
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
+  function handleNotificationClick(notification: InAppNotificationDTO) {
+    if (!notification.isRead) void handleMarkRead(notification.id);
+    setIsOpen(false);
+    // No router.push/try-catch here on purpose — the row below renders a
+    // real <Link> for actionable notifications, so navigation itself is the
+    // browser's own anchor-click handling (falls back to a full navigation
+    // even if client-side routing were to fail). This handler only ever
+    // needs to mark-as-read and close the panel; it never blocks or
+    // reverses either of those if anything downstream goes wrong.
+  }
+
   return (
     <div className="relative">
       <button
         type="button"
+        ref={buttonRef}
         aria-expanded={isOpen}
         aria-controls="notification-panel"
+        aria-haspopup="dialog"
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
         onClick={() => setIsOpen((open) => !open)}
-        className="relative hidden h-9 w-9 items-center justify-center rounded-md text-(--color-text-secondary) transition-colors duration-150 hover:bg-(--color-surface-muted) hover:text-(--color-text-primary) focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent) sm:flex"
+        className="relative flex h-9 w-9 items-center justify-center rounded-md text-(--color-text-secondary) transition-colors duration-150 hover:bg-(--color-surface-muted) hover:text-(--color-text-primary) focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)"
       >
         <Bell aria-hidden="true" size={18} strokeWidth={1.75} />
         {unreadCount > 0 && (
@@ -105,10 +129,15 @@ export function NotificationBell() {
         <div
           id="notification-panel"
           ref={panelRef}
-          className="absolute right-0 z-10 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-md border border-(--color-border) bg-(--color-surface) shadow-lg"
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby="notification-panel-title"
+          className="absolute right-0 z-10 mt-2 w-[calc(100vw-7rem)] max-w-80 rounded-md border border-(--color-border) bg-(--color-surface) shadow-lg"
         >
           <div className="flex items-center justify-between gap-2 border-b border-(--color-border) px-3 py-2">
-            <span className="text-sm font-medium text-(--color-text-primary)">Notifications</span>
+            <span id="notification-panel-title" className="text-sm font-medium text-(--color-text-primary)">
+              Notifications
+            </span>
             {unreadCount > 0 && (
               <button
                 type="button"
@@ -130,15 +159,12 @@ export function NotificationBell() {
               </div>
             ) : (
               <ul className="space-y-0.5">
-                {notifications.map((notification) => (
-                  <li key={notification.id}>
-                    <button
-                      type="button"
-                      onClick={() => !notification.isRead && void handleMarkRead(notification.id)}
-                      className={`flex w-full flex-col items-start gap-0.5 rounded-md px-3 py-2 text-left transition-colors duration-150 hover:bg-(--color-surface-muted) ${
-                        notification.isRead ? "" : "bg-(--color-accent-soft)"
-                      }`}
-                    >
+                {notifications.map((notification) => {
+                  const rowClassName = `flex w-full flex-col items-start gap-0.5 rounded-md px-3 py-2 text-left transition-colors duration-150 hover:bg-(--color-surface-muted) ${
+                    notification.isRead ? "" : "bg-(--color-accent-soft)"
+                  }`;
+                  const rowContent = (
+                    <>
                       <span className="flex w-full items-center gap-2">
                         {!notification.isRead && (
                           <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-(--color-accent)" />
@@ -149,9 +175,27 @@ export function NotificationBell() {
                       <span className="text-[11px] text-(--color-text-secondary)">
                         {new Date(notification.createdAt).toLocaleString()}
                       </span>
-                    </button>
-                  </li>
-                ))}
+                    </>
+                  );
+
+                  return (
+                    <li key={notification.id}>
+                      {notification.destination ? (
+                        <Link href={notification.destination} onClick={() => handleNotificationClick(notification)} className={rowClassName}>
+                          {rowContent}
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => !notification.isRead && void handleMarkRead(notification.id)}
+                          className={rowClassName}
+                        >
+                          {rowContent}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

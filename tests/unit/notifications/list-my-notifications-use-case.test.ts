@@ -22,6 +22,31 @@ describe("ListMyNotificationsUseCase — V4.0 E1", () => {
     expect(result[0]!.isRead).toBe(false);
   });
 
+  it("V4.0 UX fix — includes a resolved destination for templates that have one", async () => {
+    const repo = new InMemoryNotificationRepository();
+    await repo.create({ recipientUserId: STUDENT.userId, channel: "IN_APP", template: "PROFILE_APPROVED", payload: { studentName: "Alice" } });
+
+    const useCase = new ListMyNotificationsUseCase({ notificationRepository: repo });
+    const result = await useCase.execute(STUDENT);
+
+    expect(result[0]!.destination).toBe("/student/profile");
+  });
+
+  it("V4.0 UX fix — destination is null for templates with no meaningful owning page", async () => {
+    const repo = new InMemoryNotificationRepository();
+    await repo.create({
+      recipientUserId: STUDENT.userId,
+      channel: "IN_APP",
+      template: "ACCOUNT_CREDENTIALS_ISSUED",
+      payload: { reason: "account_created" },
+    });
+
+    const useCase = new ListMyNotificationsUseCase({ notificationRepository: repo });
+    const result = await useCase.execute(STUDENT);
+
+    expect(result[0]!.destination).toBeNull();
+  });
+
   it("marks isRead true once readAt is set", async () => {
     const repo = new InMemoryNotificationRepository();
     const { id } = await repo.create({ recipientUserId: STUDENT.userId, channel: "IN_APP", template: "PROFILE_APPROVED", payload: {} });

@@ -113,7 +113,7 @@ describe("SubmitRegistrationRequestUseCase", () => {
       expect.objectContaining({
         recipientUserId: "coord-1",
         template: "REGISTRATION_SUBMITTED",
-        context: { applicantName: "Priya New Student", batchName: "B.Arch 2027" },
+        context: { applicantName: "Priya New Student", batchName: "B.Arch 2027", requestId: expect.any(String) },
       }),
     );
     expect(ctx.notificationService.sent).toContainEqual(expect.objectContaining({ recipientUserId: "sec-1" }));
