@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { PrismaTransactionClient } from "@/lib/prisma";
 import { getEnv } from "@/config/env";
 import { PrismaAuditRecorder } from "@/lib/audit";
 import { saveFile, readFile, deleteFile } from "@/lib/file-storage";
@@ -15,7 +16,10 @@ import { ListConfidentialDocumentsUseCase } from "../application/use-cases/list-
 import { RemoveConfidentialDocumentUseCase } from "../application/use-cases/remove-confidential-document";
 import { ResetStudentPasswordUseCase } from "../application/use-cases/reset-password";
 import { BulkSetStudentsActiveUseCase } from "../application/use-cases/bulk-set-students-active";
-import { StartBulkImportUseCase, BULK_IMPORT_STUDENTS_JOB_TYPE } from "../application/use-cases/start-bulk-import";
+import {
+  StartBulkImportUseCase,
+  BULK_IMPORT_STUDENTS_JOB_TYPE,
+} from "../application/use-cases/start-bulk-import";
 import { GetBulkImportRunUseCase } from "../application/use-cases/get-bulk-import-run";
 import { PrismaStudentRepository } from "./prisma-student-repository";
 import { PrismaBatchLookup } from "@/lib/batch-lookup";
@@ -70,9 +74,13 @@ export const startBulkImportUseCase = new StartBulkImportUseCase({
   auditRecorder,
   saveFile,
   dispatchJob: (payload) =>
-    jobDispatcher.dispatch(BULK_IMPORT_STUDENTS_JOB_TYPE, payload as unknown as Record<string, unknown>, {
-      maxAttempts: 1,
-    }),
+    jobDispatcher.dispatch(
+      BULK_IMPORT_STUDENTS_JOB_TYPE,
+      payload as unknown as Record<string, unknown>,
+      {
+        maxAttempts: 1,
+      },
+    ),
 });
 
 // Depends on getEnv() (bcrypt cost factor) — lazily constructed and cached,
@@ -91,6 +99,24 @@ export function getCreateStudentUseCase(): CreateStudentUseCase {
     batchLookup,
     userProvisioner: getUserProvisioner(),
   }));
+}
+
+/**
+ * Transaction-scoped variant of getCreateStudentUseCase(), for a caller that
+ * must run student creation inside a larger atomic Prisma transaction
+ * alongside other cross-module writes (registration's approval flow — see
+ * modules/registration/infrastructure/container.ts). Always builds a fresh
+ * instance bound to the given client, unlike the cached singleton above.
+ * `batchLookup` deliberately stays the ordinary singleton: it only ever
+ * reads, never participates in this flow's writes, so it doesn't need to
+ * see the transaction.
+ */
+export function buildCreateStudentUseCase(client: PrismaTransactionClient): CreateStudentUseCase {
+  return new CreateStudentUseCase({
+    studentRepository: new PrismaStudentRepository(client),
+    batchLookup,
+    userProvisioner: new PrismaUserProvisioner(client, getEnv().BCRYPT_COST_FACTOR),
+  });
 }
 
 /**

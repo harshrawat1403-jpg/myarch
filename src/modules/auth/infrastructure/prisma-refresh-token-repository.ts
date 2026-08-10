@@ -1,11 +1,12 @@
-import type { PrismaClient, RefreshToken } from "@prisma/client";
+import type { RefreshToken } from "@prisma/client";
+import type { PrismaTransactionClient } from "@/lib/prisma";
 import type {
   RefreshTokenRepository,
   StoredRefreshToken,
 } from "../application/ports/refresh-token-repository";
 
 export class PrismaRefreshTokenRepository implements RefreshTokenRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaTransactionClient) {}
 
   async create(data: {
     userId: string;

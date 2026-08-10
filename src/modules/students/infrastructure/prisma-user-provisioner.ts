@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaTransactionClient } from "@/lib/prisma";
 import type { UserProvisioner } from "../application/ports/user-provisioner";
 
 /**
@@ -11,7 +11,7 @@ import type { UserProvisioner } from "../application/ports/user-provisioner";
  */
 export class PrismaUserProvisioner implements UserProvisioner {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaTransactionClient,
     private readonly bcryptCostFactor: number,
   ) {}
 

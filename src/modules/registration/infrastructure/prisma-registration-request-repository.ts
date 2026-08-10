@@ -1,5 +1,9 @@
-import type { Prisma, PrismaClient, RegistrationRequest as PrismaRegistrationRequest } from "@prisma/client";
-import type { RegistrationRequestRecord, RegistrationRequestSearchFilters } from "../domain/entities";
+import type { Prisma, RegistrationRequest as PrismaRegistrationRequest } from "@prisma/client";
+import type { PrismaTransactionClient } from "@/lib/prisma";
+import type {
+  RegistrationRequestRecord,
+  RegistrationRequestSearchFilters,
+} from "../domain/entities";
 import type {
   CreateRegistrationRequestData,
   DecideRegistrationRequestData,
@@ -12,7 +16,7 @@ const PENDING_STATUSES: Prisma.RegistrationRequestWhereInput["status"] = {
 };
 
 export class PrismaRegistrationRequestRepository implements RegistrationRequestRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaTransactionClient) {}
 
   async create(data: CreateRegistrationRequestData): Promise<RegistrationRequestRecord> {
     const row = await this.prisma.registrationRequest.create({
@@ -75,7 +79,10 @@ export class PrismaRegistrationRequestRepository implements RegistrationRequestR
     return toDomain(row);
   }
 
-  async decide(id: string, data: DecideRegistrationRequestData): Promise<RegistrationRequestRecord> {
+  async decide(
+    id: string,
+    data: DecideRegistrationRequestData,
+  ): Promise<RegistrationRequestRecord> {
     const row = await this.prisma.registrationRequest.update({
       where: { id },
       data: {

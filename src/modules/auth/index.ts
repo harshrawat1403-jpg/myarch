@@ -51,6 +51,9 @@ export type { AuthOptions, AuthenticatedHandler } from "./presentation/with-auth
 // from its own reset-password route handler, plus the input/result shapes
 // needed to call it.
 export { getAdminResetPasswordUseCase, revokeUserSessions } from "./infrastructure/container";
+// Transaction-scoped sibling of getAdminResetPasswordUseCase(), for
+// registration's approval flow — see that function's own doc comment.
+export { buildAdminResetPasswordUseCase } from "./infrastructure/container";
 export type {
   AdminResetPasswordInput,
   AdminResetPasswordResult,

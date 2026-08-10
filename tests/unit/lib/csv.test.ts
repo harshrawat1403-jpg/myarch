@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildCsvFilename, joinForCsv, toCsv, type ExportColumn } from "../../../src/lib/csv";
+import {
+  buildCsvFilename,
+  joinForCsv,
+  neutralizeFormulaInjection,
+  toCsv,
+  type ExportColumn,
+} from "../../../src/lib/csv";
 
 interface Row {
   name: string;
@@ -51,6 +57,47 @@ describe("toCsv", () => {
       COLUMNS,
     );
     expect(csv).toBe("Name,Note\r\nAlice,a\r\nBob,b\r\n");
+  });
+
+  describe("formula-injection protection", () => {
+    it.each([["="], ["+"], ["-"], ["@"]])(
+      "prefixes a field starting with %s with a single quote",
+      (trigger) => {
+        const csv = toCsv<Row>(
+          [{ name: `${trigger}HYPERLINK("http://evil")`, note: "ok" }],
+          COLUMNS,
+        );
+        expect(csv).toContain(`'${trigger}HYPERLINK`);
+      },
+    );
+
+    it("does not alter a value that merely contains a trigger character mid-string", () => {
+      const csv = toCsv<Row>([{ name: "Alice", note: "a+b=c" }], COLUMNS);
+      expect(csv).toContain("a+b=c");
+      expect(csv).not.toContain("'a+b=c");
+    });
+
+    it("still quotes a neutralized field that also contains a comma", () => {
+      const csv = toCsv<Row>([{ name: "=SUM(A1:A2),bad", note: "ok" }], COLUMNS);
+      expect(csv).toContain('"\'=SUM(A1:A2),bad"');
+    });
+
+    it("leaves an empty field untouched", () => {
+      const csv = toCsv<Row>([{ name: "", note: "ok" }], COLUMNS);
+      expect(csv).toBe("Name,Note\r\n,ok\r\n");
+    });
+  });
+});
+
+describe("neutralizeFormulaInjection", () => {
+  it("leaves an ordinary value unchanged", () => {
+    expect(neutralizeFormulaInjection("Alice")).toBe("Alice");
+  });
+
+  it.each([["="], ["+"], ["-"], ["@"]])("prefixes a value starting with %s", (trigger) => {
+    expect(neutralizeFormulaInjection(`${trigger}cmd|' /C calc'!A1`)).toBe(
+      `'${trigger}cmd|' /C calc'!A1`,
+    );
   });
 });
 

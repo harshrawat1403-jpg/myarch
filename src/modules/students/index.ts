@@ -53,3 +53,7 @@ export { registerBulkImportJobHandlers } from "./infrastructure/container";
 // way auth exports revokeUserSessions/getAdminResetPasswordUseCase for
 // cross-module reuse.
 export { getCreateStudentUseCase } from "./infrastructure/container";
+
+// Transaction-scoped sibling of getCreateStudentUseCase(), for registration's
+// approval flow — see that function's own doc comment.
+export { buildCreateStudentUseCase } from "./infrastructure/container";

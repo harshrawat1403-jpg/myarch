@@ -13,17 +13,39 @@ export interface ExportColumn<T> {
   readonly value: (row: T) => string;
 }
 
+/**
+ * OWASP CSV/formula-injection mitigation: a value opened by Excel, Sheets,
+ * or LibreOffice is interpreted as a formula if its first character is one
+ * of these — regardless of the exporting field's own meaning — so any
+ * user-controlled value (a student's bio, a company name, …) reaching an
+ * export must never reach the spreadsheet with one of these characters
+ * leading. Prefixing with a single quote is the standard neutralizer:
+ * spreadsheet software renders the value as literal text (the leading
+ * quote itself isn't shown), and the character still round-trips correctly
+ * through this module's own comma/quote/newline escaping below. Exported
+ * so `xlsx.ts` — the only other writer built on `ExportColumn<T>` — applies
+ * the exact same rule rather than a second, possibly-drifting copy of it.
+ */
+const FORMULA_TRIGGER_CHARS = new Set(["=", "+", "-", "@"]);
+
+export function neutralizeFormulaInjection(value: string): string {
+  return value.length > 0 && FORMULA_TRIGGER_CHARS.has(value[0]!) ? `'${value}` : value;
+}
+
 /** RFC 4180-ish: quote a field only when it contains a comma, quote, or newline; double up embedded quotes. */
 function escapeCsvField(value: string): string {
-  if (/[",\r\n]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const safeValue = neutralizeFormulaInjection(value);
+  if (/[",\r\n]/.test(safeValue)) {
+    return `"${safeValue.replace(/"/g, '""')}"`;
   }
-  return value;
+  return safeValue;
 }
 
 export function toCsv<T>(rows: readonly T[], columns: readonly ExportColumn<T>[]): string {
   const headerLine = columns.map((column) => escapeCsvField(column.header)).join(",");
-  const dataLines = rows.map((row) => columns.map((column) => escapeCsvField(column.value(row))).join(","));
+  const dataLines = rows.map((row) =>
+    columns.map((column) => escapeCsvField(column.value(row))).join(","),
+  );
   // CRLF line endings — the conventional CSV wire format, and what most
   // spreadsheet software expects when opening a downloaded .csv file.
   return [headerLine, ...dataLines].map((line) => `${line}\r\n`).join("");

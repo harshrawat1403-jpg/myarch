@@ -1,9 +1,9 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaTransactionClient } from "@/lib/prisma";
 import type { AuthenticatedActor } from "../domain/entities";
 import type { AuthUserRecord, UserRepository } from "../application/ports/user-repository";
 
 export class PrismaUserRepository implements UserRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaTransactionClient) {}
 
   async findByEmail(email: string): Promise<AuthUserRecord | null> {
     const user = await this.prisma.user.findUnique({ where: { email } });

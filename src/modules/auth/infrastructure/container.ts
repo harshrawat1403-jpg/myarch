@@ -18,6 +18,7 @@
  */
 import { getEnv } from "@/config/env";
 import { prisma } from "@/lib/prisma";
+import type { PrismaTransactionClient } from "@/lib/prisma";
 import { parseDurationMs } from "@/lib/duration";
 // V4.0 E1: imported from notifications' own infrastructure/container (not
 // the "@/modules/notifications" barrel) deliberately. The barrel now also
@@ -28,6 +29,9 @@ import { parseDurationMs } from "@/lib/duration";
 // a genuine circular-import TDZ failure. This deep import needs only the
 // bound `notificationService` singleton, which has no dependency on auth.
 import { notificationService } from "@/modules/notifications/infrastructure/container";
+// Type-only, so (unlike the value import above) it can safely come through
+// the public barrel — erased at compile time, no circular-import TDZ risk.
+import type { NotificationService } from "@/modules/notifications";
 import { saveFile, deleteFile } from "@/lib/file-storage";
 import { LoginUseCase } from "../application/use-cases/login";
 import { LogoutUseCase } from "../application/use-cases/logout";
@@ -121,6 +125,30 @@ export function getAdminResetPasswordUseCase(): AdminResetPasswordUseCase {
   }));
 }
 
+/**
+ * Transaction-scoped variant of getAdminResetPasswordUseCase(), for a caller
+ * that must run a password reset inside a larger atomic Prisma transaction
+ * (registration's approval flow — see
+ * modules/registration/infrastructure/container.ts). Always builds a fresh
+ * instance bound to the given client, unlike the cached singleton above. The
+ * caller supplies its own NotificationService — e.g. one that defers the
+ * resulting ACCOUNT_CREDENTIALS_ISSUED notification until the transaction
+ * has actually committed, rather than this module's regular notify-
+ * immediately singleton.
+ */
+export function buildAdminResetPasswordUseCase(
+  client: PrismaTransactionClient,
+  txNotificationService: NotificationService,
+): AdminResetPasswordUseCase {
+  return new AdminResetPasswordUseCase({
+    userRepository: new PrismaUserRepository(client),
+    refreshTokenRepository: new PrismaRefreshTokenRepository(client),
+    passwordHasher: getPasswordHasher(),
+    auditRecorder: new PrismaAuditRecorder(client),
+    notificationService: txNotificationService,
+  });
+}
+
 let cachedChangeOwnPasswordUseCase: ChangeOwnPasswordUseCase | undefined;
 export function getChangeOwnPasswordUseCase(): ChangeOwnPasswordUseCase {
   return (cachedChangeOwnPasswordUseCase ??= new ChangeOwnPasswordUseCase({
@@ -156,7 +184,9 @@ export async function getMeProfile(actor: {
   role: import("../domain/entities").Role;
 }): Promise<{ email: string | null; fullName: string | null; avatarUrl: string | null }> {
   const user = await userRepository.findById(actor.userId);
-  const fullName = await profileNameRepository.getFullName(actor.userId, actor.role).catch(() => null);
+  const fullName = await profileNameRepository
+    .getFullName(actor.userId, actor.role)
+    .catch(() => null);
   return {
     email: user?.email ?? null,
     fullName,

@@ -16,7 +16,11 @@ import type { RegistrationRequestRecord } from "../../../src/modules/registratio
 
 const BATCH_A = "batch-a";
 const SECRETARY: AuthenticatedActor = { userId: "sec-1", role: "SECRETARY" };
-const COORDINATOR: AuthenticatedActor = { userId: "coord-1", role: "COORDINATOR", batchScope: [BATCH_A] };
+const COORDINATOR: AuthenticatedActor = {
+  userId: "coord-1",
+  role: "COORDINATOR",
+  batchScope: [BATCH_A],
+};
 
 function makeRecord(overrides: Partial<RegistrationRequestRecord> = {}): RegistrationRequestRecord {
   const now = new Date();
@@ -59,16 +63,37 @@ function buildContext() {
   const sendRejectionEmail = vi.fn().mockResolvedValue(undefined);
   const notificationService = new FakeNotificationService();
 
+  // Fake stand-in for the real prisma.$transaction-backed implementation
+  // (container.ts's runApproveTransaction): just invokes the callback with
+  // these same fakes, with no real transaction/rollback semantics — good
+  // enough to unit-test the use case's own orchestration and error mapping,
+  // while the transaction/rollback behavior itself is Prisma's own
+  // responsibility, not this use case's.
   const useCase = new DecideRegistrationRequestUseCase({
     registrationRequestRepository: repo,
-    createStudent,
-    resetPassword,
+    runApproveTransaction: async (fn) => {
+      const result = await fn({
+        createStudent,
+        resetPassword,
+        registrationRequestRepository: repo,
+        auditRecorder,
+      });
+      return { result, deferredNotifications: [] };
+    },
     sendRejectionEmail,
     auditRecorder,
     notificationService,
   });
 
-  return { repo, auditRecorder, createStudent, resetPassword, sendRejectionEmail, notificationService, useCase };
+  return {
+    repo,
+    auditRecorder,
+    createStudent,
+    resetPassword,
+    sendRejectionEmail,
+    notificationService,
+    useCase,
+  };
 }
 
 describe("DecideRegistrationRequestUseCase", () => {
@@ -116,16 +141,28 @@ describe("DecideRegistrationRequestUseCase", () => {
     });
 
     it("calls resetPassword for the newly created account and returns the reveal-once tempPassword", async () => {
-      const result = await ctx.useCase.execute({ actor: SECRETARY, requestId: "req-1", decision: "APPROVE" });
+      const result = await ctx.useCase.execute({
+        actor: SECRETARY,
+        requestId: "req-1",
+        decision: "APPROVE",
+      });
 
       expect(ctx.resetPassword).toHaveBeenCalledWith(
-        expect.objectContaining({ targetUserId: "user-1", targetRole: "STUDENT", targetBatchId: BATCH_A }),
+        expect.objectContaining({
+          targetUserId: "user-1",
+          targetRole: "STUDENT",
+          targetBatchId: BATCH_A,
+        }),
       );
       expect(result.tempPassword).toBe("Temp1234!");
     });
 
     it("marks the request APPROVED with the resulting studentProfileId", async () => {
-      const result = await ctx.useCase.execute({ actor: SECRETARY, requestId: "req-1", decision: "APPROVE" });
+      const result = await ctx.useCase.execute({
+        actor: SECRETARY,
+        requestId: "req-1",
+        decision: "APPROVE",
+      });
       expect(result.request.status).toBe("APPROVED");
       expect(result.request.resultingStudentProfileId).toBe("student-1");
     });
@@ -160,6 +197,38 @@ describe("DecideRegistrationRequestUseCase", () => {
       await expect(
         ctx.useCase.execute({ actor: SECRETARY, requestId: "req-1", decision: "APPROVE" }),
       ).rejects.toBeInstanceOf(DuplicateRegistrationRollNumberError);
+    });
+
+    it("never marks the request decided or sends a notification when createStudent fails (nothing to roll back)", async () => {
+      ctx.createStudent.mockRejectedValueOnce(new DuplicateEmailError("prospective@example.com"));
+      await expect(
+        ctx.useCase.execute({ actor: SECRETARY, requestId: "req-1", decision: "APPROVE" }),
+      ).rejects.toBeInstanceOf(DuplicateRegistrationEmailError);
+
+      expect(ctx.resetPassword).not.toHaveBeenCalled();
+      const stillPending = await ctx.repo.findById("req-1");
+      expect(stillPending?.status).toBe("REVIEWED");
+      expect(ctx.notificationService.sent).toHaveLength(0);
+    });
+
+    it("V4.1 — a failure after the account is created still leaves the request re-decidable, not silently orphaned (closes the non-atomic APPROVE bug)", async () => {
+      // The whole point of runApproveTransaction being one atomic unit: if
+      // resetPassword fails after createStudent has already "succeeded"
+      // inside the same transaction, the real prisma.$transaction rolls
+      // both back together. This fake can't exercise Postgres rollback
+      // directly, but it does prove the use case itself never treats a
+      // mid-transaction failure as a partial success — it propagates the
+      // error, never calls decide(), and never notifies anyone.
+      ctx.resetPassword.mockRejectedValueOnce(new Error("temp password generation failed"));
+
+      await expect(
+        ctx.useCase.execute({ actor: SECRETARY, requestId: "req-1", decision: "APPROVE" }),
+      ).rejects.toThrow("temp password generation failed");
+
+      const stillPending = await ctx.repo.findById("req-1");
+      expect(stillPending?.status).toBe("REVIEWED");
+      expect(stillPending?.resultingStudentProfileId).toBeNull();
+      expect(ctx.notificationService.sent).toHaveLength(0);
     });
   });
 
@@ -212,7 +281,12 @@ describe("DecideRegistrationRequestUseCase", () => {
     });
 
     it("records a REGISTRATION_REQUEST_REJECTED audit entry", async () => {
-      await ctx.useCase.execute({ actor: SECRETARY, requestId: "req-1", decision: "REJECT", rejectionReason: "x" });
+      await ctx.useCase.execute({
+        actor: SECRETARY,
+        requestId: "req-1",
+        decision: "REJECT",
+        rejectionReason: "x",
+      });
       expect(ctx.auditRecorder.entries).toContainEqual(
         expect.objectContaining({ actorUserId: "sec-1", action: "REGISTRATION_REQUEST_REJECTED" }),
       );

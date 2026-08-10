@@ -1,4 +1,5 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import type { PrismaTransactionClient } from "@/lib/prisma";
 import type {
   StudentPrivateFields,
   StudentRecord,
@@ -16,7 +17,7 @@ type StudentProfileWithPrivate = Prisma.StudentProfileGetPayload<{
 }>;
 
 export class PrismaStudentRepository implements StudentRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaTransactionClient) {}
 
   async create(data: CreateStudentData): Promise<StudentRecord> {
     const row = await this.prisma.studentProfile.create({
@@ -88,18 +89,36 @@ export class PrismaStudentRepository implements StudentRepository {
     // Archiving/restoring a student's roster record also flips their login
     // access (User.isActive) in the same transaction, so an archived
     // student can never remain able to log in — see the module's
-    // Days 3–4 implementation summary for the reasoning.
-    const [row] = await this.prisma.$transaction([
-      this.prisma.studentProfile.update({
-        where: { id },
-        data: { isActive },
-        include: { privateProfile: true },
-      }),
-      this.prisma.user.updateMany({
-        where: { studentProfile: { id } },
-        data: { isActive },
-      }),
-    ]);
+    // Days 3–4 implementation summary for the reasoning. When this
+    // repository is itself already scoped to an interactive transaction
+    // (constructed with a `tx` — see buildCreateStudentUseCase()'s callers),
+    // `$transaction` isn't available (Prisma doesn't support nesting one),
+    // but it's also unnecessary: both writes below already share that
+    // outer transaction simply by running on the same `tx` client.
+    if ("$transaction" in this.prisma) {
+      const [row] = await this.prisma.$transaction([
+        this.prisma.studentProfile.update({
+          where: { id },
+          data: { isActive },
+          include: { privateProfile: true },
+        }),
+        this.prisma.user.updateMany({
+          where: { studentProfile: { id } },
+          data: { isActive },
+        }),
+      ]);
+      return toDomain(row);
+    }
+
+    const row = await this.prisma.studentProfile.update({
+      where: { id },
+      data: { isActive },
+      include: { privateProfile: true },
+    });
+    await this.prisma.user.updateMany({
+      where: { studentProfile: { id } },
+      data: { isActive },
+    });
     return toDomain(row);
   }
 

@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import type { ExportColumn } from "./csv";
+import { neutralizeFormulaInjection, type ExportColumn } from "./csv";
 
 /**
  * V4.0 E7 (PRD §16 — "New format support: XLSX... e.g. exceljs"). Sibling to
@@ -7,7 +7,11 @@ import type { ExportColumn } from "./csv";
  * anticipating exactly this) — no use case, DTO, or repository changes
  * required to add this format to any existing or new export.
  */
-export async function toXlsx<T>(rows: readonly T[], columns: readonly ExportColumn<T>[], sheetName = "Report"): Promise<Buffer> {
+export async function toXlsx<T>(
+  rows: readonly T[],
+  columns: readonly ExportColumn<T>[],
+  sheetName = "Report",
+): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet(sheetName.slice(0, 31)); // Excel's own 31-char sheet-name limit
 
@@ -15,7 +19,11 @@ export async function toXlsx<T>(rows: readonly T[], columns: readonly ExportColu
   sheet.getRow(1).font = { bold: true };
 
   for (const row of rows) {
-    sheet.addRow(Object.fromEntries(columns.map((column) => [column.header, column.value(row)])));
+    sheet.addRow(
+      Object.fromEntries(
+        columns.map((column) => [column.header, neutralizeFormulaInjection(column.value(row))]),
+      ),
+    );
   }
 
   sheet.columns.forEach((col) => {

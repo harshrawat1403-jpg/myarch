@@ -60,11 +60,33 @@ describe("toXlsx", () => {
     const sheet = await readBack(buffer);
     expect(sheet.name.length).toBeLessThanOrEqual(31);
   });
+
+  describe("formula-injection protection", () => {
+    it.each([["="], ["+"], ["-"], ["@"]])(
+      "prefixes a cell value starting with %s with a single quote",
+      async (trigger) => {
+        const buffer = await toXlsx<Row>(
+          [{ name: `${trigger}HYPERLINK("http://evil")`, note: "ok" }],
+          COLUMNS,
+        );
+        const sheet = await readBack(buffer);
+        expect(sheet.getRow(2).getCell(1).value).toBe(`'${trigger}HYPERLINK("http://evil")`);
+      },
+    );
+
+    it("does not alter a value that merely contains a trigger character mid-string", async () => {
+      const buffer = await toXlsx<Row>([{ name: "Alice", note: "a+b=c" }], COLUMNS);
+      const sheet = await readBack(buffer);
+      expect(sheet.getRow(2).getCell(2).value).toBe("a+b=c");
+    });
+  });
 });
 
 describe("buildXlsxFilename", () => {
   it("builds a <prefix>-YYYY-MM-DD.xlsx filename from a given date", () => {
-    expect(buildXlsxFilename("placements-report", new Date("2026-08-09T12:00:00.000Z"))).toBe("placements-report-2026-08-09.xlsx");
+    expect(buildXlsxFilename("placements-report", new Date("2026-08-09T12:00:00.000Z"))).toBe(
+      "placements-report-2026-08-09.xlsx",
+    );
   });
 
   it("defaults to the current date when none is provided", () => {

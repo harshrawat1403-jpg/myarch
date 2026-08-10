@@ -1,5 +1,6 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import type { AuthenticatedActor } from "@/modules/auth";
+import type { PrismaTransactionClient } from "@/lib/prisma";
 
 /**
  * Cross-cutting audit port, used by every module that performs a
@@ -43,7 +44,7 @@ export function resolveAuditFilter(actor: Pick<AuthenticatedActor, "role" | "use
 }
 
 export class PrismaAuditRecorder implements AuditRecorder {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaTransactionClient) {}
 
   async record(entry: {
     actorUserId: string;
