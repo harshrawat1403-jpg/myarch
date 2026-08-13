@@ -34,6 +34,7 @@ import { notificationService } from "@/modules/notifications/infrastructure/cont
 import type { NotificationService } from "@/modules/notifications";
 import { saveFile, deleteFile } from "@/lib/file-storage";
 import { LoginUseCase } from "../application/use-cases/login";
+import { DemoLoginUseCase } from "../application/use-cases/demo-login";
 import { LogoutUseCase } from "../application/use-cases/logout";
 import { RefreshAccessTokenUseCase } from "../application/use-cases/refresh-access-token";
 import { AdminResetPasswordUseCase } from "../application/use-cases/admin-reset-password";
@@ -86,6 +87,18 @@ export function getLoginUseCase(): LoginUseCase {
     userRepository,
     refreshTokenRepository,
     passwordHasher: getPasswordHasher(),
+    tokenService: getTokenService(),
+    auditRecorder,
+    clock,
+    refreshTokenTtlMs: getRefreshTokenTtlMs(),
+  }));
+}
+
+let cachedDemoLoginUseCase: DemoLoginUseCase | undefined;
+export function getDemoLoginUseCase(): DemoLoginUseCase {
+  return (cachedDemoLoginUseCase ??= new DemoLoginUseCase({
+    userRepository,
+    refreshTokenRepository,
     tokenService: getTokenService(),
     auditRecorder,
     clock,

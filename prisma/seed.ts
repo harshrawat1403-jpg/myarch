@@ -1,12 +1,13 @@
 /**
- * Minimal development/staging seed data — creates one account per role plus
- * enough Batch/Student/Profile state to exercise every major flow (login,
- * approval queue, recruiter directory, exports) without hand-creating data
- * through the UI first.
+ * MYARCH public showcase seed data — creates the fixed set of accounts the
+ * public demo (`/api/auth/demo-login`, see
+ * src/modules/auth/domain/demo-accounts.ts) signs a visitor into, plus a
+ * ten-student roster giving the Recruiter directory, the Coordinator's
+ * approval queue, and each student's own profile something real to show.
  *
  * NEVER run against a production database with real student data — this
- * script is idempotent-by-email (safe to re-run in a scratch dev/staging
- * DB) but is not intended to seed or reset a live environment.
+ * script is idempotent-by-email (safe to re-run in a scratch dev/staging/
+ * showcase DB) but is not intended to seed or reset a live environment.
  *
  * Usage: npm run db:seed (see package.json / ENVIRONMENT_SETUP.md).
  */
@@ -21,10 +22,17 @@ import { PUBLICATION_TEMPLATE_SEEDS } from "@/modules/publications/domain/templa
 const prisma = new PrismaClient();
 
 // Seed-only password for every account created here. Documented loudly
-// on purpose: never use this outside a throwaway dev/staging database.
+// on purpose: never use this outside a throwaway dev/staging/showcase
+// database. (The three demo personas never use this password to sign in —
+// see domain/demo-accounts.ts — but the underlying accounts still need a
+// real hash to satisfy the schema, and it lets the Secretary/Coordinator
+// accounts still be used for a normal, non-demo /login if needed.)
 const SEED_PASSWORD = "Password123!";
 
-async function upsertUser(email: string, role: "SECRETARY" | "COORDINATOR" | "STUDENT" | "RECRUITER") {
+async function upsertUser(
+  email: string,
+  role: "SECRETARY" | "COORDINATOR" | "STUDENT" | "RECRUITER",
+) {
   const passwordHash = await bcrypt.hash(SEED_PASSWORD, 12);
   return prisma.user.upsert({
     where: { email },
@@ -33,9 +41,157 @@ async function upsertUser(email: string, role: "SECRETARY" | "COORDINATOR" | "ST
   });
 }
 
-async function main() {
-  console.log("Seeding development data (seed password for every account: %s)...", SEED_PASSWORD);
+type ProfileState = "PUBLISHED" | "PENDING_REVIEW" | "NONE";
 
+interface ShowcaseStudentSeed {
+  email: string;
+  rollNumber: string;
+  fullName: string;
+  cgpa: number;
+  hasActiveBacklog?: boolean;
+  backlogDetails?: string;
+  bio?: string;
+  skills?: string[];
+  software?: string[];
+  portfolioLinks?: string[];
+  selectedProjects?: { title: string; description?: string; semester?: string }[];
+  certifications?: { title: string; issuer?: string; year?: number }[];
+  internships?: { company: string; role?: string; duration?: string }[];
+  /** PUBLISHED = approved & live in the recruiter directory; PENDING_REVIEW = sitting in the approval queue; NONE = no draft started yet. */
+  profileState: ProfileState;
+}
+
+// Ten fictional B.Arch 2026 students. `gautam@vnit.ac.in` is the account
+// domain/demo-accounts.ts points the "Visit as Student" demo entry at — see
+// that file's own doc comment for why it has to be one specific, real,
+// pre-seeded account rather than an arbitrary one. The other nine exist so
+// the Recruiter directory demo and the Coordinator's approval queue have a
+// realistic, varied roster to show, not a single lonely profile.
+const SHOWCASE_STUDENTS: ShowcaseStudentSeed[] = [
+  {
+    email: "gautam@vnit.ac.in",
+    rollNumber: "BA2026001",
+    fullName: "Gautam Deshmukh",
+    cgpa: 8.9,
+    bio: "Final-year architecture student exploring parametric and sustainable design methods for high-density housing.",
+    skills: ["Parametric Design", "Rendering", "Sustainable Design"],
+    software: ["Rhino", "Grasshopper", "Revit", "Lumion"],
+    portfolioLinks: ["https://example.com/portfolio/gautam-deshmukh"],
+    selectedProjects: [
+      {
+        title: "Vertical Village — High-Density Housing Prototype",
+        description: "A parametric massing study for climate-responsive, mixed-income housing on a constrained urban site.",
+        semester: "Semester 8",
+      },
+    ],
+    certifications: [{ title: "Grasshopper for Architects", issuer: "VNIT CEP Cell", year: 2025 }],
+    internships: [{ company: "Studio Example", role: "Design Intern", duration: "Jun–Aug 2025" }],
+    profileState: "PUBLISHED",
+  },
+  {
+    email: "vijay@vnit.ac.in",
+    rollNumber: "BA2026002",
+    fullName: "Vijay Kulkarni",
+    cgpa: 8.4,
+    bio: "Passionate about heritage conservation and adaptive reuse of historic structures around Nagpur.",
+    skills: ["Heritage Documentation", "Sketching"],
+    software: ["AutoCAD", "SketchUp"],
+    profileState: "PUBLISHED",
+  },
+  {
+    email: "devraj@vnit.ac.in",
+    rollNumber: "BA2026003",
+    fullName: "Devraj Singh",
+    cgpa: 7.8,
+    hasActiveBacklog: true,
+    backlogDetails: "One backlog, Building Construction III",
+    bio: "Focused on urban planning and transit-oriented development for growing tier-2 cities.",
+    skills: ["Urban Analysis", "Site Planning"],
+    software: ["AutoCAD", "QGIS"],
+    profileState: "PUBLISHED",
+  },
+  {
+    email: "karan@vnit.ac.in",
+    rollNumber: "BA2026004",
+    fullName: "Karan Mehta",
+    cgpa: 8.1,
+    bio: "Interior architecture enthusiast with an eye for material texture and light.",
+    skills: ["Interior Detailing", "Material Studies"],
+    software: ["SketchUp", "V-Ray", "Photoshop"],
+    profileState: "PUBLISHED",
+  },
+  {
+    email: "praful@vnit.ac.in",
+    rollNumber: "BA2026005",
+    fullName: "Praful Joshi",
+    cgpa: 7.6,
+    bio: "Landscape architecture student researching climate-responsive public spaces.",
+    skills: ["Landscape Design", "Site Planning"],
+    software: ["AutoCAD", "SketchUp", "Lumion"],
+    profileState: "PUBLISHED",
+  },
+  {
+    email: "saurabh@vnit.ac.in",
+    rollNumber: "BA2026006",
+    fullName: "Saurabh Patil",
+    cgpa: 9.0,
+    bio: "Exploring digital fabrication and parametric modeling for modular construction.",
+    skills: ["Digital Fabrication", "Parametric Modeling"],
+    software: ["Rhino", "Grasshopper"],
+    profileState: "PUBLISHED",
+  },
+  {
+    email: "namish@vnit.ac.in",
+    rollNumber: "BA2026007",
+    fullName: "Namish Rao",
+    cgpa: 7.9,
+    bio: "Interested in affordable housing and community-driven design processes.",
+    skills: ["Community Design", "Sketching"],
+    software: ["AutoCAD"],
+    // Draft submitted, awaiting review — exercises the Coordinator/Secretary approval queue.
+    profileState: "PENDING_REVIEW",
+  },
+  {
+    email: "vaibhav@vnit.ac.in",
+    rollNumber: "BA2026008",
+    fullName: "Vaibhav Shah",
+    cgpa: 8.3,
+    bio: "Studies structural systems and their expression in contemporary architecture.",
+    skills: ["Structural Analysis", "Model Making"],
+    software: ["Revit", "AutoCAD"],
+    profileState: "PUBLISHED",
+  },
+  {
+    email: "harsh@vnit.ac.in",
+    rollNumber: "BA2026009",
+    fullName: "Harsh Verma",
+    cgpa: 8.6,
+    bio: "Designs furniture and small-scale products alongside architectural studio work.",
+    skills: ["Furniture Design", "Model Making"],
+    software: ["Rhino", "SketchUp"],
+    profileState: "PUBLISHED",
+  },
+  {
+    email: "saivardhan@vnit.ac.in",
+    rollNumber: "BA2026010",
+    fullName: "Saivardhan Reddy",
+    cgpa: 9.2,
+    // No draft yet — exercises the "nothing to review" / empty-state paths.
+    profileState: "NONE",
+  },
+];
+
+async function main() {
+  console.log("Seeding MYARCH showcase data (seed password for every account: %s)...", SEED_PASSWORD);
+
+  // Internal only — never a public demo entry point (domain/demo-accounts.ts
+  // has no SECRETARY persona). Kept because approving/publishing a profile
+  // is a Secretary-only action in the real permission model
+  // (canApprovePublicProfile) and publication templates need a real creator
+  // — using this account for that attribution keeps the seed data
+  // internally consistent with how the app actually works, rather than
+  // attributing those rows to the Coordinator, who could never really have
+  // performed them.
   const secretaryUser = await upsertUser("secretary@tnparch.in", "SECRETARY");
   await prisma.secretaryProfile.upsert({
     where: { userId: secretaryUser.id },
@@ -54,6 +210,10 @@ async function main() {
     },
   });
 
+  // Demo Admin (persona ADMIN, domain/demo-accounts.ts) — a Coordinator,
+  // never Secretary: Secretary is unscoped by design, so scoping this
+  // account to exactly one batch is what keeps the public "Demo Admin"
+  // experience structurally confined to this showcase roster.
   const coordinatorUser = await upsertUser("coordinator@tnparch.in", "COORDINATOR");
   const coordinatorProfile = await prisma.coordinatorProfile.upsert({
     where: { userId: coordinatorUser.id },
@@ -61,11 +221,14 @@ async function main() {
     create: { userId: coordinatorUser.id, fullName: "Arjun Mehta", position: "T_AND_P" },
   });
   await prisma.coordinatorBatchScope.upsert({
-    where: { coordinatorProfileId_batchId: { coordinatorProfileId: coordinatorProfile.id, batchId: batch.id } },
+    where: {
+      coordinatorProfileId_batchId: { coordinatorProfileId: coordinatorProfile.id, batchId: batch.id },
+    },
     update: {},
     create: { coordinatorProfileId: coordinatorProfile.id, batchId: batch.id },
   });
 
+  // Demo Recruiter (persona RECRUITER, domain/demo-accounts.ts).
   const recruiterUser = await upsertUser("recruiter@example.com", "RECRUITER");
   await prisma.recruiterProfile.upsert({
     where: { userId: recruiterUser.id },
@@ -73,106 +236,74 @@ async function main() {
     create: { userId: recruiterUser.id, fullName: "Jordan Lee", companyName: "Studio Example" },
   });
 
-  // Student 1: fully approved public profile — visible in the recruiter directory and exports.
-  const student1User = await upsertUser("alice@vnit.ac.in", "STUDENT");
-  const student1 = await prisma.studentProfile.upsert({
-    where: { rollNumber: "BA2026001" },
-    update: {},
-    create: {
-      userId: student1User.id,
-      batchId: batch.id,
-      rollNumber: "BA2026001",
-      fullName: "Alice Architect",
-    },
-  });
-  await prisma.studentPrivateProfile.upsert({
-    where: { studentProfileId: student1.id },
-    update: {},
-    create: {
-      studentProfileId: student1.id,
-      phone: "9876543210",
-      personalEmail: "alice.personal@example.com",
-      cgpa: 8.7,
-      hasActiveBacklog: false,
-    },
-  });
-  const student1Draft = await prisma.studentPublicProfileDraft.upsert({
-    where: { studentProfileId: student1.id },
-    update: {},
-    create: {
-      studentProfileId: student1.id,
-      bio: "Aspiring architect focused on sustainable urban design.",
-      skills: ["Rendering", "Model Making"],
-      software: ["Rhino", "Revit", "AutoCAD"],
-      status: "APPROVED",
-      submittedAt: new Date(),
-      reviewedByUserId: secretaryUser.id,
-      reviewedAt: new Date(),
-    },
-  });
-  await prisma.studentPublicProfile.upsert({
-    where: { studentProfileId: student1.id },
-    update: {},
-    create: {
-      studentProfileId: student1.id,
-      bio: student1Draft.bio,
-      skills: student1Draft.skills,
-      software: student1Draft.software,
-      publishedFromDraftId: student1Draft.id,
-      publishedByUserId: secretaryUser.id,
-    },
-  });
+  for (const [index, s] of SHOWCASE_STUDENTS.entries()) {
+    const studentUser = await upsertUser(s.email, "STUDENT");
+    const student = await prisma.studentProfile.upsert({
+      where: { rollNumber: s.rollNumber },
+      update: {},
+      create: {
+        userId: studentUser.id,
+        batchId: batch.id,
+        rollNumber: s.rollNumber,
+        fullName: s.fullName,
+      },
+    });
 
-  // Student 2: draft submitted, awaiting review — exercises the approval queue.
-  const student2User = await upsertUser("bilal@vnit.ac.in", "STUDENT");
-  const student2 = await prisma.studentProfile.upsert({
-    where: { rollNumber: "BA2026002" },
-    update: {},
-    create: {
-      userId: student2User.id,
-      batchId: batch.id,
-      rollNumber: "BA2026002",
-      fullName: "Bilal Khan",
-    },
-  });
-  await prisma.studentPrivateProfile.upsert({
-    where: { studentProfileId: student2.id },
-    update: {},
-    create: { studentProfileId: student2.id, cgpa: 7.9, hasActiveBacklog: true, backlogDetails: "One backlog, Structures II" },
-  });
-  await prisma.studentPublicProfileDraft.upsert({
-    where: { studentProfileId: student2.id },
-    update: {},
-    create: {
-      studentProfileId: student2.id,
-      bio: "Interested in heritage conservation.",
-      skills: ["Sketching"],
-      software: ["AutoCAD"],
-      status: "PENDING_REVIEW",
-      submittedAt: new Date(),
-    },
-  });
+    const localPart = s.email.split("@")[0];
+    await prisma.studentPrivateProfile.upsert({
+      where: { studentProfileId: student.id },
+      update: {},
+      create: {
+        studentProfileId: student.id,
+        phone: `98000000${String(index + 1).padStart(2, "0")}`,
+        personalEmail: `${localPart}.personal@example.com`,
+        cgpa: s.cgpa,
+        hasActiveBacklog: s.hasActiveBacklog ?? false,
+        backlogDetails: s.backlogDetails,
+      },
+    });
 
-  // Student 3: no draft yet — exercises the "nothing to review" / empty-state paths.
-  const student3User = await upsertUser("chitra@vnit.ac.in", "STUDENT");
-  await prisma.studentProfile.upsert({
-    where: { rollNumber: "BA2026003" },
-    update: {},
-    create: {
-      userId: student3User.id,
-      batchId: batch.id,
-      rollNumber: "BA2026003",
-      fullName: "Chitra Nair",
-    },
-  });
-  await prisma.studentPrivateProfile.upsert({
-    where: { studentProfileId: (await prisma.studentProfile.findUniqueOrThrow({ where: { rollNumber: "BA2026003" } })).id },
-    update: {},
-    create: {
-      studentProfileId: (await prisma.studentProfile.findUniqueOrThrow({ where: { rollNumber: "BA2026003" } })).id,
-      cgpa: 9.1,
-    },
-  });
+    if (s.profileState === "NONE") continue;
+
+    const draft = await prisma.studentPublicProfileDraft.upsert({
+      where: { studentProfileId: student.id },
+      update: {},
+      create: {
+        studentProfileId: student.id,
+        bio: s.bio,
+        skills: s.skills ?? [],
+        software: s.software ?? [],
+        portfolioLinks: s.portfolioLinks ?? [],
+        selectedProjects: (s.selectedProjects ?? []) as unknown as Prisma.InputJsonValue,
+        certifications: (s.certifications ?? []) as unknown as Prisma.InputJsonValue,
+        internships: (s.internships ?? []) as unknown as Prisma.InputJsonValue,
+        status: s.profileState === "PUBLISHED" ? "APPROVED" : "PENDING_REVIEW",
+        submittedAt: new Date(),
+        ...(s.profileState === "PUBLISHED"
+          ? { reviewedByUserId: secretaryUser.id, reviewedAt: new Date() }
+          : {}),
+      },
+    });
+
+    if (s.profileState === "PUBLISHED") {
+      await prisma.studentPublicProfile.upsert({
+        where: { studentProfileId: student.id },
+        update: {},
+        create: {
+          studentProfileId: student.id,
+          bio: draft.bio,
+          skills: draft.skills,
+          software: draft.software,
+          portfolioLinks: draft.portfolioLinks,
+          selectedProjects: draft.selectedProjects as unknown as Prisma.InputJsonValue,
+          certifications: draft.certifications as unknown as Prisma.InputJsonValue,
+          internships: draft.internships as unknown as Prisma.InputJsonValue,
+          publishedFromDraftId: draft.id,
+          publishedByUserId: secretaryUser.id,
+        },
+      });
+    }
+  }
 
   // V4.0 E3 — the ten publication kinds (§13.1), seeded once. No
   // template-authoring UI exists in V4.0; the app's own flow starts at
@@ -192,11 +323,21 @@ async function main() {
     });
   }
 
+  const published = SHOWCASE_STUDENTS.filter((s) => s.profileState === "PUBLISHED").length;
+  const pending = SHOWCASE_STUDENTS.filter((s) => s.profileState === "PENDING_REVIEW").length;
+  const none = SHOWCASE_STUDENTS.filter((s) => s.profileState === "NONE").length;
+
   console.log("Seed complete:");
-  console.log("  Secretary:   secretary@tnparch.in");
-  console.log("  Coordinator: coordinator@tnparch.in (scoped to B.Arch 2026)");
-  console.log("  Recruiter:   recruiter@example.com");
-  console.log("  Students:    alice@vnit.ac.in (approved), bilal@vnit.ac.in (pending review), chitra@vnit.ac.in (no draft)");
+  console.log("  Demo Admin (Coordinator, scoped to B.Arch 2026): coordinator@tnparch.in");
+  console.log("  Demo Recruiter:                                  recruiter@example.com");
+  console.log("  Demo Student (primary):                          gautam@vnit.ac.in");
+  console.log(
+    "  Students seeded: %d (%d published, %d pending review, %d with no draft)",
+    SHOWCASE_STUDENTS.length,
+    published,
+    pending,
+    none,
+  );
   console.log("  Password for every seeded account: %s", SEED_PASSWORD);
 }
 

@@ -6,8 +6,8 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "TNPArch — Department Training & Placement Portal",
-    short_name: "TNPArch",
+    name: "MYARCH — Architecture & Planning, VNIT Digital Portal",
+    short_name: "MYARCH",
     description: "Department of Architecture & Planning, VNIT Nagpur",
     start_url: "/",
     display: "standalone",

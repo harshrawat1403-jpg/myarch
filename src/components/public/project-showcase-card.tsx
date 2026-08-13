@@ -21,10 +21,23 @@ export interface ProjectShowcaseCardProps {
  * shared `ImagePlaceholder` — no real project imagery exists yet (no
  * object storage/upload pipeline, see TECHNICAL_DEBT.md).
  */
-export function ProjectShowcaseCard({ title, studio, description, featured = false, className = "", tone = "violet" }: ProjectShowcaseCardProps) {
+export function ProjectShowcaseCard({
+  title,
+  studio,
+  description,
+  featured = false,
+  className = "",
+  tone = "violet",
+}: ProjectShowcaseCardProps) {
   return (
     <Card padded={false} className={`flex h-full flex-col overflow-hidden ${className}`}>
-      <ImagePlaceholder label={`Replace Image — ${title}`} aspect={featured ? "tall" : "video"} tag={false} rounded={false} tone={tone} />
+      <ImagePlaceholder
+        label="Studio Project Photo"
+        aspect={featured ? "tall" : "video"}
+        tag={false}
+        rounded={false}
+        tone={tone}
+      />
       <div className="flex flex-1 flex-col p-6">
         <DataLabel>{studio}</DataLabel>
         <CardTitle className={`mt-1 ${featured ? "text-lg lg:text-xl" : ""}`}>{title}</CardTitle>

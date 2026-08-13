@@ -10,6 +10,8 @@ import { UserMenu } from "@/components/user-menu";
 import { NotificationBell } from "@/components/notification-bell";
 import { Logo } from "@/components/logo";
 import { CommandPalette } from "@/components/command-palette";
+import { DemoSwitchMenu } from "@/components/demo-switch-menu";
+import type { DemoPersona } from "@/lib/demo-persona";
 
 export interface NavItem {
   href: string;
@@ -28,11 +30,17 @@ export interface SheetLayoutProps {
   /** V3.0: passed through to UserMenu's optional "Account Settings" link — see UserMenuProps's doc comment. */
   accountSettingsHref?: string;
   onLogout: () => void;
+  /** Public MYARCH showcase — renders a persistent "DEMO MODE" strip with a "Switch Demo" control (jump directly to another persona) and Exit Demo. The real read-only enforcement is server-side (with-auth.ts's `isDemo` gate); this is purely so a visitor always knows they're in a demo, not a real account, and never has to backtrack to the landing page to explore a different role. */
+  isDemo?: boolean;
+  /** The persona currently being switched into, `"EXIT"` while exiting, or `undefined`/`null` when idle — see useDemoSession. */
+  demoPending?: DemoPersona | "EXIT" | null;
+  onSwitchDemo?: (persona: DemoPersona) => void;
+  onExitDemo?: () => void;
   children: ReactNode;
 }
 
 /**
- * Where the TNPArch sidebar/drawer branding sends an authenticated user who
+ * Where the MYARCH sidebar/drawer branding sends an authenticated user who
  * wants to see the public website — not `/`, whose own page component
  * deliberately bounces any authenticated session straight back to its
  * portal home (exactly right for someone who lands on the bare domain by
@@ -55,7 +63,10 @@ function isHrefMatch(pathname: string | null, href: string): boolean {
  * marks two items active at once on a nested page — fixed by taking the
  * most specific (longest) href among every match.
  */
-function findActiveNavItem(pathname: string | null, navItems: readonly NavItem[]): NavItem | undefined {
+function findActiveNavItem(
+  pathname: string | null,
+  navItems: readonly NavItem[],
+): NavItem | undefined {
   const matches = navItems.filter((item) => isHrefMatch(pathname, item.href));
   if (matches.length === 0) return undefined;
   return matches.reduce((best, item) => (item.href.length > best.href.length ? item : best));
@@ -89,7 +100,18 @@ function roleInitial(roleLabel: string): string {
  * plus the breadcrumb's own `aria-current="page"` marking the same page.
  * Not a second semantic heading, a redundant visual one.
  */
-export function SheetLayout({ navItems, roleLabel, scopeLabel, accountSettingsHref, onLogout, children }: SheetLayoutProps) {
+export function SheetLayout({
+  navItems,
+  roleLabel,
+  scopeLabel,
+  accountSettingsHref,
+  onLogout,
+  isDemo = false,
+  demoPending = null,
+  onSwitchDemo,
+  onExitDemo,
+  children,
+}: SheetLayoutProps) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -129,7 +151,7 @@ export function SheetLayout({ navItems, roleLabel, scopeLabel, accountSettingsHr
 
   const activeItem = findActiveNavItem(pathname, navItems);
   const breadcrumbItems: BreadcrumbItem[] = [
-    { label: "TNPArch", href: navItems[0]?.href },
+    { label: "MYARCH", href: navItems[0]?.href },
     ...(activeItem ? [{ label: activeItem.label }] : []),
   ];
 
@@ -171,7 +193,9 @@ export function SheetLayout({ navItems, roleLabel, scopeLabel, accountSettingsHr
               className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-(--color-accent)"
             />
           )}
-          {Icon ? <Icon aria-hidden="true" size={18} strokeWidth={1.75} className="shrink-0" /> : null}
+          {Icon ? (
+            <Icon aria-hidden="true" size={18} strokeWidth={1.75} className="shrink-0" />
+          ) : null}
           {!collapsed && <span className="truncate">{item.label}</span>}
         </Link>,
       );
@@ -181,123 +205,150 @@ export function SheetLayout({ navItems, roleLabel, scopeLabel, accountSettingsHr
   }
 
   return (
-    <div className="flex min-h-screen bg-(--color-background)">
-      {/* Desktop: floating, collapsible sidebar. */}
-      <aside className={`hidden shrink-0 p-3 transition-[width] duration-200 md:block ${isCollapsed ? "md:w-[88px]" : "md:w-64"}`}>
-        <div className="sticky top-3 flex h-[calc(100vh-1.5rem)] flex-col rounded-lg border border-(--color-border) bg-(--color-surface) p-4 shadow-sm">
-          <Link
-            href={PUBLIC_WEBSITE_HREF}
-            aria-label="TNPArch — Visit public website"
-            className="mb-6 flex items-center gap-2.5 rounded-md px-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)"
-          >
-            <Logo variant={isCollapsed ? "mark" : "full"} size="sm" />
-          </Link>
-
-          <nav aria-label="Primary" className="flex flex-1 flex-col gap-1 overflow-y-auto">
-            {renderNavLinks(isCollapsed)}
-          </nav>
-
-          <button
-            type="button"
-            onClick={() => setIsCollapsed((collapsed) => !collapsed)}
-            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="mt-3 flex items-center justify-center gap-2 rounded-md border border-(--color-border) py-2 text-xs text-(--color-text-secondary) transition-colors duration-150 hover:bg-(--color-surface-muted) hover:text-(--color-text-primary) focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)"
-          >
-            {isCollapsed ? <ChevronRight size={16} strokeWidth={1.75} /> : <ChevronLeft size={16} strokeWidth={1.75} />}
-            {!isCollapsed && "Collapse"}
-          </button>
-
-          <div className="mt-3 flex items-center gap-2.5 border-t border-(--color-border) pt-3">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-(--color-secondary-soft) text-xs font-semibold text-(--color-secondary)">
-              {roleInitial(roleLabel)}
-            </span>
-            {!isCollapsed && (
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium text-(--color-text-primary)">{roleLabel}</span>
-                {scopeLabel ? (
-                  <span className="block truncate text-[11px] text-(--color-text-secondary)">{scopeLabel}</span>
-                ) : null}
-              </span>
-            )}
-          </div>
+    <div className="flex min-h-screen flex-col bg-(--color-background)">
+      {isDemo && (
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 bg-(--color-accent) px-4 py-2 text-center text-xs font-semibold text-white sm:text-sm">
+          <span>DEMO MODE — Exploring a demonstration account. Nothing you do here is saved.</span>
+          {onSwitchDemo && onExitDemo && (
+            <DemoSwitchMenu pending={demoPending} onSwitchDemo={onSwitchDemo} onExitDemo={onExitDemo} />
+          )}
         </div>
-      </aside>
+      )}
+      <div className="flex flex-1">
+        {/* Desktop: floating, collapsible sidebar. */}
+        <aside
+          className={`hidden shrink-0 p-3 transition-[width] duration-200 md:block ${isCollapsed ? "md:w-[88px]" : "md:w-64"}`}
+        >
+          <div className="sticky top-3 flex h-[calc(100vh-1.5rem)] flex-col rounded-lg border border-(--color-border) bg-(--color-surface) p-4 shadow-sm">
+            <Link
+              href={PUBLIC_WEBSITE_HREF}
+              aria-label="MYARCH — Visit public website"
+              className="mb-6 flex items-center gap-2.5 rounded-md px-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)"
+            >
+              <Logo variant={isCollapsed ? "mark" : "full"} size="sm" />
+            </Link>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-(--color-border) bg-(--color-surface)/90 px-4 py-3 backdrop-blur md:px-6">
-          <div className="flex min-w-0 items-center gap-3">
+            <nav aria-label="Primary" className="flex flex-1 flex-col gap-1 overflow-y-auto">
+              {renderNavLinks(isCollapsed)}
+            </nav>
+
             <button
               type="button"
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-(--color-text-primary) focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent) md:hidden"
-              aria-expanded={isMenuOpen}
-              aria-controls="authenticated-mobile-menu"
-              aria-label={isMenuOpen ? "Close navigation menu" : "Open navigation menu"}
-              onClick={() => setIsMenuOpen((open) => !open)}
+              onClick={() => setIsCollapsed((collapsed) => !collapsed)}
+              aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className="mt-3 flex items-center justify-center gap-2 rounded-md border border-(--color-border) py-2 text-xs text-(--color-text-secondary) transition-colors duration-150 hover:bg-(--color-surface-muted) hover:text-(--color-text-primary) focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)"
             >
-              {isMenuOpen ? <X size={20} strokeWidth={1.75} /> : <Menu size={20} strokeWidth={1.75} />}
+              {isCollapsed ? (
+                <ChevronRight size={16} strokeWidth={1.75} />
+              ) : (
+                <ChevronLeft size={16} strokeWidth={1.75} />
+              )}
+              {!isCollapsed && "Collapse"}
             </button>
-            <div className="min-w-0">
-              <div className="hidden sm:block">
-                <Breadcrumbs items={breadcrumbItems} />
-              </div>
-              {/* Visual-only echo of the active section — see this component's
-                  doc comment for why this is `aria-hidden`, not a second `<h1>`. */}
-              <p aria-hidden="true" className="mt-0.5 truncate font-[family-name:var(--font-display)] text-lg font-semibold text-(--color-text-primary)">
-                {activeItem?.label ?? roleLabel}
-              </p>
+
+            <div className="mt-3 flex items-center gap-2.5 border-t border-(--color-border) pt-3">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-(--color-secondary-soft) text-xs font-semibold text-(--color-secondary)">
+                {roleInitial(roleLabel)}
+              </span>
+              {!isCollapsed && (
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-(--color-text-primary)">
+                    {roleLabel}
+                  </span>
+                  {scopeLabel ? (
+                    <span className="block truncate text-[11px] text-(--color-text-secondary)">
+                      {scopeLabel}
+                    </span>
+                  ) : null}
+                </span>
+              )}
             </div>
           </div>
+        </aside>
 
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => setIsPaletteOpen(true)}
-              aria-label="Open command palette"
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-(--color-text-secondary) transition-colors duration-150 hover:bg-(--color-surface-muted) hover:text-(--color-text-primary) focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent) lg:h-auto lg:w-auto lg:gap-2 lg:rounded-md lg:border lg:border-(--color-border) lg:bg-(--color-background) lg:py-2 lg:pl-3 lg:pr-2 lg:hover:border-(--color-accent) lg:hover:bg-transparent"
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-(--color-border) bg-(--color-surface)/90 px-4 py-3 backdrop-blur md:px-6">
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-(--color-text-primary) focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent) md:hidden"
+                aria-expanded={isMenuOpen}
+                aria-controls="authenticated-mobile-menu"
+                aria-label={isMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+                onClick={() => setIsMenuOpen((open) => !open)}
+              >
+                {isMenuOpen ? (
+                  <X size={20} strokeWidth={1.75} />
+                ) : (
+                  <Menu size={20} strokeWidth={1.75} />
+                )}
+              </button>
+              <div className="min-w-0">
+                <div className="hidden sm:block">
+                  <Breadcrumbs items={breadcrumbItems} />
+                </div>
+                {/* Visual-only echo of the active section — see this component's
+                  doc comment for why this is `aria-hidden`, not a second `<h1>`. */}
+                <p
+                  aria-hidden="true"
+                  className="mt-0.5 truncate font-[family-name:var(--font-display)] text-lg font-semibold text-(--color-text-primary)"
+                >
+                  {activeItem?.label ?? roleLabel}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={() => setIsPaletteOpen(true)}
+                aria-label="Open command palette"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-(--color-text-secondary) transition-colors duration-150 hover:bg-(--color-surface-muted) hover:text-(--color-text-primary) focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent) lg:h-auto lg:w-auto lg:gap-2 lg:rounded-md lg:border lg:border-(--color-border) lg:bg-(--color-background) lg:py-2 lg:pl-3 lg:pr-2 lg:hover:border-(--color-accent) lg:hover:bg-transparent"
+              >
+                <Search aria-hidden="true" size={16} strokeWidth={1.75} />
+                <span className="hidden lg:inline">Search…</span>
+                <kbd className="ml-4 hidden rounded border border-(--color-border) px-1.5 py-0.5 font-[family-name:var(--font-data)] text-[11px] text-(--color-text-secondary) lg:inline">
+                  Ctrl K
+                </kbd>
+              </button>
+
+              <NotificationBell />
+
+              <UserMenu
+                roleLabel={roleLabel}
+                scopeLabel={scopeLabel}
+                accountSettingsHref={accountSettingsHref}
+                onLogout={onLogout}
+              />
+            </div>
+          </header>
+
+          {isMenuOpen && (
+            <div
+              id="authenticated-mobile-menu"
+              ref={menuRef}
+              className="border-b border-(--color-border) bg-(--color-surface) md:hidden"
             >
-              <Search aria-hidden="true" size={16} strokeWidth={1.75} />
-              <span className="hidden lg:inline">Search…</span>
-              <kbd className="ml-4 hidden rounded border border-(--color-border) px-1.5 py-0.5 font-[family-name:var(--font-data)] text-[11px] text-(--color-text-secondary) lg:inline">
-                Ctrl K
-              </kbd>
-            </button>
-
-            <NotificationBell />
-
-            <UserMenu
-              roleLabel={roleLabel}
-              scopeLabel={scopeLabel}
-              accountSettingsHref={accountSettingsHref}
-              onLogout={onLogout}
-            />
-          </div>
-        </header>
-
-        {isMenuOpen && (
-          <div
-            id="authenticated-mobile-menu"
-            ref={menuRef}
-            className="border-b border-(--color-border) bg-(--color-surface) md:hidden"
-          >
-            {/* The desktop sidebar's branding-as-public-website-link, mirrored
+              {/* The desktop sidebar's branding-as-public-website-link, mirrored
                 here since the desktop <aside> above is `hidden md:block` and
                 never renders below md — this drawer is mobile's equivalent of
                 the sidebar, so it gets the same branding block at its head. */}
-            <Link
-              href={PUBLIC_WEBSITE_HREF}
-              aria-label="TNPArch — Visit public website"
-              onClick={() => setIsMenuOpen(false)}
-              className="mx-4 mt-4 flex items-center gap-2.5 rounded-md px-1 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)"
-            >
-              <Logo variant="full" size="sm" />
-            </Link>
-            <nav aria-label="Primary" className="flex flex-col gap-1 px-4 py-4">
-              {renderNavLinks(false)}
-            </nav>
-          </div>
-        )}
+              <Link
+                href={PUBLIC_WEBSITE_HREF}
+                aria-label="MYARCH — Visit public website"
+                onClick={() => setIsMenuOpen(false)}
+                className="mx-4 mt-4 flex items-center gap-2.5 rounded-md px-1 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)"
+              >
+                <Logo variant="full" size="sm" />
+              </Link>
+              <nav aria-label="Primary" className="flex flex-col gap-1 px-4 py-4">
+                {renderNavLinks(false)}
+              </nav>
+            </div>
+          )}
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">{children}</main>
+          <main className="flex-1 overflow-y-auto p-4 md:p-8">{children}</main>
+        </div>
       </div>
 
       <CommandPalette

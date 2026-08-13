@@ -28,15 +28,18 @@ export const DEPARTMENT_EMAIL = "contact@tnparch.in";
 export const HOME_HERO = {
   eyebrow: "Department of Architecture & Planning · VNIT Nagpur",
   headline: "Where design thinking becomes built practice.",
-  subhead: "Connecting studio-trained architecture and planning students with recruiters who value the craft.",
-  imageLabel: "Replace Hero Image",
+  subhead:
+    "Connecting studio-trained architecture and planning students with recruiters who value the craft.",
+  imageLabel: "Hero Image",
 };
 
 export const HOME_ABOUT = {
-  paragraph: "Five years of studio-driven education across architecture and urban & regional planning.",
+  paragraph:
+    "Five years of studio-driven education across architecture and urban & regional planning.",
   visionLabel: "Vision",
-  visionText: "Designers and planners who move confidently between a single building and a growing city.",
-  imageLabel: "Replace Department Image",
+  visionText:
+    "Designers and planners who move confidently between a single building and a growing city.",
+  imageLabel: "Department Image",
 };
 
 export const STATS_CAPTION = "Illustrative figures — verified statistics to follow.";
@@ -48,7 +51,7 @@ export const HOME_CTA = {
   eyebrow: "Get Started",
   title: "Ready to get started?",
   description: "Sign in to manage your profile, or request recruiter access.",
-  imageLabel: "Replace Campus Image",
+  imageLabel: "Campus Image",
 };
 
 export interface StatItem {
@@ -82,7 +85,8 @@ export const FEATURED_PROJECTS: FeaturedProject[] = [
   {
     title: "Urban Housing Studio — Design Thesis",
     studio: "B.Arch Thesis, Final Year",
-    description: "A density study exploring incremental housing typologies for a mid-sized Indian city.",
+    description:
+      "A density study exploring incremental housing typologies for a mid-sized Indian city.",
   },
   {
     title: "Adaptive Reuse Studio",
@@ -145,7 +149,8 @@ export const LATEST_UPDATES: UpdateItem[] = [
   {
     category: "News",
     title: "Guest lectures and design workshops",
-    description: "The department regularly hosts practicing architects and planners for student workshops.",
+    description:
+      "The department regularly hosts practicing architects and planners for student workshops.",
   },
 ];
 
@@ -156,8 +161,24 @@ export interface QuickAction {
 }
 
 export const QUICK_ACTIONS: QuickAction[] = [
-  { title: "View Placements", description: "See placement outcomes and the recruitment process.", href: "/placements" },
-  { title: "Recruit Students", description: "Learn how to partner with the department.", href: "/recruiters" },
-  { title: "Student Login", description: "Access your profile and placement status.", href: "/login" },
-  { title: "Recruiter Login", description: "Sign in to browse the student directory.", href: "/login" },
+  {
+    title: "View Placements",
+    description: "See placement outcomes and the recruitment process.",
+    href: "/placements",
+  },
+  {
+    title: "Recruit Students",
+    description: "Learn how to partner with the department.",
+    href: "/recruiters",
+  },
+  {
+    title: "Student Login",
+    description: "Access your profile and placement status.",
+    href: "/login",
+  },
+  {
+    title: "Recruiter Login",
+    description: "Sign in to browse the student directory.",
+    href: "/login",
+  },
 ];

@@ -22,10 +22,10 @@ const tokenService = new JwtTokenService({
 });
 const withAuth = createAuthMiddleware(tokenService);
 
-function requestWithToken(token?: string): NextRequest {
+function requestWithToken(token?: string, method: string = "GET"): NextRequest {
   const headers: Record<string, string> = {};
   if (token) headers.authorization = `Bearer ${token}`;
-  return new NextRequest("http://localhost/api/protected", { headers });
+  return new NextRequest("http://localhost/api/protected", { headers, method });
 }
 
 async function jsonOf(response: Response): Promise<unknown> {
@@ -80,10 +80,9 @@ describe("withAuth — Authentication and JWT Validation", () => {
 });
 
 describe("withAuth — Role Validation", () => {
-  const secretaryOnlyHandler = withAuth(
-    async () => Response.json({ ok: true }),
-    { roles: ["SECRETARY"] },
-  );
+  const secretaryOnlyHandler = withAuth(async () => Response.json({ ok: true }), {
+    roles: ["SECRETARY"],
+  });
 
   it("allows the Secretary", async () => {
     const token = tokenService.signAccessToken({ sub: "sec-1", role: "SECRETARY" });
@@ -115,29 +114,38 @@ describe("withAuth — Role Validation", () => {
 });
 
 describe("withAuth — Batch Scope Validation", () => {
-  const batchScopedHandler = withAuth(
-    async () => Response.json({ ok: true }),
-    {
-      roles: ["SECRETARY", "COORDINATOR"],
-      getRequiredBatchId: () => "batch-a",
-    },
-  );
+  const batchScopedHandler = withAuth(async () => Response.json({ ok: true }), {
+    roles: ["SECRETARY", "COORDINATOR"],
+    getRequiredBatchId: () => "batch-a",
+  });
 
   it("denies a Coordinator scoped to a DIFFERENT batch (403) — brief's named restriction", async () => {
-    const token = tokenService.signAccessToken({ sub: "coord-1", role: "COORDINATOR", batchScope: ["batch-b"] });
+    const token = tokenService.signAccessToken({
+      sub: "coord-1",
+      role: "COORDINATOR",
+      batchScope: ["batch-b"],
+    });
     const response = await batchScopedHandler(requestWithToken(token));
     expect(response.status).toBe(403);
     expect(await jsonOf(response)).toMatchObject({ error: { code: "FORBIDDEN" } });
   });
 
   it("allows a Coordinator scoped to the matching batch", async () => {
-    const token = tokenService.signAccessToken({ sub: "coord-1", role: "COORDINATOR", batchScope: ["batch-a"] });
+    const token = tokenService.signAccessToken({
+      sub: "coord-1",
+      role: "COORDINATOR",
+      batchScope: ["batch-a"],
+    });
     const response = await batchScopedHandler(requestWithToken(token));
     expect(response.status).toBe(200);
   });
 
   it("denies a Coordinator with an empty batch scope", async () => {
-    const token = tokenService.signAccessToken({ sub: "coord-1", role: "COORDINATOR", batchScope: [] });
+    const token = tokenService.signAccessToken({
+      sub: "coord-1",
+      role: "COORDINATOR",
+      batchScope: [],
+    });
     const response = await batchScopedHandler(requestWithToken(token));
     expect(response.status).toBe(403);
   });
@@ -151,10 +159,10 @@ describe("withAuth — Batch Scope Validation", () => {
 
 describe("withAuth — Recruiter access restrictions", () => {
   it("denies a Recruiter on a route restricted to Secretary/Coordinator, even with a batch scope function present", async () => {
-    const handler = withAuth(
-      async () => Response.json({ ok: true }),
-      { roles: ["SECRETARY", "COORDINATOR"], getRequiredBatchId: () => "batch-a" },
-    );
+    const handler = withAuth(async () => Response.json({ ok: true }), {
+      roles: ["SECRETARY", "COORDINATOR"],
+      getRequiredBatchId: () => "batch-a",
+    });
     const token = tokenService.signAccessToken({ sub: "rec-1", role: "RECRUITER" });
     const response = await handler(requestWithToken(token));
     expect(response.status).toBe(403);
@@ -219,6 +227,69 @@ describe("withAuth — rate limiting (V4.0 A2)", () => {
     const response = await handler(requestWithToken(token));
     expect(response.status).toBe(403);
     expect(consumeCalls).toBe(0);
+  });
+});
+
+describe("withAuth — public showcase demo sessions are read-only", () => {
+  const handler = withAuth(async () => Response.json({ ok: true }));
+
+  it("blocks a POST from a demo session (403 DEMO_READ_ONLY), without invoking the handler", async () => {
+    let handlerCalled = false;
+    const blockingHandler = withAuth(async () => {
+      handlerCalled = true;
+      return Response.json({ ok: true });
+    });
+    const token = tokenService.signAccessToken({
+      sub: "demo-student-1",
+      role: "STUDENT",
+      isDemo: true,
+    });
+
+    const response = await blockingHandler(requestWithToken(token, "POST"));
+    expect(response.status).toBe(403);
+    expect(await jsonOf(response)).toMatchObject({ error: { code: "DEMO_READ_ONLY" } });
+    expect(handlerCalled).toBe(false);
+  });
+
+  it("blocks PATCH/DELETE the same way", async () => {
+    const token = tokenService.signAccessToken({
+      sub: "demo-admin-1",
+      role: "COORDINATOR",
+      isDemo: true,
+    });
+    for (const method of ["PATCH", "DELETE", "PUT"]) {
+      const response = await handler(requestWithToken(token, method));
+      expect(response.status).toBe(403);
+    }
+  });
+
+  it("still allows a GET from a demo session", async () => {
+    const token = tokenService.signAccessToken({
+      sub: "demo-recruiter-1",
+      role: "RECRUITER",
+      isDemo: true,
+    });
+    const response = await handler(requestWithToken(token, "GET"));
+    expect(response.status).toBe(200);
+  });
+
+  it("never restricts a normal (non-demo) session's POST", async () => {
+    const token = tokenService.signAccessToken({ sub: "stu-1", role: "STUDENT" });
+    const response = await handler(requestWithToken(token, "POST"));
+    expect(response.status).toBe(200);
+  });
+
+  it("role validation still applies to a demo session's GET requests", async () => {
+    const secretaryOnlyHandler = withAuth(async () => Response.json({ ok: true }), {
+      roles: ["SECRETARY"],
+    });
+    const token = tokenService.signAccessToken({
+      sub: "demo-admin-1",
+      role: "COORDINATOR",
+      isDemo: true,
+    });
+    const response = await secretaryOnlyHandler(requestWithToken(token, "GET"));
+    expect(response.status).toBe(403);
   });
 });
 

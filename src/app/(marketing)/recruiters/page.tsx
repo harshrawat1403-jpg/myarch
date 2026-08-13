@@ -28,7 +28,13 @@ import {
   RECRUITERS_CTA,
 } from "@/lib/recruiters-content";
 
-const RECRUITERS_FAQ = [FAQ_DIRECTORY_ACCESS, FAQ_RECRUITING_COST, FAQ_INTERNSHIP_ONLY, FAQ_SHORTLISTING, ...RECRUITERS_FAQ_EXTRA];
+const RECRUITERS_FAQ = [
+  FAQ_DIRECTORY_ACCESS,
+  FAQ_RECRUITING_COST,
+  FAQ_INTERNSHIP_ONLY,
+  FAQ_SHORTLISTING,
+  ...RECRUITERS_FAQ_EXTRA,
+];
 const WHY_RECRUIT_ICONS: Record<FeatureItem["glyph"], LucideIcon> = {
   design: Compass,
   software: LayoutGrid,
@@ -68,18 +74,28 @@ export default function RecruitersPage() {
             <PageTitle className="mt-6 text-4xl font-bold leading-[1.05] tracking-tight lg:text-6xl">
               {RECRUITERS_HERO.title}
             </PageTitle>
-            <p className="mt-6 max-w-md text-base text-(--color-text-secondary) lg:text-lg">{RECRUITERS_HERO.subhead}</p>
+            <p className="mt-6 max-w-md text-base text-(--color-text-secondary) lg:text-lg">
+              {RECRUITERS_HERO.subhead}
+            </p>
             <div className="mt-10 flex flex-wrap gap-x-8 gap-y-3 border-t border-(--color-border) pt-6">
               {PLACEMENT_STATS.map((stat) => (
                 <div key={stat.label}>
-                  <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-(--color-text-primary)">{stat.value}</p>
+                  <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-(--color-text-primary)">
+                    {stat.value}
+                  </p>
                   <p className="text-xs text-(--color-text-secondary)">{stat.label}</p>
                 </div>
               ))}
             </div>
           </div>
           <div className="h-[20rem] sm:h-[26rem] lg:h-auto">
-            <ImagePlaceholder label={RECRUITERS_HERO.imageLabel} aspect="auto" tone="bold" rounded={false} className="h-full w-full" />
+            <ImagePlaceholder
+              label={RECRUITERS_HERO.imageLabel}
+              aspect="auto"
+              tone="bold"
+              rounded={false}
+              className="h-full w-full"
+            />
           </div>
         </div>
       </section>
@@ -97,7 +113,9 @@ export default function RecruitersPage() {
                   <Icon aria-hidden="true" size={20} strokeWidth={1.75} />
                 </span>
                 <CardTitle className="mt-4">{feature.title}</CardTitle>
-                <p className="mt-1.5 text-sm text-(--color-text-secondary)">{feature.description}</p>
+                <p className="mt-1.5 text-sm text-(--color-text-secondary)">
+                  {feature.description}
+                </p>
               </div>
             );
           })}
@@ -111,7 +129,10 @@ export default function RecruitersPage() {
         <SectionIntro title="Student Capabilities" />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {SKILL_MATRIX.map((category) => (
-            <div key={category.category} className="rounded-2xl border-t-2 border-(--color-accent) bg-(--color-surface) p-5 shadow-sm">
+            <div
+              key={category.category}
+              className="rounded-2xl border-t-2 border-(--color-accent) bg-(--color-surface) p-5 shadow-sm"
+            >
               <DataLabel>{category.category}</DataLabel>
               <ul className="mt-3 space-y-2">
                 {category.skills.map((skill) => (
@@ -132,7 +153,9 @@ export default function RecruitersPage() {
         <div className="grid divide-y divide-(--color-border) border-y border-(--color-border) sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-4">
           {SOFTWARE_ECOSYSTEM.map((item) => (
             <div key={item.tool} className="px-6 py-5 first:pl-0 last:pr-0">
-              <p className="font-[family-name:var(--font-display)] text-base font-semibold text-(--color-text-primary)">{item.tool}</p>
+              <p className="font-[family-name:var(--font-display)] text-base font-semibold text-(--color-text-primary)">
+                {item.tool}
+              </p>
               <p className="mt-1 text-xs text-(--color-text-secondary)">{item.description}</p>
             </div>
           ))}
@@ -152,11 +175,11 @@ export default function RecruitersPage() {
             <SectionIntro title="Internship Engagement" />
             <p className="text-(--color-text-secondary)">{INTERNSHIP_OVERVIEW}</p>
             <p className="mt-6 border-l-2 border-(--color-accent) pl-4 text-sm font-medium text-(--color-text-primary)">
-              Many recruiters use an internship to evaluate a candidate before a full-time offer — see the
-              Pre-Placement Internship model below.
+              Many recruiters use an internship to evaluate a candidate before a full-time offer —
+              see the Pre-Placement Internship model below.
             </p>
           </div>
-          <ImagePlaceholder label="Replace Workshop Image" aspect="square" tone="cool" />
+          <ImagePlaceholder label="Recruiter Workshop Photo" aspect="square" tone="cool" />
         </div>
       </Section>
 
@@ -171,11 +194,15 @@ export default function RecruitersPage() {
               <dl className="mt-4 space-y-2 text-xs">
                 <div className="flex justify-between gap-2">
                   <dt className="text-(--color-text-secondary)">Commitment</dt>
-                  <dd className="text-right font-medium text-(--color-text-primary)">{model.commitment}</dd>
+                  <dd className="text-right font-medium text-(--color-text-primary)">
+                    {model.commitment}
+                  </dd>
                 </div>
                 <div className="flex justify-between gap-2">
                   <dt className="text-(--color-text-secondary)">Duration</dt>
-                  <dd className="text-right font-medium text-(--color-text-primary)">{model.duration}</dd>
+                  <dd className="text-right font-medium text-(--color-text-primary)">
+                    {model.duration}
+                  </dd>
                 </div>
               </dl>
               <p className="mt-4 text-sm text-(--color-text-secondary)">{model.bestFor}</p>
@@ -190,7 +217,12 @@ export default function RecruitersPage() {
         <div className="grid gap-8 sm:grid-cols-2">
           {PLACEMENT_SUPPORT.map((item) => (
             <div key={item.title} className="flex items-start gap-4">
-              <CheckCircle2 aria-hidden="true" size={22} strokeWidth={1.75} className="mt-0.5 shrink-0 text-(--color-success)" />
+              <CheckCircle2
+                aria-hidden="true"
+                size={22}
+                strokeWidth={1.75}
+                className="mt-0.5 shrink-0 text-(--color-success)"
+              />
               <div>
                 <CardTitle>{item.title}</CardTitle>
                 <p className="mt-1 text-sm text-(--color-text-secondary)">{item.description}</p>
@@ -203,17 +235,37 @@ export default function RecruitersPage() {
       {/* 9 — Trusted By: an editable recruiter-logo grid plus honest
           testimonial placeholders — new to this page, never fabricated. */}
       <Section className="border-t border-(--color-border) bg-(--color-surface-muted)">
-        <SectionIntro title="Trusted By" description="Recruiting partners and their teams' experience working with the department." />
+        <SectionIntro
+          title="Trusted By"
+          description="Recruiting partners and their teams' experience working with the department."
+        />
         <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
           {Array.from({ length: RECRUITER_LOGO_COUNT }).map((_, i) => (
-            <ImagePlaceholder key={i} label="Replace Logo" aspect="square" tag={false} tone={IMAGE_TONES[i % IMAGE_TONES.length]} />
+            <ImagePlaceholder
+              key={i}
+              label="Replace Logo"
+              aspect="square"
+              tag={false}
+              tone={IMAGE_TONES[i % IMAGE_TONES.length]}
+            />
           ))}
         </div>
         <div className="mt-10 grid gap-6 sm:grid-cols-2">
           {RECRUITER_TESTIMONIALS.map((testimonial, i) => (
-            <div key={i} className="flex items-center gap-4 rounded-2xl border border-(--color-border) bg-(--color-surface) p-5 shadow-sm">
-              <ImagePlaceholder label={testimonial.imageLabel} aspect="square" tag={false} tone={IMAGE_TONES[i % IMAGE_TONES.length]} className="h-16 w-16 shrink-0" />
-              <p className="text-sm font-medium text-(--color-text-secondary)">{testimonial.role}</p>
+            <div
+              key={i}
+              className="flex items-center gap-4 rounded-2xl border border-(--color-border) bg-(--color-surface) p-5 shadow-sm"
+            >
+              <ImagePlaceholder
+                label={testimonial.imageLabel}
+                aspect="square"
+                tag={false}
+                tone={IMAGE_TONES[i % IMAGE_TONES.length]}
+                className="h-16 w-16 shrink-0"
+              />
+              <p className="text-sm font-medium text-(--color-text-secondary)">
+                {testimonial.role}
+              </p>
             </div>
           ))}
         </div>
@@ -229,15 +281,27 @@ export default function RecruitersPage() {
 
       {/* 11 — Closing: full-bleed band matching every other page. */}
       <section className="relative overflow-hidden">
-        <ImagePlaceholder label={RECRUITERS_CTA.imageLabel} aspect="auto" tone="bold" rounded={false} minimal className="h-[22rem] w-full lg:h-[26rem]" />
+        <ImagePlaceholder
+          label={RECRUITERS_CTA.imageLabel}
+          aspect="auto"
+          tone="bold"
+          rounded={false}
+          minimal
+          className="h-[22rem] w-full lg:h-[26rem]"
+        />
         <div className="absolute inset-0 flex items-center">
           <PageContainer>
             <div className="max-w-xl">
               <DataLabel className="text-white/80">{RECRUITERS_CTA.eyebrow}</DataLabel>
-              <SectionHeading className="mt-3 text-3xl text-white lg:text-4xl">{RECRUITERS_CTA.title}</SectionHeading>
+              <SectionHeading className="mt-3 text-3xl text-white lg:text-4xl">
+                {RECRUITERS_CTA.title}
+              </SectionHeading>
               <p className="mt-4 text-white/85">{RECRUITERS_CTA.description}</p>
               <div className="mt-8 flex flex-wrap items-center gap-6">
-                <Link href="/contact" className={buttonClassName("secondary", "px-8 py-3 text-base")}>
+                <Link
+                  href="/contact"
+                  className={buttonClassName("secondary", "px-8 py-3 text-base")}
+                >
                   Request Recruiter Access
                 </Link>
                 <Link

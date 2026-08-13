@@ -53,7 +53,9 @@ export default function ChangePasswordPage() {
       applySessionToken(result.accessToken);
       router.replace(ROLE_HOME[result.role] ?? "/login");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Unable to change your password. Please try again.");
+      setError(
+        err instanceof ApiError ? err.message : "Unable to change your password. Please try again.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -65,7 +67,7 @@ export default function ChangePasswordPage() {
         <div className="flex flex-col items-center text-center">
           <Logo variant="mark" size="lg" />
           <p className="mt-4 font-[family-name:var(--font-display)] text-lg font-bold text-(--color-text-primary)">
-            TNPArch
+            MYARCH
           </p>
         </div>
 
@@ -75,7 +77,12 @@ export default function ChangePasswordPage() {
 
         {mustChangePassword && (
           <div className="mt-4 flex gap-2.5 rounded-lg border border-(--color-warning)/30 bg-(--color-warning-soft) p-3">
-            <AlertCircle aria-hidden="true" size={16} strokeWidth={1.75} className="mt-0.5 shrink-0 text-(--color-warning)" />
+            <AlertCircle
+              aria-hidden="true"
+              size={16}
+              strokeWidth={1.75}
+              className="mt-0.5 shrink-0 text-(--color-warning)"
+            />
             <p className="text-sm text-(--color-text-primary)">
               You&apos;re signing in with a temporary password. Choose a new one to continue.
             </p>

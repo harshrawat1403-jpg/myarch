@@ -50,7 +50,12 @@ describe("Contact page (/contact)", () => {
 
   it("does not fabricate a map embed or a phone number", () => {
     render(<ContactPage />);
-    expect(screen.getByText(/map integration pending/i)).toBeInTheDocument();
+    // The map slot is a placeholder (ImagePlaceholder renders no visible
+    // caption — see that component's own doc comment); the honest "not
+    // real yet" disclosure survives as its accessible name, not as painted
+    // text, so a screen-reader user still learns it, a sighted visitor
+    // doesn't see instructional copy.
+    expect(screen.getByRole("img", { name: /map integration pending/i })).toBeInTheDocument();
     expect(screen.getByText(/phone contact details are being finalised/i)).toBeInTheDocument();
   });
 

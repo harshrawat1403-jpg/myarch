@@ -19,8 +19,9 @@
 export const ABOUT_HERO = {
   eyebrow: "About · Department of Architecture & Planning",
   title: "A department built on studio practice.",
-  subhead: "Studio-driven education in architecture and planning, at every scale from a single room to a growing city.",
-  imageLabel: "Replace About Hero Image",
+  subhead:
+    "Studio-driven education in architecture and planning, at every scale from a single room to a growing city.",
+  imageLabel: "About Hero Image",
 };
 
 export interface VisionMissionItem {
@@ -45,12 +46,13 @@ export const HISTORY_PARAGRAPHS: string[] = [
 ];
 
 export const HISTORY_PULL_QUOTE = "A department that has grown with the discipline itself.";
-export const HISTORY_IMAGE_LABEL = "Replace History Image";
+export const HISTORY_IMAGE_LABEL = "History Image";
 
 export const PHILOSOPHY_PARAGRAPH =
   "Studio is the spine of the curriculum, not an elective around it. Design problems are worked iteratively and defended in front of faculty and peers — technical and theoretical coursework runs alongside studio, in the context of a live design problem, not in isolation from one.";
 
-export const PHILOSOPHY_PULL_LINE = "Design is taught as a way of reasoning, not a style to imitate.";
+export const PHILOSOPHY_PULL_LINE =
+  "Design is taught as a way of reasoning, not a style to imitate.";
 
 export interface StudioCultureTrait {
   title: string;
@@ -60,11 +62,13 @@ export interface StudioCultureTrait {
 export const STUDIO_CULTURE_TRAITS: StudioCultureTrait[] = [
   {
     title: "Critique Culture",
-    description: "Work is presented and defended in open review — critique as part of the process, not judgment after it.",
+    description:
+      "Work is presented and defended in open review — critique as part of the process, not judgment after it.",
   },
   {
     title: "Iterative Process",
-    description: "Ideas move through repeated cycles of sketch, model, and drawing before a design is resolved.",
+    description:
+      "Ideas move through repeated cycles of sketch, model, and drawing before a design is resolved.",
   },
   {
     title: "Collaborative Making",
@@ -72,7 +76,7 @@ export const STUDIO_CULTURE_TRAITS: StudioCultureTrait[] = [
   },
 ];
 
-export const STUDIO_CULTURE_IMAGE_LABEL = "Replace Studio Culture Image";
+export const STUDIO_CULTURE_IMAGE_LABEL = "Studio Culture Image";
 
 export interface Facility {
   title: string;
@@ -100,7 +104,7 @@ export const FACILITIES: Facility[] = [
 
 export const FACULTY_PLACEHOLDER_MESSAGE =
   "A full faculty directory is being prepared. Department faculty can be reached through the Contact page in the meantime.";
-export const FACULTY_IMAGE_LABEL = "Replace Faculty Image";
+export const FACULTY_IMAGE_LABEL = "Faculty Image";
 
 export interface WhyVnitReason {
   title: string;
@@ -114,7 +118,8 @@ export const WHY_VNIT_REASONS: WhyVnitReason[] = [
   },
   {
     title: "Hands-On Software Training",
-    description: "Practical fluency in AutoCAD, Revit, SketchUp, and Rhino/Grasshopper, built into coursework.",
+    description:
+      "Practical fluency in AutoCAD, Revit, SketchUp, and Rhino/Grasshopper, built into coursework.",
   },
   {
     title: "A Studio You Actually Work In",
@@ -122,13 +127,15 @@ export const WHY_VNIT_REASONS: WhyVnitReason[] = [
   },
   {
     title: "Design Thinking, Applied Broadly",
-    description: "Problem-framing that carries into urban and regional-scale work, not just buildings.",
+    description:
+      "Problem-framing that carries into urban and regional-scale work, not just buildings.",
   },
 ];
 
 export const ABOUT_CTA = {
   eyebrow: "Continue Exploring",
   title: "See what our students go on to do.",
-  description: "Explore placement outcomes, or meet the students currently building their portfolios.",
-  imageLabel: "Replace Closing Image",
+  description:
+    "Explore placement outcomes, or meet the students currently building their portfolios.",
+  imageLabel: "Closing Image",
 };

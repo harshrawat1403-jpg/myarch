@@ -27,7 +27,14 @@ export interface StatPanelProps {
  * refinement pass) distinguish it from a plain `Card` at a glance — a
  * stat is the one card shape on the page meant to be scanned, not read.
  */
-export function StatPanel({ label, value, scope, asOf = "Updated periodically", compact = false, icon: Icon }: StatPanelProps) {
+export function StatPanel({
+  label,
+  value,
+  scope,
+  asOf = "Updated periodically",
+  compact = false,
+  icon: Icon,
+}: StatPanelProps) {
   if (compact) {
     return (
       <Card className="border-t-2 border-t-(--color-accent)">
@@ -47,8 +54,10 @@ export function StatPanel({ label, value, scope, asOf = "Updated periodically", 
 
   return (
     <Card className="border-t-2 border-t-(--color-accent)">
-      <p className="font-[family-name:var(--font-data)] text-4xl text-(--color-text-primary) lg:text-5xl">{value}</p>
-      <TitleBlock project={label} scale={scope} date={asOf} drawnBy="TNPArch" />
+      <p className="font-[family-name:var(--font-data)] text-4xl text-(--color-text-primary) lg:text-5xl">
+        {value}
+      </p>
+      <TitleBlock project={label} scale={scope} date={asOf} drawnBy="MYARCH" />
     </Card>
   );
 }

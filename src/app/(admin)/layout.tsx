@@ -1,8 +1,27 @@
 "use client";
 
-import { LayoutDashboard, Users, Layers, ClipboardCheck, ClipboardList, History, Download, Settings, UserCog, Building2, IdCard, CalendarClock, Briefcase, GraduationCap, Target, Contact, BookOpen } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  Layers,
+  ClipboardCheck,
+  ClipboardList,
+  History,
+  Download,
+  Settings,
+  UserCog,
+  Building2,
+  IdCard,
+  CalendarClock,
+  Briefcase,
+  GraduationCap,
+  Target,
+  Contact,
+  BookOpen,
+} from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { useRequireRole } from "@/lib/use-require-role";
+import { useDemoSession } from "@/lib/use-demo-session";
 import { SheetLayout, type NavItem } from "@/components/sheet-layout";
 import { LoadingScreen } from "@/components/loading-screen";
 
@@ -14,7 +33,12 @@ const BASE_NAV_ITEMS: NavItem[] = [
   // V4.0 B2: visible to both roles — Coordinator can comment/mark, Secretary
   // additionally decides (B3). Matches its own route handlers' shared
   // { roles: ["SECRETARY", "COORDINATOR"] } gate.
-  { href: "/dashboard/registrations", label: "Registrations", icon: ClipboardList, group: "Workflow" },
+  {
+    href: "/dashboard/registrations",
+    label: "Registrations",
+    icon: ClipboardList,
+    group: "Workflow",
+  },
   { href: "/dashboard/audit", label: "Audit", icon: History, group: "Workflow" },
   // V4.0 E7 (§2, §3, §16): rename/extend "Exports" → "Reports" — the route
   // itself moves from /dashboard/exports to /dashboard/reports (a
@@ -36,7 +60,12 @@ const BASE_NAV_ITEMS: NavItem[] = [
   // V4.0 D2 — Internships is the SAME PlacementDrive model filtered to
   // type=INTERNSHIP (§0's "type variant, not a parallel entity"), never a
   // separate feature; both routes share PlacementDriveListPage.
-  { href: "/dashboard/placement-drives", label: "Placement Drives", icon: Target, group: "Placement" },
+  {
+    href: "/dashboard/placement-drives",
+    label: "Placement Drives",
+    icon: Target,
+    group: "Placement",
+  },
   { href: "/dashboard/internships", label: "Internships", icon: GraduationCap, group: "Placement" },
   // V4.0 D5 (§3): "**People**: + Alumni." Full CRUD for both roles — no
   // role-gated write UI on this page at all, unlike Companies.
@@ -60,9 +89,24 @@ const BASE_NAV_ITEMS: NavItem[] = [
 // { roles: ["SECRETARY"] } server-side, so a Coordinator never sees a nav
 // entry that would just 403.
 const SECRETARY_ONLY_NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard/admin/coordinators", label: "Coordinators", icon: UserCog, group: "Administration" },
-  { href: "/dashboard/admin/recruiters", label: "Recruiters", icon: Building2, group: "Administration" },
-  { href: "/dashboard/admin/academic-year", label: "Academic Year", icon: CalendarClock, group: "Administration" },
+  {
+    href: "/dashboard/admin/coordinators",
+    label: "Coordinators",
+    icon: UserCog,
+    group: "Administration",
+  },
+  {
+    href: "/dashboard/admin/recruiters",
+    label: "Recruiters",
+    icon: Building2,
+    group: "Administration",
+  },
+  {
+    href: "/dashboard/admin/academic-year",
+    label: "Academic Year",
+    icon: CalendarClock,
+    group: "Administration",
+  },
 ];
 
 // Ungrouped, like Overview — also reachable from UserMenu (see
@@ -71,7 +115,11 @@ const SECRETARY_ONLY_NAV_ITEMS: NavItem[] = [
 // Settings" instead of falling back to Overview (a bare "/dashboard"
 // nav item is a prefix of every dashboard route — see
 // findActiveNavItem's doc comment).
-const ACCOUNT_NAV_ITEM: NavItem = { href: "/dashboard/account", label: "Account Settings", icon: Settings };
+const ACCOUNT_NAV_ITEM: NavItem = {
+  href: "/dashboard/account",
+  label: "Account Settings",
+  icon: Settings,
+};
 
 const ROLE_LABELS: Record<string, string> = {
   SECRETARY: "Secretary",
@@ -95,10 +143,19 @@ function formatScopeLabel(batchScope: readonly string[] | null): string | undefi
  */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { role, batchScope } = useAuth();
-  const { isLoading, isAuthorized, isBlockedByPasswordChange, handleLogout } = useRequireRole([
-    "SECRETARY",
-    "COORDINATOR",
-  ]);
+  // Public MYARCH showcase — "Switch Demo"/"Exit Demo" in SheetLayout's demo
+  // banner, distinct from the normal UserMenu logout (still wired to
+  // handleLogout below, unchanged). Switching goes straight to the target
+  // persona's own dashboard; exiting returns to the public landing page,
+  // never /login. Read before useRequireRole so its `pending` can suppress
+  // that guard's redirect while a switch/exit is applying new session state
+  // out from under the still-mounted (old-persona) layout — see
+  // useRequireRole's own doc comment for the race this prevents.
+  const { isDemo, pending: demoPending, switchDemo, exitDemo } = useDemoSession();
+  const { isLoading, isAuthorized, isBlockedByPasswordChange, handleLogout } = useRequireRole(
+    ["SECRETARY", "COORDINATOR"],
+    { suppressRedirect: demoPending !== null },
+  );
 
   if (isLoading || !isAuthorized || isBlockedByPasswordChange || !role) {
     return <LoadingScreen />;
@@ -121,6 +178,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       scopeLabel={scopeLabel}
       accountSettingsHref="/dashboard/account"
       onLogout={handleLogout}
+      isDemo={isDemo}
+      demoPending={demoPending}
+      onSwitchDemo={switchDemo}
+      onExitDemo={exitDemo}
     >
       {children}
     </SheetLayout>

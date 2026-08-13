@@ -79,14 +79,19 @@ describe("SheetLayout — the authenticated application shell", () => {
     );
 
     const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
-    expect(within(breadcrumb).getByText("TNPArch")).toBeInTheDocument();
+    expect(within(breadcrumb).getByText("MYARCH")).toBeInTheDocument();
     expect(within(breadcrumb).getByText("Students")).toBeInTheDocument();
   });
 
   it("shows the Coordinator scope sub-label when provided, in both the rail and the user menu", () => {
     mockPathname = "/dashboard";
     render(
-      <SheetLayout navItems={NAV_ITEMS} roleLabel="Coordinator" scopeLabel="Scoped to 2 batches" onLogout={vi.fn()}>
+      <SheetLayout
+        navItems={NAV_ITEMS}
+        roleLabel="Coordinator"
+        scopeLabel="Scoped to 2 batches"
+        onLogout={vi.fn()}
+      >
         content
       </SheetLayout>,
     );
@@ -102,11 +107,11 @@ describe("SheetLayout — the authenticated application shell", () => {
       </SheetLayout>,
     );
 
-    const brandingLink = screen.getByRole("link", { name: /tnparch.*visit public website/i });
+    const brandingLink = screen.getByRole("link", { name: /myarch.*visit public website/i });
     expect(brandingLink).toHaveAttribute("href", "/about");
-    // The logo, "TNPArch", and "VNIT Nagpur" all live inside this one link —
+    // The logo, "MYARCH", and "VNIT Nagpur" all live inside this one link —
     // not three separately-clickable things.
-    expect(within(brandingLink).getByText("TNPArch")).toBeInTheDocument();
+    expect(within(brandingLink).getByText("MYARCH")).toBeInTheDocument();
     expect(within(brandingLink).getByText("VNIT Nagpur")).toBeInTheDocument();
   });
 
@@ -121,7 +126,7 @@ describe("SheetLayout — the authenticated application shell", () => {
 
     await user.click(screen.getByRole("button", { name: /collapse sidebar/i }));
 
-    const brandingLink = screen.getByRole("link", { name: /tnparch.*visit public website/i });
+    const brandingLink = screen.getByRole("link", { name: /myarch.*visit public website/i });
     expect(brandingLink).toHaveAttribute("href", "/about");
   });
 
@@ -137,7 +142,9 @@ describe("SheetLayout — the authenticated application shell", () => {
     await user.click(screen.getByRole("button", { name: /open navigation menu/i }));
 
     const drawer = document.getElementById("authenticated-mobile-menu")!;
-    const brandingLink = within(drawer).getByRole("link", { name: /tnparch.*visit public website/i });
+    const brandingLink = within(drawer).getByRole("link", {
+      name: /myarch.*visit public website/i,
+    });
     expect(brandingLink).toHaveAttribute("href", "/about");
   });
 
@@ -156,7 +163,10 @@ describe("SheetLayout — the authenticated application shell", () => {
 
     await user.click(toggle);
 
-    expect(screen.getByRole("button", { name: /close navigation menu/i })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /close navigation menu/i })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
     await waitFor(() => {
       const menu = document.getElementById("authenticated-mobile-menu");
       expect(menu?.contains(document.activeElement)).toBe(true);
@@ -177,7 +187,9 @@ describe("SheetLayout — the authenticated application shell", () => {
 
     await user.keyboard("{Escape}");
 
-    await waitFor(() => expect(document.getElementById("authenticated-mobile-menu")).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(document.getElementById("authenticated-mobile-menu")).not.toBeInTheDocument(),
+    );
   });
 
   it("calls onLogout via the user menu", async () => {
@@ -214,11 +226,18 @@ describe("SheetLayout — the authenticated application shell", () => {
   it("V4.0 E1 — shows an unread indicator and marks a notification read on click", async () => {
     mockPathname = "/dashboard";
     fetchMock.mockImplementation((url: string) => {
-      if (url.includes("/api/notifications/notif-1/read")) return Promise.resolve(jsonResponse({ id: "notif-1" }));
+      if (url.includes("/api/notifications/notif-1/read"))
+        return Promise.resolve(jsonResponse({ id: "notif-1" }));
       if (url.includes("/api/notifications")) {
         return Promise.resolve(
           jsonResponse([
-            { id: "notif-1", title: "Profile approved", message: "Your profile is now visible.", isRead: false, createdAt: "2026-08-01T00:00:00.000Z" },
+            {
+              id: "notif-1",
+              title: "Profile approved",
+              message: "Your profile is now visible.",
+              isRead: false,
+              createdAt: "2026-08-01T00:00:00.000Z",
+            },
           ]),
         );
       }

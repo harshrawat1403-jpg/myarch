@@ -28,4 +28,13 @@ export interface AuthenticatedActor {
    * `allowMustChangePassword` gate.
    */
   readonly mustChangePassword?: boolean;
+  /**
+   * True only for a session issued by DemoLoginUseCase (the public MYARCH
+   * showcase's "Visit as Student/Recruiter/Admin" entry points — see
+   * domain/demo-accounts.ts). with-auth.ts rejects every non-GET request
+   * for such a session, platform-wide, regardless of role — a demo visitor
+   * can look around the real dashboards but never create, change, or
+   * delete anything.
+   */
+  readonly isDemo?: boolean;
 }

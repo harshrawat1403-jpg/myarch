@@ -55,3 +55,12 @@ export const publicDirectoryRateLimiter = new PrismaTokenBucketRateLimiter(prism
   capacity: 60,
   refillRatePerSecond: 1,
 });
+
+// Public MYARCH showcase (/api/auth/demo-login) — unauthenticated, so
+// keyed by IP. Generous enough that a visitor clicking between "Visit as
+// Student/Recruiter/Demo Admin" a few times never gets blocked, tight
+// enough to bound scripted refresh-token-row spam against this endpoint.
+export const demoLoginRateLimiter = new PrismaTokenBucketRateLimiter(prisma, {
+  capacity: 20,
+  refillRatePerSecond: 20 / (15 * 60),
+});

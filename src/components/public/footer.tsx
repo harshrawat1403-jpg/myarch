@@ -39,7 +39,7 @@ export function Footer() {
           <div>
             <Logo variant="full" size="xs" />
             <p className="mt-3 text-sm text-(--color-text-secondary)">
-              Training &amp; Placement Portal for the Department of Architecture &amp; Planning, Visvesvaraya
+              The digital portal for the Department of Architecture &amp; Planning, Visvesvaraya
               National Institute of Technology, Nagpur.
             </p>
           </div>
@@ -79,7 +79,11 @@ export function Footer() {
             <DataLabel>Connect</DataLabel>
             <ul className="mt-2 space-y-1">
               {SOCIAL_PLACEHOLDERS.map((label) => (
-                <li key={label} className="text-sm text-(--color-text-secondary)/60" title="Not yet available">
+                <li
+                  key={label}
+                  className="text-sm text-(--color-text-secondary)/60"
+                  title="Not yet available"
+                >
                   {label} <span className="text-xs">(coming soon)</span>
                 </li>
               ))}
@@ -89,12 +93,16 @@ export function Footer() {
 
         <div className="mt-8 flex flex-col gap-3 border-t border-(--color-text-secondary)/10 pt-6 font-[family-name:var(--font-data)] text-xs text-(--color-text-secondary) sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-center gap-2">
-            <Logo variant="mark" size="xs" className="h-4 w-4" />© {year} TNPArch — Department of Architecture &amp; Planning, VNIT
-            Nagpur.
+            <Logo variant="mark" size="xs" className="h-4 w-4" />© {year} MYARCH — Department of
+            Architecture &amp; Planning, VNIT Nagpur.
           </p>
           <div className="flex gap-4">
             {POLICY_PLACEHOLDERS.map((label) => (
-              <span key={label} className="text-(--color-text-secondary)/60" title="Not yet available">
+              <span
+                key={label}
+                className="text-(--color-text-secondary)/60"
+                title="Not yet available"
+              >
                 {label} <span>(coming soon)</span>
               </span>
             ))}

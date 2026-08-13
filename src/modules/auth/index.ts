@@ -61,6 +61,9 @@ export type {
 
 // Route handlers, mounted by the thin files under src/app/api/auth/*.
 export { loginRouteHandler } from "./presentation/route-handlers/login";
+// Public MYARCH showcase — "Visit as Student/Recruiter/Demo Admin" (see
+// domain/demo-accounts.ts and DemoLoginUseCase's own doc comment).
+export { demoLoginRouteHandler } from "./presentation/route-handlers/demo-login";
 export { logoutRouteHandler } from "./presentation/route-handlers/logout";
 export { refreshRouteHandler } from "./presentation/route-handlers/refresh";
 export { meRouteHandler } from "./presentation/route-handlers/me";

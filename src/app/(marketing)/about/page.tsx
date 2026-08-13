@@ -54,10 +54,18 @@ export default function AboutPage() {
             <PageTitle className="mt-6 text-4xl font-bold leading-[1.05] tracking-tight lg:text-6xl">
               {ABOUT_HERO.title}
             </PageTitle>
-            <p className="mt-6 max-w-md text-base text-(--color-text-secondary) lg:text-lg">{ABOUT_HERO.subhead}</p>
+            <p className="mt-6 max-w-md text-base text-(--color-text-secondary) lg:text-lg">
+              {ABOUT_HERO.subhead}
+            </p>
           </div>
           <div className="h-[20rem] sm:h-[26rem] lg:h-auto">
-            <ImagePlaceholder label={ABOUT_HERO.imageLabel} aspect="auto" tone="bold" rounded={false} className="h-full w-full" />
+            <ImagePlaceholder
+              label={ABOUT_HERO.imageLabel}
+              aspect="auto"
+              tone="bold"
+              rounded={false}
+              className="h-full w-full"
+            />
           </div>
         </div>
       </section>
@@ -72,8 +80,12 @@ export default function AboutPage() {
           <div className="mt-8 grid gap-10 sm:grid-cols-2 sm:gap-16">
             {VISION_MISSION.map((item) => (
               <div key={item.label}>
-                <p className="font-[family-name:var(--font-display)] text-lg font-semibold text-(--color-accent)">{item.label}</p>
-                <p className="mt-3 text-xl leading-snug text-(--color-text-primary) lg:text-2xl">{item.body}</p>
+                <p className="font-[family-name:var(--font-display)] text-lg font-semibold text-(--color-accent)">
+                  {item.label}
+                </p>
+                <p className="mt-3 text-xl leading-snug text-(--color-text-primary) lg:text-2xl">
+                  {item.body}
+                </p>
               </div>
             ))}
           </div>
@@ -126,7 +138,9 @@ export default function AboutPage() {
                   </span>
                   <div>
                     <CardTitle>{trait.title}</CardTitle>
-                    <p className="mt-1 text-sm text-(--color-text-secondary)">{trait.description}</p>
+                    <p className="mt-1 text-sm text-(--color-text-secondary)">
+                      {trait.description}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -139,11 +153,18 @@ export default function AboutPage() {
       {/* 6 — Facilities: an image gallery row — four equal, image-led
           tiles rather than four small icon cards. */}
       <Section className="border-t border-(--color-border) bg-(--color-surface-muted)">
-        <SectionIntro title="Facilities Overview" description="Representative facilities — exact inventory is confirmed department-side." />
+        <SectionIntro
+          title="Facilities Overview"
+          description="Representative facilities — exact inventory is confirmed department-side."
+        />
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {FACILITIES.map((facility, i) => (
             <div key={facility.title}>
-              <ImagePlaceholder label={`Replace Image — ${facility.title}`} aspect="square" tone={FACILITY_TONES[i % FACILITY_TONES.length]} />
+              <ImagePlaceholder
+                label={`${facility.title} Photo`}
+                aspect="square"
+                tone={FACILITY_TONES[i % FACILITY_TONES.length]}
+              />
               <CardTitle className="mt-4">{facility.title}</CardTitle>
               <p className="mt-1.5 text-sm text-(--color-text-secondary)">{facility.description}</p>
             </div>
@@ -177,13 +198,18 @@ export default function AboutPage() {
           </SectionHeading>
           <div className="divide-y divide-(--color-border) border-t border-(--color-border) lg:border-t-0">
             {WHY_VNIT_REASONS.map((reason, i) => (
-              <div key={reason.title} className="flex items-center gap-6 py-6 first:pt-0 lg:first:pt-0">
+              <div
+                key={reason.title}
+                className="flex items-center gap-6 py-6 first:pt-0 lg:first:pt-0"
+              >
                 <span className="font-[family-name:var(--font-display)] text-3xl font-bold text-(--color-border) lg:text-4xl">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <div>
                   <CardTitle>{reason.title}</CardTitle>
-                  <p className="mt-1.5 text-sm text-(--color-text-secondary)">{reason.description}</p>
+                  <p className="mt-1.5 text-sm text-(--color-text-secondary)">
+                    {reason.description}
+                  </p>
                 </div>
               </div>
             ))}
@@ -194,15 +220,27 @@ export default function AboutPage() {
       {/* 9 — Closing: the same full-bleed color band as Home's, not the
           shared `CtaPanel` boxed panel. */}
       <section className="relative overflow-hidden">
-        <ImagePlaceholder label={ABOUT_CTA.imageLabel} aspect="auto" tone="bold" rounded={false} minimal className="h-[22rem] w-full lg:h-[26rem]" />
+        <ImagePlaceholder
+          label={ABOUT_CTA.imageLabel}
+          aspect="auto"
+          tone="bold"
+          rounded={false}
+          minimal
+          className="h-[22rem] w-full lg:h-[26rem]"
+        />
         <div className="absolute inset-0 flex items-center">
           <PageContainer>
             <div className="max-w-xl">
               <DataLabel className="text-white/80">{ABOUT_CTA.eyebrow}</DataLabel>
-              <SectionHeading className="mt-3 text-3xl text-white lg:text-4xl">{ABOUT_CTA.title}</SectionHeading>
+              <SectionHeading className="mt-3 text-3xl text-white lg:text-4xl">
+                {ABOUT_CTA.title}
+              </SectionHeading>
               <p className="mt-4 text-white/85">{ABOUT_CTA.description}</p>
               <div className="mt-8 flex flex-wrap items-center gap-6">
-                <Link href="/placements" className={buttonClassName("secondary", "px-8 py-3 text-base")}>
+                <Link
+                  href="/placements"
+                  className={buttonClassName("secondary", "px-8 py-3 text-base")}
+                >
                   See Placement Outcomes
                 </Link>
                 <Link

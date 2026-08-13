@@ -1,6 +1,14 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastProvider } from "@/components/ui/toast";
+
+// useDemoSession (SheetLayout's "Switch Demo" control) calls useToast(),
+// which throws without a provider — production always has one (mounted at
+// src/app/layout.tsx), so it's supplied here rather than mocked away.
+function renderLayout(children: React.ReactNode) {
+  return render(<ToastProvider>{children}</ToastProvider>);
+}
 
 const replaceMock = vi.fn();
 let mockAuthState: {
@@ -28,7 +36,7 @@ describe("AdminLayout — dashboard authorization (UI-level route protection)", 
 
   it("shows a loading state and does not redirect while auth status is resolving", () => {
     mockAuthState = { isLoading: true, isAuthenticated: false, role: null, logout: vi.fn() };
-    render(<AdminLayout>{"content"}</AdminLayout>);
+    renderLayout(<AdminLayout>{"content"}</AdminLayout>);
 
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
     expect(replaceMock).not.toHaveBeenCalled();
@@ -36,28 +44,28 @@ describe("AdminLayout — dashboard authorization (UI-level route protection)", 
 
   it("redirects to /login when not authenticated", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: false, role: null, logout: vi.fn() };
-    render(<AdminLayout>{"content"}</AdminLayout>);
+    renderLayout(<AdminLayout>{"content"}</AdminLayout>);
 
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/login"));
   });
 
   it("redirects to /login for a Student role (this dashboard is Secretary/Coordinator only)", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "STUDENT", logout: vi.fn() };
-    render(<AdminLayout>{"content"}</AdminLayout>);
+    renderLayout(<AdminLayout>{"content"}</AdminLayout>);
 
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/login"));
   });
 
   it("redirects to /login for a Recruiter role", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "RECRUITER", logout: vi.fn() };
-    render(<AdminLayout>{"content"}</AdminLayout>);
+    renderLayout(<AdminLayout>{"content"}</AdminLayout>);
 
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/login"));
   });
 
   it("renders the dashboard shell and children for the Secretary — no redirect", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "SECRETARY", logout: vi.fn() };
-    render(<AdminLayout>{"dashboard content"}</AdminLayout>);
+    renderLayout(<AdminLayout>{"dashboard content"}</AdminLayout>);
 
     expect(await screen.findByText("dashboard content")).toBeInTheDocument();
     expect(replaceMock).not.toHaveBeenCalled();
@@ -65,7 +73,7 @@ describe("AdminLayout — dashboard authorization (UI-level route protection)", 
 
   it("renders the dashboard shell for a Coordinator — no redirect", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "COORDINATOR", logout: vi.fn() };
-    render(<AdminLayout>{"dashboard content"}</AdminLayout>);
+    renderLayout(<AdminLayout>{"dashboard content"}</AdminLayout>);
 
     expect(await screen.findByText("dashboard content")).toBeInTheDocument();
     expect(replaceMock).not.toHaveBeenCalled();
@@ -73,7 +81,7 @@ describe("AdminLayout — dashboard authorization (UI-level route protection)", 
 
   it("links Companies, Placement Drives, and Internships (V4.0 D2)", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "SECRETARY", logout: vi.fn() };
-    render(<AdminLayout>{"dashboard content"}</AdminLayout>);
+    renderLayout(<AdminLayout>{"dashboard content"}</AdminLayout>);
 
     await screen.findByText("dashboard content");
     expect(screen.getByRole("link", { name: /companies/i })).toHaveAttribute("href", "/dashboard/companies");
@@ -83,7 +91,7 @@ describe("AdminLayout — dashboard authorization (UI-level route protection)", 
 
   it("links Alumni for both Secretary and Coordinator (V4.0 D5 — identical access)", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "COORDINATOR", logout: vi.fn() };
-    render(<AdminLayout>{"dashboard content"}</AdminLayout>);
+    renderLayout(<AdminLayout>{"dashboard content"}</AdminLayout>);
 
     await screen.findByText("dashboard content");
     expect(screen.getByRole("link", { name: /^alumni$/i })).toHaveAttribute("href", "/dashboard/alumni");

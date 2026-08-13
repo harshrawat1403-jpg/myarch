@@ -24,6 +24,8 @@ export interface AuthContextValue {
   batchScope: readonly string[] | null;
   /** True when this session must change its password before doing anything else — see with-auth.ts's `allowMustChangePassword` gate, which is the real enforcement; this is what drives the frontend's forced-redirect. */
   mustChangePassword: boolean;
+  /** True only for a session from the public MYARCH showcase's "Visit as Student/Recruiter/Demo Admin" — see with-auth.ts's `isDemo` gate, which is the real (server-side) enforcement; this only drives the "DEMO MODE" banner. */
+  isDemo: boolean;
   isLoading: boolean;
   isAuthenticated: boolean;
   /**
@@ -33,6 +35,8 @@ export interface AuthContextValue {
    * role immediately after a successful login.
    */
   login: (email: string, password: string) => Promise<{ role: Role | null }>;
+  /** Public showcase entry point — no credentials, just which persona to explore. Same return shape as `login` for the same reason (immediate post-call redirect). */
+  loginAsDemo: (persona: "STUDENT" | "RECRUITER" | "ADMIN") => Promise<{ role: Role | null }>;
   logout: () => Promise<void>;
   /**
    * Applies a freshly-issued access token without a full login round trip —
@@ -51,6 +55,7 @@ interface DecodedClaims {
   studentProfileId?: string;
   batchScope?: readonly string[];
   mustChangePassword?: boolean;
+  isDemo?: boolean;
 }
 
 function decodeAccessTokenClaims(token: string): DecodedClaims {
@@ -58,7 +63,8 @@ function decodeAccessTokenClaims(token: string): DecodedClaims {
     const payloadSegment = token.split(".")[1];
     if (!payloadSegment) return {};
     const base64 = payloadSegment.replace(/-/g, "+").replace(/_/g, "/");
-    const json = typeof atob === "function" ? atob(base64) : Buffer.from(base64, "base64").toString("utf-8");
+    const json =
+      typeof atob === "function" ? atob(base64) : Buffer.from(base64, "base64").toString("utf-8");
     return JSON.parse(json) as DecodedClaims;
   } catch {
     // Display-only decoding — a malformed token here just means the UI
@@ -75,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [studentProfileId, setStudentProfileId] = useState<string | null>(null);
   const [batchScope, setBatchScope] = useState<readonly string[] | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const applyToken = useCallback((token: string): Role | null => {
@@ -86,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStudentProfileId(claims.studentProfileId ?? null);
     setBatchScope(claims.batchScope ?? null);
     setMustChangePassword(claims.mustChangePassword ?? false);
+    setIsDemo(claims.isDemo ?? false);
     return decodedRole;
   }, []);
 
@@ -96,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStudentProfileId(null);
     setBatchScope(null);
     setMustChangePassword(false);
+    setIsDemo(false);
   }, []);
 
   useEffect(() => {
@@ -135,7 +144,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const result = await apiClient.post<{ accessToken: string }>("/api/auth/login", { email, password });
+      const result = await apiClient.post<{ accessToken: string }>("/api/auth/login", {
+        email,
+        password,
+      });
+      const decodedRole = applyToken(result.accessToken);
+      return { role: decodedRole };
+    },
+    [applyToken],
+  );
+
+  const loginAsDemo = useCallback(
+    async (persona: "STUDENT" | "RECRUITER" | "ADMIN") => {
+      const result = await apiClient.post<{ accessToken: string }>("/api/auth/demo-login", {
+        persona,
+      });
       const decodedRole = applyToken(result.accessToken);
       return { role: decodedRole };
     },
@@ -158,9 +181,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         studentProfileId,
         batchScope,
         mustChangePassword,
+        isDemo,
         isLoading,
         isAuthenticated: accessToken !== null,
         login,
+        loginAsDemo,
         logout,
         applySessionToken: applyToken,
       }}

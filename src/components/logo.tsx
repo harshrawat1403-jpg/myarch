@@ -10,7 +10,7 @@ const LOGO_SRC = "/brand/logo.png";
 const LOGO_NATURAL_SIZE = 1024;
 
 export interface LogoProps {
-  /** "mark" — the glyph alone. "full" — glyph plus the TNPArch / VNIT Nagpur wordmark beside it. */
+  /** "mark" — the glyph alone. "full" — glyph plus the MYARCH / VNIT Nagpur wordmark beside it. */
   variant?: "mark" | "full";
   /** Preset sizes matching each placement's spec: `xs` (footer), `sm` (collapsed sidebar), `md` (nav/sidebar/drawer — the default), `lg` (login/loading hero). */
   size?: "xs" | "sm" | "md" | "lg";
@@ -34,7 +34,7 @@ const WORDMARK_NAME_SIZE: Record<NonNullable<LogoProps["size"]>, string> = {
 };
 
 /**
- * The one shared brand mark — every page that needs the TNPArch logo
+ * The one shared brand mark — every page that needs the MYARCH logo
  * imports this instead of hand-rolling an `<Image>` call. Wraps the
  * provided asset (`public/brand/logo.png`) exactly as supplied: no
  * redraw, no SVG recreation, just responsive sizing and an optional
@@ -44,7 +44,7 @@ const WORDMARK_NAME_SIZE: Record<NonNullable<LogoProps["size"]>, string> = {
  * backgrounds.
  *
  * `variant="full"` marks the glyph `aria-hidden` rather than giving it its
- * own `alt` — the adjacent visible "TNPArch" text already announces the
+ * own `alt` — the adjacent visible "MYARCH" text already announces the
  * name, and a screen reader shouldn't hear it twice. `variant="mark"`
  * (used alone, e.g. the collapsed sidebar) carries the real `alt` text
  * instead, since nothing else nearby conveys it.
@@ -55,7 +55,7 @@ export function Logo({ variant = "mark", size = "md", tone = "dark", className =
       src={LOGO_SRC}
       width={LOGO_NATURAL_SIZE}
       height={LOGO_NATURAL_SIZE}
-      alt={variant === "mark" ? "TNPArch Logo" : ""}
+      alt={variant === "mark" ? "MYARCH Logo" : ""}
       aria-hidden={variant === "full" ? true : undefined}
       priority={size === "lg"}
       className={`shrink-0 object-contain ${MARK_SIZE_CLASSES[size]} ${tone === "light" ? "brightness-0 invert" : ""} ${
@@ -70,8 +70,10 @@ export function Logo({ variant = "mark", size = "md", tone = "dark", className =
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
       {mark}
       <span className="flex flex-col leading-tight">
-        <span className={`font-[family-name:var(--font-display)] font-bold text-(--color-text-primary) ${WORDMARK_NAME_SIZE[size]}`}>
-          TNPArch
+        <span
+          className={`font-[family-name:var(--font-display)] font-bold text-(--color-text-primary) ${WORDMARK_NAME_SIZE[size]}`}
+        >
+          MYARCH
         </span>
         <span className="text-xs text-(--color-text-secondary)">VNIT Nagpur</span>
       </span>

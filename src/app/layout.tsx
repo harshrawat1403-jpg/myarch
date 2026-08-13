@@ -20,11 +20,19 @@ import "./globals.css";
  * already the right call, just never wired up.
  */
 const sora = Sora({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--font-sora" });
-const plexSans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-sans" });
-const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-plex-mono" });
+const plexSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-sans",
+});
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-plex-mono",
+});
 
 export const metadata: Metadata = {
-  title: "TNPArch — Department Training & Placement Portal",
+  title: "MYARCH — Architecture & Planning, VNIT Digital Portal",
   description: "Department of Architecture & Planning, VNIT Nagpur",
   // `favicon.ico` / `icon.png` / `apple-icon.png` and `opengraph-image.png` /
   // `twitter-image.png`, all under `src/app/`, are Next's own file-convention

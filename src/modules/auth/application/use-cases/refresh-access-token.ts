@@ -1,4 +1,5 @@
 import type { AuthenticatedActor } from "../../domain/entities";
+import { isReservedDemoAccountEmail } from "../../domain/demo-accounts";
 import {
   InvalidRefreshTokenError,
   RefreshTokenExpiredError,
@@ -73,6 +74,13 @@ export class RefreshAccessTokenUseCase {
       role: user.role,
       ...scope,
       ...(user.mustChangePassword ? { mustChangePassword: true } : {}),
+      // Re-derived from the DB user's email on every rotation, the same way
+      // mustChangePassword is re-derived above — not carried over from the
+      // presented access token's own (unverified-here) claims. Safe to
+      // re-derive this way specifically because LoginUseCase refuses
+      // ordinary password login for these addresses, so any session tied
+      // to one of them can only ever have come from /api/auth/demo-login.
+      ...(isReservedDemoAccountEmail(user.email) ? { isDemo: true } : {}),
     };
 
     // Rotate: same family as the presented token, which is retired and

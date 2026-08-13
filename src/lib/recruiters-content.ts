@@ -20,8 +20,9 @@ import type { FaqContentItem } from "./placements-content";
 export const RECRUITERS_HERO = {
   eyebrow: "Recruiters",
   title: "Why recruit architecture students from VNIT?",
-  subhead: "Direct, verified access to studio-trained graduates — ready to contribute from day one.",
-  imageLabel: "Replace Recruiters Hero Image",
+  subhead:
+    "Direct, verified access to studio-trained graduates — ready to contribute from day one.",
+  imageLabel: "Recruiters Hero Image",
 };
 
 export interface HiringModel {
@@ -66,30 +67,36 @@ export interface SupportItem {
 export const PLACEMENT_SUPPORT: SupportItem[] = [
   {
     title: "Coordinated Scheduling",
-    description: "Pre-placement talks, tests, and interview slots are scheduled and coordinated by the department.",
+    description:
+      "Pre-placement talks, tests, and interview slots are scheduled and coordinated by the department.",
   },
   {
     title: "Verified Student Directory",
-    description: "Recruiter accounts get directory access scoped to students with an approved, published profile.",
+    description:
+      "Recruiter accounts get directory access scoped to students with an approved, published profile.",
   },
   {
     title: "Resume Reference Generation",
-    description: "A structured resume reference is generated per student, consistent across the batch.",
+    description:
+      "A structured resume reference is generated per student, consistent across the batch.",
   },
   {
     title: "Single Point of Contact",
-    description: "The Training & Placement Cell is the one point of contact for scheduling, logistics, and queries.",
+    description:
+      "The Training & Placement Cell is the one point of contact for scheduling, logistics, and queries.",
   },
 ];
 
 export const RECRUITERS_FAQ_EXTRA: FaqContentItem[] = [
   {
     question: "How do we schedule a pre-placement talk?",
-    answer: "Once access is granted, the Training & Placement Cell coordinates scheduling directly with your team.",
+    answer:
+      "Once access is granted, the Training & Placement Cell coordinates scheduling directly with your team.",
   },
   {
     question: "Do you support virtual interviews?",
-    answer: "Yes — interviews and pre-placement talks can be conducted in person or virtually, based on what works for your team.",
+    answer:
+      "Yes — interviews and pre-placement talks can be conducted in person or virtually, based on what works for your team.",
   },
 ];
 
@@ -100,8 +107,8 @@ export interface RecruiterTestimonial {
 
 /** Editable placeholders, not fabricated testimonials — no invented recruiter names, companies, or quotes until real ones are supplied. */
 export const RECRUITER_TESTIMONIALS: RecruiterTestimonial[] = [
-  { role: "Add a recruiter testimonial", imageLabel: "Replace Photo" },
-  { role: "Add a recruiter testimonial", imageLabel: "Replace Photo" },
+  { role: "Add a recruiter testimonial", imageLabel: "Photo" },
+  { role: "Add a recruiter testimonial", imageLabel: "Photo" },
 ];
 
 /** How many editable recruiter-logo placeholder tiles to render. */
@@ -110,6 +117,7 @@ export const RECRUITER_LOGO_COUNT = 6;
 export const RECRUITERS_CTA = {
   eyebrow: "Get Started",
   title: "Ready to recruit from VNIT Architecture?",
-  description: "Request access to the student directory, or see how placement outcomes look so far.",
-  imageLabel: "Replace Closing Image",
+  description:
+    "Request access to the student directory, or see how placement outcomes look so far.",
+  imageLabel: "Closing Image",
 };

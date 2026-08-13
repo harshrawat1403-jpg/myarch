@@ -8,6 +8,8 @@ export interface AccessTokenClaims {
   readonly batchScope?: readonly string[];
   readonly studentProfileId?: string;
   readonly mustChangePassword?: boolean;
+  /** See AuthenticatedActor.isDemo's doc comment (domain/entities.ts). */
+  readonly isDemo?: boolean;
 }
 
 export interface TokenService {
