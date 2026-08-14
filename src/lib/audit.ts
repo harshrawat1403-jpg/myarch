@@ -118,4 +118,29 @@ export class PrismaAuditRecorder implements AuditRecorder {
       occurredAt: row.occurredAt,
     }));
   }
+
+  /**
+   * MYARCH Phase 2 (§3.4/§3.7) — "history"/"timeline" for a single domain
+   * entity (a MaintenanceIssue or Request), read via AuditLog's own existing
+   * targetEntityType/targetEntityId index rather than a per-domain event
+   * table. Chronological (oldest first) since a timeline reads naturally
+   * top-to-bottom.
+   */
+  async listForEntity(targetEntityType: string, targetEntityId: string, limit: number): Promise<AuditLogEntry[]> {
+    const rows = await this.prisma.auditLog.findMany({
+      where: { targetEntityType, targetEntityId },
+      orderBy: { occurredAt: "asc" },
+      take: limit,
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      actorUserId: row.actorUserId,
+      action: row.action,
+      targetEntityType: row.targetEntityType,
+      targetEntityId: row.targetEntityId,
+      metadata: row.metadata as Record<string, unknown>,
+      occurredAt: row.occurredAt,
+    }));
+  }
 }

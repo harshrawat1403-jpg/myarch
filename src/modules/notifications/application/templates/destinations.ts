@@ -91,5 +91,18 @@ export function resolveNotificationDestination(
       const taskId = context.taskId;
       return typeof taskId === "string" && taskId.length > 0 ? `/tasks/${taskId}` : null;
     }
+
+    // MYARCH Phase 2 (§3.1–§3.7) — Maintenance & Generic Requests.
+    case "MAINTENANCE_ISSUE_SUBMITTED":
+    case "MAINTENANCE_ISSUE_RESOLVED": {
+      const issueId = context.issueId;
+      return typeof issueId === "string" && issueId.length > 0 ? `/maintenance/${issueId}` : null;
+    }
+
+    case "REQUEST_SUBMITTED":
+    case "REQUEST_DECIDED": {
+      const requestId = context.requestId;
+      return typeof requestId === "string" && requestId.length > 0 ? `/requests/${requestId}` : null;
+    }
   }
 }

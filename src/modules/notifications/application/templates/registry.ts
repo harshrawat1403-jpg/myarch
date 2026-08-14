@@ -36,6 +36,16 @@ import {
 import { taskOverdueTemplate, taskOverdueInAppTemplate } from "./definitions/task-overdue";
 import { taskCompletedTemplate, taskCompletedInAppTemplate } from "./definitions/task-completed";
 import { taskEscalatedTemplate, taskEscalatedInAppTemplate } from "./definitions/task-escalated";
+import {
+  maintenanceIssueSubmittedTemplate,
+  maintenanceIssueSubmittedInAppTemplate,
+} from "./definitions/maintenance-issue-submitted";
+import {
+  maintenanceIssueResolvedTemplate,
+  maintenanceIssueResolvedInAppTemplate,
+} from "./definitions/maintenance-issue-resolved";
+import { requestSubmittedTemplate, requestSubmittedInAppTemplate } from "./definitions/request-submitted";
+import { requestDecidedTemplate, requestDecidedInAppTemplate } from "./definitions/request-decided";
 
 /**
  * Every known template, keyed by the id business use cases pass to
@@ -84,6 +94,10 @@ export const EMAIL_TEMPLATE_REGISTRY: Record<NotificationTemplateId, EmailTempla
   TASK_OVERDUE: taskOverdueTemplate,
   TASK_COMPLETED: taskCompletedTemplate,
   TASK_ESCALATED: taskEscalatedTemplate,
+  MAINTENANCE_ISSUE_SUBMITTED: maintenanceIssueSubmittedTemplate,
+  MAINTENANCE_ISSUE_RESOLVED: maintenanceIssueResolvedTemplate,
+  REQUEST_SUBMITTED: requestSubmittedTemplate,
+  REQUEST_DECIDED: requestDecidedTemplate,
 };
 
 /** V4.0 E1 — the IN_APP counterpart to EMAIL_TEMPLATE_REGISTRY. */
@@ -109,6 +123,10 @@ export const IN_APP_TEMPLATE_REGISTRY: Record<NotificationTemplateId, InAppTempl
   TASK_OVERDUE: taskOverdueInAppTemplate,
   TASK_COMPLETED: taskCompletedInAppTemplate,
   TASK_ESCALATED: taskEscalatedInAppTemplate,
+  MAINTENANCE_ISSUE_SUBMITTED: maintenanceIssueSubmittedInAppTemplate,
+  MAINTENANCE_ISSUE_RESOLVED: maintenanceIssueResolvedInAppTemplate,
+  REQUEST_SUBMITTED: requestSubmittedInAppTemplate,
+  REQUEST_DECIDED: requestDecidedInAppTemplate,
 };
 
 /**
@@ -158,4 +176,10 @@ export const NOTIFICATION_CHANNELS: Record<NotificationTemplateId, readonly Noti
   TASK_OVERDUE: ["EMAIL", "IN_APP"],
   TASK_COMPLETED: ["IN_APP"],
   TASK_ESCALATED: ["EMAIL", "IN_APP"],
+  // MYARCH Phase 2 (§3.1–§3.7) — resolution/decision are time-sensitive
+  // (dual-channel); submission is routine, IN_APP-only.
+  MAINTENANCE_ISSUE_SUBMITTED: ["IN_APP"],
+  MAINTENANCE_ISSUE_RESOLVED: ["EMAIL", "IN_APP"],
+  REQUEST_SUBMITTED: ["IN_APP"],
+  REQUEST_DECIDED: ["EMAIL", "IN_APP"],
 };

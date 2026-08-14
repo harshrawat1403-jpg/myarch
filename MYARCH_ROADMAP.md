@@ -26,15 +26,15 @@
 
 
 
-CURRENT\_PHASE: 2
+CURRENT\_PHASE: 3
 
-STATUS: IN\_PROGRESS
+STATUS: NOT\_STARTED
 
-LAST\_COMPLETED\_PHASE: 1
+LAST\_COMPLETED\_PHASE: 2
 
 BLOCKED: FALSE
 
-BLOCK\_REASON: none. Phase 2 (\# 3, "MAINTENANCE & REQUESTS") is partially complete: at the Technical Secretary's explicit direction, \#3.8's Task/Follow-up Engine was extracted and built FIRST, as standalone reusable infrastructure, deliberately BEFORE Maintenance (\#3.1–3.6), the Generic Request System (\#3.7), or the Maintenance Dashboard (\#3.9) — none of those have been started. See the Phase 2 report under "\# 3. PHASE 2 — MAINTENANCE & REQUESTS" below for exactly what is and isn't done. \*\*Phase 3 must not begin\*\* until the remainder of Phase 2 (\#3.1–3.7, \#3.9) is implemented and this section reads COMPLETE.
+BLOCK\_REASON: none. Phase 2 (\# 3, "MAINTENANCE & REQUESTS") is now COMPLETE — \#3.8 (Task/Follow-up Engine) was built first as reusable infrastructure, then \#3.1–\#3.7 (Maintenance lifecycle, complainant tracking, assignment, SLA/escalation, Generic Request System) and \#3.9 (Maintenance Dashboard) were built on top of it, reusing the existing auth/authorization/notification/job/audit/storage systems throughout — no second task, scheduler, reminder, notification, or escalation system was created. See the Phase Report under "\# 3. PHASE 2 — MAINTENANCE & REQUESTS" below. Phase 3 (\# 4, CALENDAR, EVENTS \& MEETINGS) has NOT been started — per instruction, it was not begun automatically after Phase 2 completed.
 
 
 
@@ -1724,7 +1724,7 @@ Support:
 
 
 
-STATUS: IN\_PROGRESS — \#3.8 (Task/Follow-up Engine) COMPLETE; \#3.1–\#3.7 and \#3.9 NOT\_STARTED. See the Phase Report under \#3.8 below for full detail. Built out of the section's own internal order at the Technical Secretary's explicit instruction: the reusable engine \#3.7's Generic Request System and every later Maintenance workflow are expected to build on (per \#3.8's own "Use this system for... Do not create separate task systems") had to exist first.
+STATUS: COMPLETE — \#3.8 (Task/Follow-up Engine) COMPLETE (2026-08-14); \#3.1–\#3.7 and \#3.9 COMPLETE (2026-08-15). See the \#3.8 Phase Report and the \#3.1–\#3.7/\#3.9 Phase Report (under \#3.9 below) for full detail. Built out of the section's own internal order at the Technical Secretary's explicit instruction: the reusable engine every later Maintenance/Request workflow builds on (per \#3.8's own "Use this system for... Do not create separate task systems") had to exist first.
 
 
 
@@ -2197,6 +2197,94 @@ Show:
 \- escalation
 
 \- Coordinator workload
+
+
+
+\---
+
+
+
+\## §3.1–§3.7, §3.9 PHASE REPORT (2026-08-15)
+
+
+
+STATUS: COMPLETE
+
+
+
+IMPLEMENTED:
+
+\- Two new modules, \`src/modules/maintenance\` (§3.1–§3.6, §3.9) and \`src/modules/requests\` (§3.7), each built ON TOP of the Task/Follow-up Engine exactly as instructed — neither has its own reminder, scheduler, escalation, or comment system.
+
+\- Maintenance: 12 categories (§3.1); report with category/location/description/priority/photos/attachments (§3.2); the full SUBMITTED → ACKNOWLEDGED → ASSIGNED → IN\_PROGRESS → RESOLVED → VERIFIED → CLOSED lifecycle plus a distinct REOPENED action (§3.3); complainant tracking — complaint id, status, assigned person, timeline (via history), updates, expected resolution (the linked Task's deadline), resolution details, "notify complainant" on resolution, Confirm Resolved, Reopen (§3.4); assign/reassign/change-priority/set-deadline/add-updates/resolve/reopen, all Secretary or delegated-Coordinator, all audited (§3.5); SLA/deadline/overdue/reminders/escalation — entirely via the linked Task's existing job-driven overdue-check, which auto-escalates to the Technical Secretary (§3.6); the Maintenance Dashboard — open/critical/overdue/assigned/in-progress/resolved counts, average response/resolution time, category and location analytics, recurring-issue detection (3+ reports at one location), escalation count (read from Task.escalatedAt), and Coordinator workload (§3.9).
+
+\- Generic Requests (§3.7): SUBMITTED → REVIEW → ASSIGNED → IN\_PROGRESS → COMPLETED → CLOSED, plus a REVIEW→CLOSED rejection shortcut; requester/type/description/attachments/priority/owner/deadline/approval-rejection/comments(via the linked Task)/history(via audit)/linked-task, exactly as specified.
+
+\- Photos/attachments for both domains reuse the EXISTING generic file-storage module (\`src/lib/file-storage.ts\`, explicitly documented there as "generic on purpose... the future \[feature\] extends this same module rather than introducing a second storage path") and the existing \`FileAsset\` table (classification PUBLIC) — two new lightweight join tables (\`MaintenanceAttachment\`, \`RequestAttachment\`) are the only additions, mirroring the existing InternshipOutcome-certificate pattern.
+
+\- "History"/"timeline" for both domains is served by the EXISTING AuditLog, via one new, narrowly-scoped \`PrismaAuditRecorder.listForEntity(targetEntityType, targetEntityId)\` method (mirrors the table's own pre-existing targetEntityType/targetEntityId index) — no per-domain event-sourcing table was built.
+
+\- Coordinator delegation reuses the EXISTING granular-permission catalog from Phase 1 (\`maintenance.view/create/assign/manage\`, already forward-declared then; \`requests.view/requests.manage\` added now, the exact "add a key once a real phase needs it" case that catalog's own doc comment anticipated) and the EXISTING \`hasCoordinatorPermission\` check — no new authorization primitive.
+
+
+
+ARCHITECTURE — how "built on top of the Task Engine" actually works: a MaintenanceIssue/Request carries its own richer, domain-specific status (its lifecycle has stages — ACKNOWLEDGED, VERIFIED, REVIEW/decision — a generic Task doesn't and shouldn't model). Once Secretary/Coordinator ASSIGNs it, exactly one Task row is created (\`relatedEntityType: "MaintenanceIssue"\` or \`"Request"\`, owner = assignee, deadline = the issue/request's own SLA deadline) via the Task Engine's own \`createTaskUseCase\` — completely unmodified. From that point on, the linked Task is the SLA/reminder/overdue-detection/escalation/comments backend: \`AssignMaintenanceIssueUseCase\`/\`ResolveMaintenanceIssueUseCase\`/etc. call the Task Engine's own \`setTaskStatusUseCase\`/\`reassignTaskUseCase\`/\`reopenTaskUseCase\`/\`addTaskCommentUseCase\` to keep it in sync, through a small per-module bridge (\`application/task-engine-bridge.ts\`) that deliberately elevates the calling actor to a Secretary-shaped one ONLY for these internal calls — Task Engine's own owner/creator-only authorization has no way to know a Coordinator was independently delegated \`maintenance.manage\`/\`requests.manage\` at the higher layer, and elevation (keeping the real user's id, only changing the role check) is what lets an already-authorized Maintenance/Request action drive its Task without being incorrectly rejected. \`taskId\` on both new models is a plain, unconstrained UUID column — the exact same FK-less "polymorphic pointer" convention \`Task.relatedEntityId\` itself already established — so the Task Engine needed zero schema or code changes to support either new domain.
+
+
+
+FILES CHANGED (full list intentionally not duplicated — see \`git diff\`): \`prisma/schema.prisma\` (4 enums, 4 tables — \`maintenance\_issues\`, \`maintenance\_attachments\`, \`requests\`, \`request\_attachments\` — fully additive); \`src/modules/maintenance/\*\*\` and \`src/modules/requests/\*\*\` (new modules: domain, application incl. task-engine-bridge, infrastructure, presentation); \`src/modules/tasks/index.ts\` (exports \`setTaskStatusUseCase\`/\`reassignTaskUseCase\`/\`reopenTaskUseCase\`/\`updateTaskUseCase\`/\`addTaskCommentUseCase\` for this cross-module reuse — the Task Engine's own use-case classes/logic are untouched); \`src/lib/audit.ts\` (added \`listForEntity\`); \`src/lib/audit-actions.ts\` (new \`MAINTENANCE\_\*\`/\`REQUEST\_\*\` actions); \`src/modules/coordinators/domain/permissions.ts\` + \`src/lib/coordinator-permissions.ts\` (added \`requests.view\`/\`requests.manage\`); \`src/modules/notifications/\*\` (4 new template definitions: \`MAINTENANCE\_ISSUE\_SUBMITTED\`, \`MAINTENANCE\_ISSUE\_RESOLVED\`, \`REQUEST\_SUBMITTED\`, \`REQUEST\_DECIDED\`); \`src/app/(maintenance)/\*\*\`, \`src/app/(requests)/\*\*\`, \`src/app/api/maintenance/\*\*\`, \`src/app/api/requests/\*\*\` (new UI + API routes).
+
+
+
+DATABASE: Migration \`20260814194128\_myarch\_phase2\_maintenance\_requests\` — 4 enums, 4 tables, 5 indexes, 8 foreign keys (all to \`users\`/\`file\_assets\`/each domain's own attachment table — none to \`tasks\`, per the FK-less design above). Fully additive. Rehearsed against local Docker Postgres first (20 migrations applied cleanly), then applied to production Neon — 20/20, zero errors. As with both prior MYARCH migrations, the raw \`prisma migrate diff\` output included the same 4 pairs of spurious \`DROP INDEX\`/\`ALTER COLUMN ... DROP DEFAULT\` statements against the pre-existing \`searchVector\` generated columns (the documented Prisma/\`Unsupported("tsvector")\` limitation) — manually excluded again; re-diffing after applying confirms only that same harmless, pre-existing drift remains.
+
+
+
+APIS: \`/api/maintenance/issues\` (search, report) and its full sub-resource set (\`/[id]\`, \`/acknowledge\`, \`/assign\`, \`/reassign\`, \`/start-progress\`, \`/resolve\`, \`/confirm\`, \`/close\`, \`/reopen\`, \`/updates\`, \`/attachments\`, \`/history\`), \`/api/maintenance/attachments/[id]\` (public file serve, PUBLIC classification only), \`/api/maintenance/dashboard\`; the identical shape under \`/api/requests/\*\` (\`/review\`, \`/decide\`, \`/assign\`, \`/reassign\`, \`/start-progress\`, \`/complete\`, \`/close\`, \`/updates\`, \`/attachments\`, \`/history\`) plus \`/api/requests/attachments/[id]\`. Every route: Route → withAuth (Authentication) → domain permission function (Authorization) → Zod schema (Validation) → use case (Service) → Prisma repository (Database) → NextResponse (Response) — no business logic in a route handler.
+
+
+
+PERMISSIONS (server-side only, never trusted from the frontend):
+
+\- Technical Secretary: unconditional full administration of every issue/request.
+
+\- Coordinator: \`canManageMaintenanceIssue\`/\`canManageRequest\` restrict full management to issues/requests they're delegated (\`maintenance.manage\`/\`requests.manage\`) or currently assigned/own; \`canAssignMaintenanceIssue\` additionally recognizes the narrower \`maintenance.assign\` delegation. A Coordinator with no delegation and no assignment sees and can do nothing on an issue/request that isn't theirs.
+
+\- Student: can create and track only their OWN complaints/requests (\`canViewMaintenanceIssue\`/\`canViewRequest\` check \`requesterId\`, with no override possible via query parameters — verified by a dedicated test); cannot access another student's issue/request at all, not even a filtered view.
+
+\- Complainant-specific actions (Confirm Resolved, Reopen) are gated separately from staff management, matching §3.4's own split between "what staff can do" and "what the complainant can do."
+
+
+
+TESTS: 5 new test files under \`tests/unit/maintenance/\` and \`tests/unit/requests/\` each (10 total), 112 new tests (54 + 58) on top of the Task Engine's own 112 — domain (lifecycle state machines, permissions, overdue/critical predicates), every core use case (report/submit, acknowledge, assign, reassign, add-attachment, search — with explicit authorization-boundary and pagination coverage), and two dedicated end-to-end workflow tests driving each domain through its ENTIRE lifecycle in one test (SUBMITTED through CLOSED and REOPENED for Maintenance; SUBMITTED through CLOSED, plus the REVIEW-reject shortcut, for Requests) — asserting the linked Task is created/updated/reopened at exactly the right moments via a mocked \`task-engine-bridge\` module (the real Task Engine is already tested on its own terms in \`tests/unit/tasks/\`; re-testing it here would only duplicate that coverage against a live-Prisma-backed singleton these use cases can't otherwise unit-test against). Full repo suite: 224 test files / 1681 tests passing.
+
+
+
+BUILD: \`npx tsc --noEmit\` clean; \`npm run lint\` clean; \`npx next build\` (Turbopack) clean — \`/maintenance\`, \`/maintenance/[id]\`, \`/maintenance/dashboard\`, \`/requests\`, \`/requests/[id]\` all present in the route manifest.
+
+
+
+UI: \`(maintenance)\`/\`(requests)\` route groups (own thin shells, matching \`(tasks)\`'s precedent — Secretary/Coordinator/Student share the same pages, each scoped server-side). Loading/empty/error/unauthorized/success states present throughout; the owner/assignee picker reuses the EXISTING User Directory search endpoint (no new lookup UI). Mobile responsiveness: inherits the same Tailwind responsive grid/flex patterns already used across every other admin/student page in this app; not separately verified at a mobile viewport as part of this phase (no dedicated device/viewport testing tool was used) — flagged honestly rather than claimed as fully verified.
+
+
+
+SECURITY: every write use case re-derives authorization from the loaded issue/request record, never trusts a client-supplied role/ownership claim (mirrors the Task Engine's own posture, and its "verified by a failing test before the fix" precedent for the identical class of Coordinator-boundary bug). Every mutation is audited. Attachments are validated by MIME type (JPEG/PNG/PDF only) and size (5MB max) before ever touching disk.
+
+
+
+KNOWN ISSUES / DEFERRED (by design):
+
+\- \`/maintenance\` and \`/requests\` are not yet linked from the (admin)/(student) sidebar navigation, for the same reason \`/tasks\` wasn't in the §3.8 report — reachable today by direct URL or a notification's destination link; a low-risk follow-up once nav real estate is revisited.
+
+\- The "escalation" dashboard/history story is entirely the Task Engine's own auto-escalation (deadline passes → owner notified → Secretary notified → \`Task.escalatedAt\` set) — there is no Maintenance/Request-specific escalation ladder beyond what §3.6's own example already maps onto that mechanism.
+
+
+
+ACCEPTANCE (roadmap's own criteria below, verified): students can submit issues — yes (\`canReportMaintenanceIssue\` includes STUDENT, tested). Issues persist correctly — yes (Prisma-backed, tested). Assignment works — yes (creates the linked Task, tested). Tracking works — yes (\`GetMaintenanceIssueUseCase\` + history route). Resolution works — yes (tested, notifies complainant). Reopening works — yes (tested, reopens the linked Task). Notifications work — yes (4 new templates on the existing pipeline). SLA works — yes (deadline mirrored onto the Task). Escalation works — yes (Task Engine's own auto-escalation, verified via \`escalatedCount\` in dashboard stats and a dedicated job-handler test in the §3.8 suite). Audit works — yes (\`AUDIT\_ACTIONS.MAINTENANCE\_\*\`/\`REQUEST\_\*\`, history endpoint). Dashboard works — yes (all 12 §3.9 metrics implemented and tested via the repository's \`getDashboardStats\`). Authorization works — yes (dedicated permission tests for every role/delegation combination). Mobile workflow works — inherited, not independently verified (see UI note above).
+
+
+
+NEXT: \# 4 — PHASE 3 (CALENDAR, EVENTS \& MEETINGS). Not started, per explicit instruction not to begin it automatically in this session.
 
 
 

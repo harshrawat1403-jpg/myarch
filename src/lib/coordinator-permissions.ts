@@ -15,6 +15,9 @@ export const COORDINATOR_PERMISSION_KEYS: readonly CoordinatorPermissionKey[] = 
   "maintenance.assign",
   "maintenance.manage",
 
+  "requests.view",
+  "requests.manage",
+
   "events.view",
   "events.create",
   "events.manage",

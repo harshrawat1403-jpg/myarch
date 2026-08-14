@@ -41,12 +41,23 @@ export { addTaskCommentRouteHandler } from "./presentation/route-handlers/add-co
 export { searchTasksRouteHandler } from "./presentation/route-handlers/search";
 
 /**
- * Direct use-case access for a future domain module to create/query tasks
- * from its own use cases (e.g. a Maintenance module creating a Task when an
- * issue is submitted) — the same "export the bound use case, not just the
- * route handler" shape as coordinators' `assignBatchUseCase`.
+ * Direct use-case access for a future domain module to create/query/drive
+ * tasks from its own use cases (e.g. the Maintenance module creating a Task
+ * on assignment, then advancing/reassigning/reopening it as the linked
+ * MaintenanceIssue moves through its own lifecycle) — the same "export the
+ * bound use case, not just the route handler" shape as coordinators'
+ * `assignBatchUseCase`.
  */
-export { createTaskUseCase, getTaskUseCase, searchTasksUseCase } from "./infrastructure/container";
+export {
+  createTaskUseCase,
+  getTaskUseCase,
+  searchTasksUseCase,
+  setTaskStatusUseCase,
+  reassignTaskUseCase,
+  reopenTaskUseCase,
+  updateTaskUseCase,
+  addTaskCommentUseCase,
+} from "./infrastructure/container";
 
 // Called explicitly by scripts/run-worker.ts to register this module's
 // TASK_REMINDER_CHECK/TASK_OVERDUE_CHECK handlers into the shared job

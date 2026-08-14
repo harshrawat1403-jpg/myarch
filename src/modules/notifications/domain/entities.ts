@@ -38,7 +38,12 @@ export type NotificationTemplateId =
   | "TASK_DEADLINE_APPROACHING"
   | "TASK_OVERDUE"
   | "TASK_COMPLETED"
-  | "TASK_ESCALATED";
+  | "TASK_ESCALATED"
+  // MYARCH Phase 2 (§3.1–§3.7) — Maintenance & Generic Requests.
+  | "MAINTENANCE_ISSUE_SUBMITTED"
+  | "MAINTENANCE_ISSUE_RESOLVED"
+  | "REQUEST_SUBMITTED"
+  | "REQUEST_DECIDED";
 
 /**
  * The one thing a business use case knows about a notification: who should

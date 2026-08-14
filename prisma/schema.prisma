@@ -59,6 +59,47 @@ enum TaskPriority {
   URGENT
 }
 
+// MYARCH Phase 2 (§3.1/§3.7) — Maintenance & Generic Requests.
+enum MaintenanceCategory {
+  ELECTRICAL
+  PLUMBING
+  FURNITURE
+  HVAC
+  NETWORK
+  CLASSROOM_STUDIO
+  LAB
+  EQUIPMENT
+  CLEANING
+  SAFETY
+  CIVIL_BUILDING
+  OTHER
+}
+
+enum MaintenanceIssueStatus {
+  SUBMITTED
+  ACKNOWLEDGED
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  VERIFIED
+  CLOSED
+  REOPENED
+}
+
+enum RequestStatus {
+  SUBMITTED
+  REVIEW
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CLOSED
+}
+
+enum RequestDecision {
+  APPROVED
+  REJECTED
+}
+
 enum BatchStatus {
   ACTIVE
   GRADUATED
@@ -236,6 +277,12 @@ model User {
   tasksCreated       Task[]        @relation("TaskCreator")
   tasksEscalatedToMe Task[]        @relation("TaskEscalatedTo")
   taskComments       TaskComment[] @relation("TaskCommentAuthor")
+
+  // MYARCH Phase 2 (§3.1–§3.7) — Maintenance & Generic Requests.
+  maintenanceIssuesReported MaintenanceIssue[] @relation("MaintenanceIssueRequester")
+  maintenanceIssuesAssigned MaintenanceIssue[] @relation("MaintenanceIssueAssignee")
+  requestsSubmitted         Request[]          @relation("RequestRequester")
+  requestsOwned             Request[]          @relation("RequestOwner")
 
   @@map("users")
 }
@@ -660,6 +707,8 @@ model FileAsset {
   usedAsCertificateOf       InternshipOutcome?          @relation("InternshipCertificate")
   usedAsTemplateThumbnailOf PublicationTemplate?        @relation("PublicationTemplateThumbnail")
   usedAsPublicationExportOf PublicationExport?          @relation("PublicationExportFile")
+  usedAsMaintenanceAttachmentOf MaintenanceAttachment[] @relation("MaintenanceAttachmentFile")
+  usedAsRequestAttachmentOf     RequestAttachment[]     @relation("RequestAttachmentFile")
 
   @@index([ownerUserId])
   @@map("file_assets")
@@ -1023,6 +1072,115 @@ model TaskComment {
 
   @@index([taskId])
   @@map("task_comments")
+}
+
+// ---------------------------------------------------------------------------
+// MYARCH Phase 2 (§3.1–§3.7) — Maintenance & Generic Requests, built on top
+// of the Task Engine above. Neither model gets its own reminder/escalation/
+// comment system: once a MaintenanceIssue/Request is assigned, a single Task
+// row is created (owner = assignee, relatedEntityType/relatedEntityId
+// pointing back here) and every SLA/deadline/reminder/overdue-detection/
+// escalation/update-comment need is served by the EXISTING Task Engine
+// unchanged. `taskId` below is a plain, FK-less pointer to that Task —
+// mirrors Task.relatedEntityId's own already-established "polymorphic
+// cross-domain reference = plain column, no enforced FK" convention; the
+// Task Engine itself never needs to know either of these models exist.
+// ---------------------------------------------------------------------------
+
+model MaintenanceIssue {
+  id          String                  @id @default(uuid()) @db.Uuid
+  category    MaintenanceCategory
+  location    String
+  description String
+  priority    TaskPriority            @default(MEDIUM)
+  status      MaintenanceIssueStatus  @default(SUBMITTED)
+
+  requesterId String @db.Uuid
+  requester   User   @relation("MaintenanceIssueRequester", fields: [requesterId], references: [id])
+  assigneeId  String? @db.Uuid
+  assignee    User?   @relation("MaintenanceIssueAssignee", fields: [assigneeId], references: [id])
+
+  // SLA deadline — mirrored onto the linked Task's own `deadline` at
+  // assignment time so the Task Engine's existing overdue/escalation job
+  // handles it; kept here too for display and dashboard aggregation without
+  // an extra join.
+  deadline DateTime?
+  taskId   String?   @unique @db.Uuid
+
+  resolutionDetails String?
+  // Used for the dashboard's "average response time" (acknowledgedAt -
+  // createdAt) and "average resolution time" (resolvedAt - createdAt)
+  // metrics — the only two lifecycle timestamps besides createdAt/updatedAt
+  // worth a dedicated column; the full stage-by-stage history is served by
+  // the existing AuditLog (targetEntityType "MaintenanceIssue"), not
+  // duplicated here.
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attachments MaintenanceAttachment[]
+
+  @@index([status])
+  @@index([requesterId])
+  @@index([assigneeId])
+  @@index([category])
+  @@map("maintenance_issues")
+}
+
+model MaintenanceAttachment {
+  id        String            @id @default(uuid()) @db.Uuid
+  issueId   String            @db.Uuid
+  issue     MaintenanceIssue  @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  fileId    String            @db.Uuid
+  file      FileAsset         @relation("MaintenanceAttachmentFile", fields: [fileId], references: [id])
+  createdAt DateTime          @default(now())
+
+  @@index([issueId])
+  @@map("maintenance_attachments")
+}
+
+model Request {
+  id          String        @id @default(uuid()) @db.Uuid
+  type        String
+  description String
+  priority    TaskPriority  @default(MEDIUM)
+  status      RequestStatus @default(SUBMITTED)
+
+  requesterId String @db.Uuid
+  requester   User   @relation("RequestRequester", fields: [requesterId], references: [id])
+  ownerId     String? @db.Uuid
+  owner       User?   @relation("RequestOwner", fields: [ownerId], references: [id])
+
+  deadline DateTime?
+  taskId   String?   @unique @db.Uuid
+
+  decision       RequestDecision?
+  decisionReason String?
+  decidedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attachments RequestAttachment[]
+
+  @@index([status])
+  @@index([requesterId])
+  @@index([ownerId])
+  @@map("requests")
+}
+
+model RequestAttachment {
+  id        String   @id @default(uuid()) @db.Uuid
+  requestId String   @db.Uuid
+  request   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fileId    String   @db.Uuid
+  file      FileAsset @relation("RequestAttachmentFile", fields: [fileId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([requestId])
+  @@map("request_attachments")
 }
 
 // ---------------------------------------------------------------------------

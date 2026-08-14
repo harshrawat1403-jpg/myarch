@@ -21,6 +21,11 @@ export const COORDINATOR_PERMISSION_KEYS = [
   "maintenance.assign",
   "maintenance.manage",
 
+  // MYARCH Phase 2 (§3.7) — Generic Request System, added now that a real
+  // phase needs it (not speculative — see this file's own doc comment).
+  "requests.view",
+  "requests.manage",
+
   "events.view",
   "events.create",
   "events.manage",
