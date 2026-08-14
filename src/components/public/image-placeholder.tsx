@@ -59,9 +59,10 @@ const TONE_ICON_CLASSES: Record<NonNullable<ImagePlaceholderProps["tone"]>, stri
  *
  * MYARCH public showcase: renders no visible text at all — no "Editable"
  * corner tag, no centered caption. Both were, in different ways, an editor-
- * facing scaffold leaking into the public/demo experience; a missing-image
- * slot should read as an intentional, polished empty state (icon + soft
- * gradient field only), not as a labeled gap waiting to be filled in.
+ * facing scaffold leaking into the public marketing experience; a
+ * missing-image slot should read as an intentional, polished empty state
+ * (icon + soft gradient field only), not as a labeled gap waiting to be
+ * filled in.
  * `label` still carries the same honest description it always did — it's
  * just the element's `aria-label` now, never painted on screen.
  */

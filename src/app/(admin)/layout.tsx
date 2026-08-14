@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { useRequireRole } from "@/lib/use-require-role";
-import { useDemoSession } from "@/lib/use-demo-session";
 import { SheetLayout, type NavItem } from "@/components/sheet-layout";
 import { LoadingScreen } from "@/components/loading-screen";
 
@@ -143,19 +142,10 @@ function formatScopeLabel(batchScope: readonly string[] | null): string | undefi
  */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { role, batchScope } = useAuth();
-  // Public MYARCH showcase — "Switch Demo"/"Exit Demo" in SheetLayout's demo
-  // banner, distinct from the normal UserMenu logout (still wired to
-  // handleLogout below, unchanged). Switching goes straight to the target
-  // persona's own dashboard; exiting returns to the public landing page,
-  // never /login. Read before useRequireRole so its `pending` can suppress
-  // that guard's redirect while a switch/exit is applying new session state
-  // out from under the still-mounted (old-persona) layout — see
-  // useRequireRole's own doc comment for the race this prevents.
-  const { isDemo, pending: demoPending, switchDemo, exitDemo } = useDemoSession();
-  const { isLoading, isAuthorized, isBlockedByPasswordChange, handleLogout } = useRequireRole(
-    ["SECRETARY", "COORDINATOR"],
-    { suppressRedirect: demoPending !== null },
-  );
+  const { isLoading, isAuthorized, isBlockedByPasswordChange, handleLogout } = useRequireRole([
+    "SECRETARY",
+    "COORDINATOR",
+  ]);
 
   if (isLoading || !isAuthorized || isBlockedByPasswordChange || !role) {
     return <LoadingScreen />;
@@ -178,10 +168,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       scopeLabel={scopeLabel}
       accountSettingsHref="/dashboard/account"
       onLogout={handleLogout}
-      isDemo={isDemo}
-      demoPending={demoPending}
-      onSwitchDemo={switchDemo}
-      onExitDemo={exitDemo}
     >
       {children}
     </SheetLayout>

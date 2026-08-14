@@ -2,14 +2,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ToastProvider } from "@/components/ui/toast";
-
-// useDemoSession (SheetLayout's "Switch Demo" control) calls useToast(),
-// which throws without a provider — production always has one (mounted at
-// src/app/layout.tsx), so it's supplied here rather than mocked away.
-function renderLayout(children: React.ReactNode) {
-  return render(<ToastProvider>{children}</ToastProvider>);
-}
 
 const replaceMock = vi.fn();
 let mockAuthState: {
@@ -37,7 +29,7 @@ describe("StudentLayout — Student-only route protection", () => {
 
   it("shows a loading state and does not redirect while auth status is resolving", () => {
     mockAuthState = { isLoading: true, isAuthenticated: false, role: null, logout: vi.fn() };
-    renderLayout(<StudentLayout>{"content"}</StudentLayout>);
+    render(<StudentLayout>{"content"}</StudentLayout>);
 
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
     expect(replaceMock).not.toHaveBeenCalled();
@@ -45,28 +37,28 @@ describe("StudentLayout — Student-only route protection", () => {
 
   it("redirects to /login when not authenticated", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: false, role: null, logout: vi.fn() };
-    renderLayout(<StudentLayout>{"content"}</StudentLayout>);
+    render(<StudentLayout>{"content"}</StudentLayout>);
 
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/login"));
   });
 
   it("redirects a Secretary to /login — this portal is Student-only", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "SECRETARY", logout: vi.fn() };
-    renderLayout(<StudentLayout>{"content"}</StudentLayout>);
+    render(<StudentLayout>{"content"}</StudentLayout>);
 
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/login"));
   });
 
   it("redirects a Recruiter to /login", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "RECRUITER", logout: vi.fn() };
-    renderLayout(<StudentLayout>{"content"}</StudentLayout>);
+    render(<StudentLayout>{"content"}</StudentLayout>);
 
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/login"));
   });
 
   it("renders the portal shell and children for a Student — no redirect", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "STUDENT", logout: vi.fn() };
-    renderLayout(<StudentLayout>{"student content"}</StudentLayout>);
+    render(<StudentLayout>{"student content"}</StudentLayout>);
 
     expect(await screen.findByText("student content")).toBeInTheDocument();
     expect(replaceMock).not.toHaveBeenCalled();
@@ -74,7 +66,7 @@ describe("StudentLayout — Student-only route protection", () => {
 
   it("links to /student/applications (V4.0 D2)", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "STUDENT", logout: vi.fn() };
-    renderLayout(<StudentLayout>{"student content"}</StudentLayout>);
+    render(<StudentLayout>{"student content"}</StudentLayout>);
 
     await screen.findByText("student content");
     expect(screen.getByRole("link", { name: /applications/i })).toHaveAttribute("href", "/student/applications");
@@ -82,7 +74,7 @@ describe("StudentLayout — Student-only route protection", () => {
 
   it("links to /student/interests (V4.0 C3)", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "STUDENT", logout: vi.fn() };
-    renderLayout(<StudentLayout>{"student content"}</StudentLayout>);
+    render(<StudentLayout>{"student content"}</StudentLayout>);
 
     await screen.findByText("student content");
     expect(screen.getByRole("link", { name: /interests/i })).toHaveAttribute("href", "/student/interests");
@@ -90,7 +82,7 @@ describe("StudentLayout — Student-only route protection", () => {
 
   it("links Overview to /student and My Profile to /student/profile (V4.0 D6 — career hub split)", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "STUDENT", logout: vi.fn() };
-    renderLayout(<StudentLayout>{"student content"}</StudentLayout>);
+    render(<StudentLayout>{"student content"}</StudentLayout>);
 
     await screen.findByText("student content");
     expect(screen.getByRole("link", { name: /^overview$/i })).toHaveAttribute("href", "/student");
@@ -100,7 +92,7 @@ describe("StudentLayout — Student-only route protection", () => {
   it("offers Account Settings from the user menu, linking to /student/account (V4.0 A3 parity fix)", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "STUDENT", logout: vi.fn() };
     const user = userEvent.setup();
-    renderLayout(<StudentLayout>{"student content"}</StudentLayout>);
+    render(<StudentLayout>{"student content"}</StudentLayout>);
 
     await screen.findByText("student content");
     await user.click(screen.getByRole("button", { name: /account menu/i }));

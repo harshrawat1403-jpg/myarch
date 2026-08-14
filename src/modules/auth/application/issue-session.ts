@@ -39,7 +39,6 @@ export async function issueSessionTokens(
     batchScope: actor.batchScope,
     studentProfileId: actor.studentProfileId,
     mustChangePassword: actor.mustChangePassword,
-    isDemo: actor.isDemo,
   });
 
   const rawRefreshToken = deps.tokenService.generateRefreshToken();

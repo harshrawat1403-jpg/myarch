@@ -77,11 +77,3 @@ export class InvalidAvatarFileError extends Error {
     this.name = "InvalidAvatarFileError";
   }
 }
-
-/** Public MYARCH showcase: DemoLoginUseCase, the requested persona's fixed seed account (domain/demo-accounts.ts) doesn't exist in this environment — e.g. `npm run db:seed` was never run. */
-export class DemoAccountNotSeededError extends Error {
-  constructor() {
-    super("This demo account has not been seeded in this environment");
-    this.name = "DemoAccountNotSeededError";
-  }
-}

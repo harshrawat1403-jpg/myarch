@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import type { AuthenticatedActor } from "../../domain/entities";
-import { isReservedDemoAccountEmail } from "../../domain/demo-accounts";
 import { InvalidCredentialsError } from "../../domain/errors";
 import { issueSessionTokens } from "../issue-session";
 import type { AuditRecorder } from "../ports/audit-recorder";
@@ -38,15 +37,7 @@ export class LoginUseCase {
 
   async execute(input: LoginInput): Promise<LoginResult> {
     const normalizedEmail = input.email.trim().toLowerCase();
-    // Reserved demo accounts (see domain/demo-accounts.ts) are only ever
-    // reachable through /api/auth/demo-login, which always issues a
-    // read-only `isDemo: true` session. Treated identically to "no such
-    // user" below (including the timing-safe dummy-hash comparison) so
-    // ordinary password login can never mint a full, non-demo session for
-    // one of these publicly-documented seed accounts.
-    const user = isReservedDemoAccountEmail(normalizedEmail)
-      ? null
-      : await this.deps.userRepository.findByEmail(normalizedEmail);
+    const user = await this.deps.userRepository.findByEmail(normalizedEmail);
 
     // Always run a real password comparison, even when no user is found,
     // against a precomputed dummy hash of matching cost — so response

@@ -10,8 +10,6 @@ import { UserMenu } from "@/components/user-menu";
 import { NotificationBell } from "@/components/notification-bell";
 import { Logo } from "@/components/logo";
 import { CommandPalette } from "@/components/command-palette";
-import { DemoSwitchMenu } from "@/components/demo-switch-menu";
-import type { DemoPersona } from "@/lib/demo-persona";
 
 export interface NavItem {
   href: string;
@@ -30,12 +28,6 @@ export interface SheetLayoutProps {
   /** V3.0: passed through to UserMenu's optional "Account Settings" link — see UserMenuProps's doc comment. */
   accountSettingsHref?: string;
   onLogout: () => void;
-  /** Public MYARCH showcase — renders a persistent "DEMO MODE" strip with a "Switch Demo" control (jump directly to another persona) and Exit Demo. The real read-only enforcement is server-side (with-auth.ts's `isDemo` gate); this is purely so a visitor always knows they're in a demo, not a real account, and never has to backtrack to the landing page to explore a different role. */
-  isDemo?: boolean;
-  /** The persona currently being switched into, `"EXIT"` while exiting, or `undefined`/`null` when idle — see useDemoSession. */
-  demoPending?: DemoPersona | "EXIT" | null;
-  onSwitchDemo?: (persona: DemoPersona) => void;
-  onExitDemo?: () => void;
   children: ReactNode;
 }
 
@@ -106,10 +98,6 @@ export function SheetLayout({
   scopeLabel,
   accountSettingsHref,
   onLogout,
-  isDemo = false,
-  demoPending = null,
-  onSwitchDemo,
-  onExitDemo,
   children,
 }: SheetLayoutProps) {
   const pathname = usePathname();
@@ -206,14 +194,6 @@ export function SheetLayout({
 
   return (
     <div className="flex min-h-screen flex-col bg-(--color-background)">
-      {isDemo && (
-        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 bg-(--color-accent) px-4 py-2 text-center text-xs font-semibold text-white sm:text-sm">
-          <span>DEMO MODE — Exploring a demonstration account. Nothing you do here is saved.</span>
-          {onSwitchDemo && onExitDemo && (
-            <DemoSwitchMenu pending={demoPending} onSwitchDemo={onSwitchDemo} onExitDemo={onExitDemo} />
-          )}
-        </div>
-      )}
       <div className="flex flex-1">
         {/* Desktop: floating, collapsible sidebar. */}
         <aside

@@ -23,16 +23,6 @@ export function passwordChangeRequired(message: string): NextResponse {
   return NextResponse.json({ error: { code: "MUST_CHANGE_PASSWORD", message } }, { status: 403 });
 }
 
-/**
- * Public showcase demo sessions (`AuthenticatedActor.isDemo`) are read-only
- * platform-wide — see with-auth.ts. A distinct code, same shape as
- * `passwordChangeRequired` above, so the frontend can show a friendly
- * "this is a demo" message rather than a generic permission error.
- */
-export function demoActionBlocked(message: string): NextResponse {
-  return NextResponse.json({ error: { code: "DEMO_READ_ONLY", message } }, { status: 403 });
-}
-
 export function badRequest(message: string, details?: unknown): NextResponse {
   return NextResponse.json(
     { error: { code: "VALIDATION_ERROR", message, details } },
@@ -46,11 +36,6 @@ export function notFound(message: string): NextResponse {
 
 export function conflict(message: string): NextResponse {
   return NextResponse.json({ error: { code: "CONFLICT", message } }, { status: 409 });
-}
-
-/** An unexpected failure (DB unreachable, misconfigured environment, etc.) that isn't the caller's fault and carries no safe-to-expose detail — the message must stay generic; log the real cause server-side at the call site instead. */
-export function serviceUnavailable(message: string): NextResponse {
-  return NextResponse.json({ error: { code: "SERVICE_UNAVAILABLE", message } }, { status: 503 });
 }
 
 export function tooManyRequests(message: string, retryAfterMs?: number): NextResponse {

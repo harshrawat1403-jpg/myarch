@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -8,17 +8,13 @@ import {
   Building2,
   CircleUser,
   ClipboardList,
-  GraduationCap,
   LogIn,
-  ShieldCheck,
   Users2,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
-import { ApiError } from "@/lib/api-client";
 import { roleHomePath } from "@/lib/role-home-path";
-import type { DemoPersona } from "@/lib/demo-persona";
 import { buttonClassName } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PageTitle, SectionHeading, DataLabel, CardTitle } from "@/components/ui/typography";
@@ -49,32 +45,6 @@ const UPDATE_TONE_CLASSES = [
   "text-(--color-secondary)",
 ];
 
-const DEMO_ENTRIES: {
-  persona: DemoPersona;
-  label: string;
-  description: string;
-  icon: LucideIcon;
-}[] = [
-  {
-    persona: "STUDENT",
-    label: "Visit as Student",
-    description: "Profile, applications, recruiter interest.",
-    icon: GraduationCap,
-  },
-  {
-    persona: "RECRUITER",
-    label: "Visit as Recruiter",
-    description: "Browse the directory, save, express interest.",
-    icon: Users2,
-  },
-  {
-    persona: "ADMIN",
-    label: "Visit as Demo Admin",
-    description: "The administrative view — read-only.",
-    icon: ShieldCheck,
-  },
-];
-
 /**
  * `/` — the public marketing Home page. An authenticated session is still
  * bounced straight to its own portal (see `roleHomePath`); only an
@@ -95,29 +65,13 @@ const DEMO_ENTRIES: {
  * were for the other public pages that still use them.
  */
 export default function Home() {
-  const { isLoading, isAuthenticated, role, loginAsDemo } = useAuth();
+  const { isLoading, isAuthenticated, role } = useAuth();
   const router = useRouter();
-  const [pendingDemo, setPendingDemo] = useState<DemoPersona | null>(null);
-  const [demoError, setDemoError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isLoading || !isAuthenticated) return;
     router.replace(roleHomePath(role));
   }, [isLoading, isAuthenticated, role, router]);
-
-  async function handleDemoEntry(persona: DemoPersona) {
-    setDemoError(null);
-    setPendingDemo(persona);
-    try {
-      const { role: demoRole } = await loginAsDemo(persona);
-      router.push(roleHomePath(demoRole));
-    } catch (err) {
-      setDemoError(
-        err instanceof ApiError ? err.message : "Couldn't start the demo. Please try again.",
-      );
-      setPendingDemo(null);
-    }
-  }
 
   if (isLoading || isAuthenticated) {
     return (
@@ -171,54 +125,6 @@ export default function Home() {
             />
           </div>
         </div>
-      </section>
-
-      {/* MYARCH public showcase — explore any of the three real portals
-          without an account. Immediately after the hero, its own visually
-          distinct callout panel (not folded into the hero's two CTAs, not
-          anywhere near the logo/nav) so it reads as a deliberate, separate
-          offer — "try it yourself" — rather than a third link competing
-          with "Explore Placements" / "Sign In". */}
-      <section className="border-b border-(--color-border) bg-(--color-surface)">
-        <PageContainer className="py-10 lg:py-14">
-          <div className="rounded-3xl border-2 border-(--color-accent)/25 bg-(--color-accent-soft) p-6 sm:p-8 lg:p-10">
-            <DataLabel className="text-(--color-accent)">Try the demo</DataLabel>
-            <SectionHeading className="mt-2 text-2xl lg:text-3xl">
-              Explore the complete MYARCH platform without signing in
-            </SectionHeading>
-            <p className="mt-2 max-w-2xl text-sm text-(--color-text-secondary)">
-              Step into a live demonstration account for the Student, Recruiter, or Admin
-              experience — nothing you do there is saved.
-            </p>
-            {demoError && (
-              <p role="alert" className="mt-4 text-sm font-medium text-(--color-highlight)">
-                {demoError}
-              </p>
-            )}
-            <div className="mt-6 grid gap-4 sm:grid-cols-3">
-              {DEMO_ENTRIES.map(({ persona, label, description, icon: Icon }) => (
-                <button
-                  key={persona}
-                  type="button"
-                  onClick={() => handleDemoEntry(persona)}
-                  disabled={pendingDemo !== null}
-                  className="flex flex-col items-start gap-2 rounded-2xl border border-(--color-border) bg-(--color-surface) p-5 text-left shadow-sm transition-colors duration-150 hover:border-(--color-accent) disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-(--color-accent-soft) text-(--color-accent)">
-                    <Icon aria-hidden="true" size={20} strokeWidth={1.75} />
-                  </span>
-                  <span className="font-[family-name:var(--font-display)] text-base font-semibold text-(--color-text-primary)">
-                    {pendingDemo === persona ? "Opening…" : label}
-                  </span>
-                  <span className="text-xs text-(--color-text-secondary)">{description}</span>
-                </button>
-              ))}
-            </div>
-            <p className="mt-6 text-xs font-semibold uppercase tracking-wide text-(--color-text-secondary)">
-              No account required · Explore the platform
-            </p>
-          </div>
-        </PageContainer>
       </section>
 
       {/* 2 — Stats: a plain full-width typographic band, no card in

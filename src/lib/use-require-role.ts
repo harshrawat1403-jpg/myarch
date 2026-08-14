@@ -25,29 +25,16 @@ export interface RequireRoleResult {
  * that would just get 403s back from every fetch. The real authorization
  * is still enforced server-side on every API call via `withAuth`, exactly
  * as before — this hook never substitutes for that.
- *
- * `suppressRedirect` (passed by callers using `useDemoSession`, e.g.
- * SheetLayout's "Switch Demo" control): while a demo persona switch/exit is
- * in flight, `useDemoSession` applies the new session state (role/
- * isAuthenticated) before its own navigation lands on the new route — this
- * guard would otherwise see a transient mismatch on the OLD route and
- * redirect to /login, racing the intended navigation. Real sessions never
- * pass this flag, so it never suppresses a redirect for an actually
- * unauthorized visitor.
  */
-export function useRequireRole(
-  allowedRoles: readonly string[],
-  options?: { suppressRedirect?: boolean },
-): RequireRoleResult {
+export function useRequireRole(allowedRoles: readonly string[]): RequireRoleResult {
   const { isLoading, isAuthenticated, role, mustChangePassword, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const isAuthorized = isAuthenticated && role !== null && allowedRoles.includes(role);
   const isBlockedByPasswordChange = mustChangePassword && pathname !== "/change-password";
-  const suppressRedirect = options?.suppressRedirect ?? false;
 
   useEffect(() => {
-    if (isLoading || suppressRedirect) return;
+    if (isLoading) return;
     if (!isAuthorized) {
       router.replace("/login");
       return;
@@ -61,7 +48,7 @@ export function useRequireRole(
     if (isBlockedByPasswordChange) {
       router.replace("/change-password");
     }
-  }, [isLoading, isAuthorized, isBlockedByPasswordChange, suppressRedirect, router]);
+  }, [isLoading, isAuthorized, isBlockedByPasswordChange, router]);
 
   async function handleLogout() {
     await logout();

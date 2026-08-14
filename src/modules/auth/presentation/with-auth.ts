@@ -3,7 +3,6 @@ import type { AuthenticatedActor, Role } from "../domain/entities";
 import type { TokenService } from "../application/ports/token-service";
 import type { RateLimiter } from "@/lib/rate-limit";
 import {
-  demoActionBlocked,
   forbidden,
   passwordChangeRequired,
   tooManyRequests,
@@ -113,7 +112,6 @@ export function createAuthMiddleware(tokenService: Pick<TokenService, "verifyAcc
         batchScope: claims.batchScope,
         studentProfileId: claims.studentProfileId,
         mustChangePassword: claims.mustChangePassword,
-        isDemo: claims.isDemo,
       };
 
       // 2.5. Forced password-change gate — before role/scope checks, since a
@@ -121,19 +119,6 @@ export function createAuthMiddleware(tokenService: Pick<TokenService, "verifyAcc
       // regardless of what role it holds.
       if (actor.mustChangePassword && !options.allowMustChangePassword) {
         return passwordChangeRequired("You must change your password before continuing");
-      }
-
-      // 2.6. Public showcase demo sessions (isDemo — see
-      // domain/entities.ts's doc comment and domain/demo-accounts.ts) are
-      // read-only across the entire API, regardless of role or which
-      // specific action a route performs — the single, centrally-enforced
-      // guarantee that a public visitor can look around the real dashboards
-      // but can never create, change, or delete anything. GET requests
-      // (and HEAD) are unaffected.
-      if (actor.isDemo && req.method !== "GET" && req.method !== "HEAD") {
-        return demoActionBlocked(
-          "This is a public demo account — actions aren't saved here. Explore freely.",
-        );
       }
 
       // 3. Role Validation.

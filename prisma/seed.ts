@@ -1,9 +1,8 @@
 /**
- * MYARCH public showcase seed data — creates the fixed set of accounts the
- * public demo (`/api/auth/demo-login`, see
- * src/modules/auth/domain/demo-accounts.ts) signs a visitor into, plus a
- * ten-student roster giving the Recruiter directory, the Coordinator's
- * approval queue, and each student's own profile something real to show.
+ * MYARCH showcase seed data — creates a fixed set of Secretary/Coordinator/
+ * Recruiter accounts plus a ten-student roster giving the Recruiter
+ * directory, the Coordinator's approval queue, and each student's own
+ * profile something real to show.
  *
  * NEVER run against a production database with real student data — this
  * script is idempotent-by-email (safe to re-run in a scratch dev/staging/
@@ -23,10 +22,7 @@ const prisma = new PrismaClient();
 
 // Seed-only password for every account created here. Documented loudly
 // on purpose: never use this outside a throwaway dev/staging/showcase
-// database. (The three demo personas never use this password to sign in —
-// see domain/demo-accounts.ts — but the underlying accounts still need a
-// real hash to satisfy the schema, and it lets the Secretary/Coordinator
-// accounts still be used for a normal, non-demo /login if needed.)
+// database.
 const SEED_PASSWORD = "Password123!";
 
 async function upsertUser(
@@ -61,12 +57,9 @@ interface ShowcaseStudentSeed {
   profileState: ProfileState;
 }
 
-// Ten fictional B.Arch 2026 students. `gautam@vnit.ac.in` is the account
-// domain/demo-accounts.ts points the "Visit as Student" demo entry at — see
-// that file's own doc comment for why it has to be one specific, real,
-// pre-seeded account rather than an arbitrary one. The other nine exist so
-// the Recruiter directory demo and the Coordinator's approval queue have a
-// realistic, varied roster to show, not a single lonely profile.
+// Ten fictional B.Arch 2026 students, giving the Recruiter directory and
+// the Coordinator's approval queue a realistic, varied roster to show, not
+// a single lonely profile.
 const SHOWCASE_STUDENTS: ShowcaseStudentSeed[] = [
   {
     email: "gautam@vnit.ac.in",
@@ -184,14 +177,12 @@ const SHOWCASE_STUDENTS: ShowcaseStudentSeed[] = [
 async function main() {
   console.log("Seeding MYARCH showcase data (seed password for every account: %s)...", SEED_PASSWORD);
 
-  // Internal only — never a public demo entry point (domain/demo-accounts.ts
-  // has no SECRETARY persona). Kept because approving/publishing a profile
-  // is a Secretary-only action in the real permission model
-  // (canApprovePublicProfile) and publication templates need a real creator
-  // — using this account for that attribution keeps the seed data
-  // internally consistent with how the app actually works, rather than
-  // attributing those rows to the Coordinator, who could never really have
-  // performed them.
+  // Approving/publishing a profile is a Secretary-only action in the real
+  // permission model (canApprovePublicProfile) and publication templates
+  // need a real creator — using this account for that attribution keeps
+  // the seed data internally consistent with how the app actually works,
+  // rather than attributing those rows to the Coordinator, who could never
+  // really have performed them.
   const secretaryUser = await upsertUser("secretary@tnparch.in", "SECRETARY");
   await prisma.secretaryProfile.upsert({
     where: { userId: secretaryUser.id },
@@ -210,10 +201,6 @@ async function main() {
     },
   });
 
-  // Demo Admin (persona ADMIN, domain/demo-accounts.ts) — a Coordinator,
-  // never Secretary: Secretary is unscoped by design, so scoping this
-  // account to exactly one batch is what keeps the public "Demo Admin"
-  // experience structurally confined to this showcase roster.
   const coordinatorUser = await upsertUser("coordinator@tnparch.in", "COORDINATOR");
   const coordinatorProfile = await prisma.coordinatorProfile.upsert({
     where: { userId: coordinatorUser.id },
@@ -228,7 +215,6 @@ async function main() {
     create: { coordinatorProfileId: coordinatorProfile.id, batchId: batch.id },
   });
 
-  // Demo Recruiter (persona RECRUITER, domain/demo-accounts.ts).
   const recruiterUser = await upsertUser("recruiter@example.com", "RECRUITER");
   await prisma.recruiterProfile.upsert({
     where: { userId: recruiterUser.id },
@@ -328,9 +314,9 @@ async function main() {
   const none = SHOWCASE_STUDENTS.filter((s) => s.profileState === "NONE").length;
 
   console.log("Seed complete:");
-  console.log("  Demo Admin (Coordinator, scoped to B.Arch 2026): coordinator@tnparch.in");
-  console.log("  Demo Recruiter:                                  recruiter@example.com");
-  console.log("  Demo Student (primary):                          gautam@vnit.ac.in");
+  console.log("  Coordinator (scoped to B.Arch 2026): coordinator@tnparch.in");
+  console.log("  Recruiter:                            recruiter@example.com");
+  console.log("  Student (primary):                    gautam@vnit.ac.in");
   console.log(
     "  Students seeded: %d (%d published, %d pending review, %d with no draft)",
     SHOWCASE_STUDENTS.length,

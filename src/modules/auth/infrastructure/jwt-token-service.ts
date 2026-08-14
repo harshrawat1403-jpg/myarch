@@ -27,7 +27,6 @@ export class JwtTokenService implements TokenService {
         batchScope: claims.batchScope,
         studentProfileId: claims.studentProfileId,
         mustChangePassword: claims.mustChangePassword,
-        isDemo: claims.isDemo,
       },
       this.config.accessSecret,
       {
@@ -59,7 +58,6 @@ export class JwtTokenService implements TokenService {
       batchScope: decoded["batchScope"] as readonly string[] | undefined,
       studentProfileId: decoded["studentProfileId"] as string | undefined,
       mustChangePassword: decoded["mustChangePassword"] as boolean | undefined,
-      isDemo: decoded["isDemo"] as boolean | undefined,
     };
   }
 

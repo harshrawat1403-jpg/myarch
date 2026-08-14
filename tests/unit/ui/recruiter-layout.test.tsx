@@ -1,14 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ToastProvider } from "@/components/ui/toast";
-
-// useDemoSession (SheetLayout's "Switch Demo" control) calls useToast(),
-// which throws without a provider — production always has one (mounted at
-// src/app/layout.tsx), so it's supplied here rather than mocked away.
-function renderLayout(children: React.ReactNode) {
-  return render(<ToastProvider>{children}</ToastProvider>);
-}
 
 const replaceMock = vi.fn();
 let mockAuthState: {
@@ -36,7 +28,7 @@ describe("RecruiterLayout — isolation from the admin dashboard", () => {
 
   it("shows a loading state and does not redirect while auth status is resolving", () => {
     mockAuthState = { isLoading: true, isAuthenticated: false, role: null, logout: vi.fn() };
-    renderLayout(<RecruiterLayout>{"content"}</RecruiterLayout>);
+    render(<RecruiterLayout>{"content"}</RecruiterLayout>);
 
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
     expect(replaceMock).not.toHaveBeenCalled();
@@ -44,35 +36,35 @@ describe("RecruiterLayout — isolation from the admin dashboard", () => {
 
   it("redirects to /login when not authenticated", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: false, role: null, logout: vi.fn() };
-    renderLayout(<RecruiterLayout>{"content"}</RecruiterLayout>);
+    render(<RecruiterLayout>{"content"}</RecruiterLayout>);
 
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/login"));
   });
 
   it("redirects a Secretary to /login — the recruiter portal is isolated from admin roles", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "SECRETARY", logout: vi.fn() };
-    renderLayout(<RecruiterLayout>{"content"}</RecruiterLayout>);
+    render(<RecruiterLayout>{"content"}</RecruiterLayout>);
 
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/login"));
   });
 
   it("redirects a Coordinator to /login", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "COORDINATOR", logout: vi.fn() };
-    renderLayout(<RecruiterLayout>{"content"}</RecruiterLayout>);
+    render(<RecruiterLayout>{"content"}</RecruiterLayout>);
 
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/login"));
   });
 
   it("redirects a Student to /login", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "STUDENT", logout: vi.fn() };
-    renderLayout(<RecruiterLayout>{"content"}</RecruiterLayout>);
+    render(<RecruiterLayout>{"content"}</RecruiterLayout>);
 
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/login"));
   });
 
   it("renders the portal shell and children for a Recruiter — no redirect", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "RECRUITER", logout: vi.fn() };
-    renderLayout(<RecruiterLayout>{"recruiter content"}</RecruiterLayout>);
+    render(<RecruiterLayout>{"recruiter content"}</RecruiterLayout>);
 
     expect(await screen.findByText("recruiter content")).toBeInTheDocument();
     expect(replaceMock).not.toHaveBeenCalled();
@@ -80,7 +72,7 @@ describe("RecruiterLayout — isolation from the admin dashboard", () => {
 
   it("links Dashboard, Student Directory, Saved, and Interests (V4.0 C4)", async () => {
     mockAuthState = { isLoading: false, isAuthenticated: true, role: "RECRUITER", logout: vi.fn() };
-    renderLayout(<RecruiterLayout>{"recruiter content"}</RecruiterLayout>);
+    render(<RecruiterLayout>{"recruiter content"}</RecruiterLayout>);
 
     await screen.findByText("recruiter content");
     expect(screen.getByRole("link", { name: /^dashboard$/i })).toHaveAttribute("href", "/recruiter");

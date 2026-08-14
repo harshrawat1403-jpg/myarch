@@ -1,9 +1,8 @@
 /**
- * Where a session lands right after signing in — real login (the landing
- * page's own post-auth redirect) and every demo entry point (the landing
- * page's "Visit as ..." buttons, and useDemoSession's in-dashboard
- * switcher) all resolve the same session role through this one function,
- * rather than three copies of the same switch statement.
+ * Where an already-authenticated session lands when it reaches the public
+ * landing page — used by `/`'s own post-auth redirect so an authenticated
+ * visitor is bounced straight to their portal home instead of seeing
+ * marketing content meant for signed-out visitors.
  */
 export function roleHomePath(role: string | null): string {
   switch (role) {

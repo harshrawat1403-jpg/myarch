@@ -230,69 +230,6 @@ describe("withAuth — rate limiting (V4.0 A2)", () => {
   });
 });
 
-describe("withAuth — public showcase demo sessions are read-only", () => {
-  const handler = withAuth(async () => Response.json({ ok: true }));
-
-  it("blocks a POST from a demo session (403 DEMO_READ_ONLY), without invoking the handler", async () => {
-    let handlerCalled = false;
-    const blockingHandler = withAuth(async () => {
-      handlerCalled = true;
-      return Response.json({ ok: true });
-    });
-    const token = tokenService.signAccessToken({
-      sub: "demo-student-1",
-      role: "STUDENT",
-      isDemo: true,
-    });
-
-    const response = await blockingHandler(requestWithToken(token, "POST"));
-    expect(response.status).toBe(403);
-    expect(await jsonOf(response)).toMatchObject({ error: { code: "DEMO_READ_ONLY" } });
-    expect(handlerCalled).toBe(false);
-  });
-
-  it("blocks PATCH/DELETE the same way", async () => {
-    const token = tokenService.signAccessToken({
-      sub: "demo-admin-1",
-      role: "COORDINATOR",
-      isDemo: true,
-    });
-    for (const method of ["PATCH", "DELETE", "PUT"]) {
-      const response = await handler(requestWithToken(token, method));
-      expect(response.status).toBe(403);
-    }
-  });
-
-  it("still allows a GET from a demo session", async () => {
-    const token = tokenService.signAccessToken({
-      sub: "demo-recruiter-1",
-      role: "RECRUITER",
-      isDemo: true,
-    });
-    const response = await handler(requestWithToken(token, "GET"));
-    expect(response.status).toBe(200);
-  });
-
-  it("never restricts a normal (non-demo) session's POST", async () => {
-    const token = tokenService.signAccessToken({ sub: "stu-1", role: "STUDENT" });
-    const response = await handler(requestWithToken(token, "POST"));
-    expect(response.status).toBe(200);
-  });
-
-  it("role validation still applies to a demo session's GET requests", async () => {
-    const secretaryOnlyHandler = withAuth(async () => Response.json({ ok: true }), {
-      roles: ["SECRETARY"],
-    });
-    const token = tokenService.signAccessToken({
-      sub: "demo-admin-1",
-      role: "COORDINATOR",
-      isDemo: true,
-    });
-    const response = await secretaryOnlyHandler(requestWithToken(token, "GET"));
-    expect(response.status).toBe(403);
-  });
-});
-
 describe("withAuth — middleware never runs business logic itself", () => {
   it("the wrapped handler is not invoked when authentication fails", async () => {
     let handlerCalled = false;
