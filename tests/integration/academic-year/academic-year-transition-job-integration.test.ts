@@ -67,7 +67,7 @@ function buildWorld() {
       },
       assignBatch: async (input) => {
         assignedCoordinatorIds.push(input.coordinatorId);
-        return { id: input.coordinatorId, userId: "u", email: "x@x.com", fullName: "x", isActive: true, position: null, batchIds: [input.batchId], createdAt: new Date() };
+        return { id: input.coordinatorId, userId: "u", email: "x@x.com", fullName: "x", isActive: true, position: null, batchIds: [input.batchId], permissions: [], createdAt: new Date() };
       },
     }),
   );

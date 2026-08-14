@@ -28,7 +28,7 @@ import { parseDurationMs } from "@/lib/duration";
 // mid-initialization) require `withAuth` before auth finishes exporting it,
 // a genuine circular-import TDZ failure. This deep import needs only the
 // bound `notificationService` singleton, which has no dependency on auth.
-import { notificationService } from "@/modules/notifications/infrastructure/container";
+import { notificationService, sendDirectEmail } from "@/modules/notifications/infrastructure/container";
 // Type-only, so (unlike the value import above) it can safely come through
 // the public barrel — erased at compile time, no circular-import TDZ risk.
 import type { NotificationService } from "@/modules/notifications";
@@ -40,6 +40,11 @@ import { AdminResetPasswordUseCase } from "../application/use-cases/admin-reset-
 import { ChangeOwnPasswordUseCase } from "../application/use-cases/change-own-password";
 import { UpdateOwnProfileUseCase } from "../application/use-cases/update-own-profile";
 import { UploadAvatarUseCase } from "../application/use-cases/upload-avatar";
+import { IssueEmailVerificationTokenUseCase } from "../application/use-cases/issue-email-verification";
+import { VerifyEmailUseCase } from "../application/use-cases/verify-email";
+import { ResendEmailVerificationUseCase } from "../application/use-cases/resend-email-verification";
+import { ForgotPasswordUseCase } from "../application/use-cases/forgot-password";
+import { ResetPasswordUseCase } from "../application/use-cases/reset-password";
 import { BcryptPasswordHasher } from "./bcrypt-password-hasher";
 import { JwtTokenService } from "./jwt-token-service";
 import { PrismaUserRepository } from "./prisma-user-repository";
@@ -47,6 +52,8 @@ import { PrismaRefreshTokenRepository } from "./prisma-refresh-token-repository"
 import { PrismaAuditRecorder } from "./prisma-audit-recorder";
 import { PrismaProfileNameRepository } from "./prisma-profile-name-repository";
 import { PrismaAvatarFileRepository } from "./prisma-avatar-file-repository";
+import { PrismaEmailVerificationTokenRepository } from "./prisma-email-verification-token-repository";
+import { PrismaPasswordResetTokenRepository } from "./prisma-password-reset-token-repository";
 import { SystemClock } from "./system-clock";
 import { createAuthMiddleware } from "../presentation/with-auth";
 
@@ -56,6 +63,8 @@ const refreshTokenRepository = new PrismaRefreshTokenRepository(prisma);
 const auditRecorder = new PrismaAuditRecorder(prisma);
 const profileNameRepository = new PrismaProfileNameRepository(prisma);
 const avatarFileRepository = new PrismaAvatarFileRepository(prisma);
+const emailVerificationTokenRepository = new PrismaEmailVerificationTokenRepository(prisma);
+const passwordResetTokenRepository = new PrismaPasswordResetTokenRepository(prisma);
 const clock = new SystemClock();
 
 let cachedPasswordHasher: BcryptPasswordHasher | undefined;
@@ -178,6 +187,18 @@ export async function revokeUserSessions(userId: string): Promise<void> {
   await refreshTokenRepository.revokeAllForUser(userId);
 }
 
+/**
+ * MYARCH Phase 1 (§2.4) — recruiter/alumni self-signup hash their own
+ * caller-chosen password (no existing auth primitive does this; every
+ * other account-creation path generates its own temp password). Exposed
+ * as a plain function rather than PasswordHasher/BcryptPasswordHasher
+ * itself, mirroring revokeUserSessions's exact reasoning — other modules
+ * never depend on auth's infrastructure layer directly.
+ */
+export async function hashPassword(plaintext: string): Promise<string> {
+  return getPasswordHasher().hash(plaintext);
+}
+
 /** Backs the /api/auth/me route's email/fullName fields — see me.ts's doc comment. */
 export async function getMeProfile(actor: {
   userId: string;
@@ -212,6 +233,58 @@ export function getUploadAvatarUseCase(): UploadAvatarUseCase {
     auditRecorder,
     saveFile,
     deleteFile,
+  }));
+}
+
+let cachedIssueEmailVerificationTokenUseCase: IssueEmailVerificationTokenUseCase | undefined;
+export function getIssueEmailVerificationTokenUseCase(): IssueEmailVerificationTokenUseCase {
+  return (cachedIssueEmailVerificationTokenUseCase ??= new IssueEmailVerificationTokenUseCase({
+    emailVerificationTokenRepository,
+    sendEmail: sendDirectEmail,
+    appBaseUrl: getEnv().APP_BASE_URL,
+    hashSecret: getEnv().JWT_REFRESH_SECRET,
+  }));
+}
+
+let cachedVerifyEmailUseCase: VerifyEmailUseCase | undefined;
+export function getVerifyEmailUseCase(): VerifyEmailUseCase {
+  return (cachedVerifyEmailUseCase ??= new VerifyEmailUseCase({
+    emailVerificationTokenRepository,
+    userRepository,
+    hashSecret: getEnv().JWT_REFRESH_SECRET,
+  }));
+}
+
+let cachedResendEmailVerificationUseCase: ResendEmailVerificationUseCase | undefined;
+export function getResendEmailVerificationUseCase(): ResendEmailVerificationUseCase {
+  return (cachedResendEmailVerificationUseCase ??= new ResendEmailVerificationUseCase({
+    emailVerificationTokenRepository,
+    sendEmail: sendDirectEmail,
+    appBaseUrl: getEnv().APP_BASE_URL,
+    hashSecret: getEnv().JWT_REFRESH_SECRET,
+  }));
+}
+
+let cachedForgotPasswordUseCase: ForgotPasswordUseCase | undefined;
+export function getForgotPasswordUseCase(): ForgotPasswordUseCase {
+  return (cachedForgotPasswordUseCase ??= new ForgotPasswordUseCase({
+    userRepository,
+    passwordResetTokenRepository,
+    sendEmail: sendDirectEmail,
+    appBaseUrl: getEnv().APP_BASE_URL,
+    hashSecret: getEnv().JWT_REFRESH_SECRET,
+  }));
+}
+
+let cachedResetPasswordUseCase: ResetPasswordUseCase | undefined;
+export function getResetPasswordUseCase(): ResetPasswordUseCase {
+  return (cachedResetPasswordUseCase ??= new ResetPasswordUseCase({
+    userRepository,
+    passwordResetTokenRepository,
+    refreshTokenRepository,
+    passwordHasher: getPasswordHasher(),
+    hashSecret: getEnv().JWT_REFRESH_SECRET,
+    auditRecorder,
   }));
 }
 

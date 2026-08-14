@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SubmitRegistrationRequestUseCase } from "../../../src/modules/registration/application/use-cases/submit-registration-request";
 import {
   DuplicateRegistrationEmailError,
@@ -21,6 +21,7 @@ function buildContext() {
   const existingAccountLookup = new FakeExistingAccountLookup();
   const reviewerLookup = new FakeRegistrationReviewerLookup();
   const notificationService = new FakeNotificationService();
+  const issueEmailVerificationToken = vi.fn().mockResolvedValue(undefined);
   batchLookup.seed(ACTIVE_BATCH, "ACTIVE", "B.Arch 2027");
   batchLookup.seed(GRADUATED_BATCH, "GRADUATED");
   reviewerLookup.seedReviewers(ACTIVE_BATCH, ["coord-1", "sec-1"]);
@@ -31,9 +32,18 @@ function buildContext() {
     existingAccountLookup,
     reviewerLookup,
     notificationService,
+    issueEmailVerificationToken,
   });
 
-  return { useCase, registrationRequestRepository, batchLookup, existingAccountLookup, reviewerLookup, notificationService };
+  return {
+    useCase,
+    registrationRequestRepository,
+    batchLookup,
+    existingAccountLookup,
+    reviewerLookup,
+    notificationService,
+    issueEmailVerificationToken,
+  };
 }
 
 const VALID_INPUT = {
@@ -117,5 +127,16 @@ describe("SubmitRegistrationRequestUseCase", () => {
       }),
     );
     expect(ctx.notificationService.sent).toContainEqual(expect.objectContaining({ recipientUserId: "sec-1" }));
+  });
+
+  it("MYARCH Phase 1 (§2.4) — issues an email verification token bound to the new request, not a User (none exists yet)", async () => {
+    const request = await ctx.useCase.execute(VALID_INPUT);
+
+    expect(ctx.issueEmailVerificationToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "prospective@example.com",
+        registrationRequestId: request.id,
+      }),
+    );
   });
 });

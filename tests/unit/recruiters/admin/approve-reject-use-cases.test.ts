@@ -5,6 +5,7 @@ import { RecruiterNotPendingError } from "../../../../src/modules/recruiters/dom
 import { NotAuthorizedError } from "../../../../src/lib/errors";
 import { InMemoryRecruiterAccountRepository } from "../../../support/fakes/in-memory-recruiter-account-repository";
 import { FakeAuditRecorder } from "../../../support/fakes/fake-audit-recorder";
+import { FakeNotificationService } from "../../../support/fakes/fake-notification-service";
 import type { RecruiterAccountRecord } from "../../../../src/modules/recruiters";
 import type { AuthenticatedActor } from "../../../../src/modules/auth";
 
@@ -28,6 +29,7 @@ function record(overrides: Partial<RecruiterAccountRecord> = {}): RecruiterAccou
 describe("ApproveRecruiterUseCase / RejectRecruiterUseCase", () => {
   let recruiterAccountRepository: InMemoryRecruiterAccountRepository;
   let auditRecorder: FakeAuditRecorder;
+  let notificationService: FakeNotificationService;
   let approveUseCase: ApproveRecruiterUseCase;
   let rejectUseCase: RejectRecruiterUseCase;
 
@@ -35,8 +37,9 @@ describe("ApproveRecruiterUseCase / RejectRecruiterUseCase", () => {
     recruiterAccountRepository = new InMemoryRecruiterAccountRepository();
     recruiterAccountRepository.seed(record());
     auditRecorder = new FakeAuditRecorder();
-    approveUseCase = new ApproveRecruiterUseCase({ recruiterAccountRepository, auditRecorder });
-    rejectUseCase = new RejectRecruiterUseCase({ recruiterAccountRepository, auditRecorder });
+    notificationService = new FakeNotificationService();
+    approveUseCase = new ApproveRecruiterUseCase({ recruiterAccountRepository, auditRecorder, notificationService });
+    rejectUseCase = new RejectRecruiterUseCase({ recruiterAccountRepository, auditRecorder, notificationService });
   });
 
   it("rejects a non-Secretary actor for both approve and reject", async () => {
@@ -73,5 +76,33 @@ describe("ApproveRecruiterUseCase / RejectRecruiterUseCase", () => {
     expect(auditRecorder.entries).toContainEqual(
       expect.objectContaining({ action: "RECRUITER_APPROVED", targetEntityId: "target-user" }),
     );
+  });
+
+  it("MYARCH Phase 1 — approval activates the account (isActive: true), granting the login access self-signup withheld", async () => {
+    const result = await approveUseCase.execute({ actor: SECRETARY, recruiterId: "target-recruiter" });
+    expect(result.isActive).toBe(true);
+  });
+
+  it("MYARCH Phase 1 — approval notifies the recruiter (ACCOUNT_SIGNUP_DECIDED, APPROVED)", async () => {
+    await approveUseCase.execute({ actor: SECRETARY, recruiterId: "target-recruiter" });
+    expect(notificationService.sent).toContainEqual(
+      expect.objectContaining({
+        recipientUserId: "target-user",
+        template: "ACCOUNT_SIGNUP_DECIDED",
+        context: { accountType: "RECRUITER", decision: "APPROVED" },
+      }),
+    );
+  });
+
+  it("MYARCH Phase 1 — rejection notifies the recruiter (ACCOUNT_SIGNUP_DECIDED, REJECTED) and never activates", async () => {
+    const result = await rejectUseCase.execute({ actor: SECRETARY, recruiterId: "target-recruiter" });
+    expect(notificationService.sent).toContainEqual(
+      expect.objectContaining({
+        recipientUserId: "target-user",
+        template: "ACCOUNT_SIGNUP_DECIDED",
+        context: { accountType: "RECRUITER", decision: "REJECTED" },
+      }),
+    );
+    expect(result.approvalStatus).toBe("REJECTED");
   });
 });

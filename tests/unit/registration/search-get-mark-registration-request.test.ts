@@ -31,6 +31,7 @@ function makeRecord(overrides: Partial<RegistrationRequestRecord> = {}): Registr
     batchId: BATCH_A,
     submittedData: {},
     status: "SUBMITTED",
+    emailVerifiedAt: null,
     coordinatorComment: null,
     reviewedByUserId: null,
     reviewedAt: null,

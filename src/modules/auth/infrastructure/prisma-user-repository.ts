@@ -17,13 +17,16 @@ export class PrismaUserRepository implements UserRepository {
 
   async loadActorScope(
     user: AuthUserRecord,
-  ): Promise<Pick<AuthenticatedActor, "batchScope" | "studentProfileId">> {
+  ): Promise<Pick<AuthenticatedActor, "batchScope" | "permissions" | "studentProfileId">> {
     if (user.role === "COORDINATOR") {
       const coordinatorProfile = await this.prisma.coordinatorProfile.findUnique({
         where: { userId: user.id },
         include: { batchScopes: true },
       });
-      return { batchScope: coordinatorProfile?.batchScopes.map((scope) => scope.batchId) ?? [] };
+      return {
+        batchScope: coordinatorProfile?.batchScopes.map((scope) => scope.batchId) ?? [],
+        permissions: coordinatorProfile?.permissions ?? [],
+      };
     }
 
     if (user.role === "STUDENT") {
@@ -61,6 +64,10 @@ export class PrismaUserRepository implements UserRepository {
 
   async setAvatarFileId(userId: string, avatarFileId: string | null): Promise<void> {
     await this.prisma.user.update({ where: { id: userId }, data: { avatarFileId } });
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    await this.prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() } });
   }
 }
 

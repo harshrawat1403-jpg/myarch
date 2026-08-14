@@ -8,6 +8,7 @@ import {
   DuplicateRegistrationEmailError,
   DuplicateRegistrationRollNumberError,
   InvalidRegistrationTransitionError,
+  RegistrationEmailNotVerifiedError,
   RegistrationRequestNotFoundError,
 } from "../../domain/errors";
 import { DecideRegistrationRequestSchema } from "../validation";
@@ -36,6 +37,7 @@ export const decideRegistrationRequestRouteHandler = withAuth(
       if (err instanceof RegistrationRequestNotFoundError) return notFound(err.message);
       if (err instanceof NotAuthorizedError) return forbidden(err.message);
       if (err instanceof InvalidRegistrationTransitionError) return badRequest(err.message);
+      if (err instanceof RegistrationEmailNotVerifiedError) return badRequest(err.message);
       if (err instanceof DuplicateRegistrationEmailError) return conflict(err.message);
       if (err instanceof DuplicateRegistrationRollNumberError) return conflict(err.message);
       throw err;

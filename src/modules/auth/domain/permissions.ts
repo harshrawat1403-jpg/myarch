@@ -30,6 +30,7 @@ export function canViewPrivateProfile(
     case "STUDENT":
       return actor.studentProfileId === targetStudentProfileId;
     case "RECRUITER":
+    case "ALUMNI":
       return false;
   }
 }
@@ -59,6 +60,7 @@ export function canEditPublicProfileDraft(
     case "STUDENT":
       return actor.studentProfileId === targetStudentProfileId;
     case "RECRUITER":
+    case "ALUMNI":
       return false;
   }
 }

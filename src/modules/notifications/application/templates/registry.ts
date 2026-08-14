@@ -20,6 +20,13 @@ import {
 } from "./definitions/recruiter-interest-responded";
 import { placementDriveAnnouncedTemplate, placementDriveAnnouncedInAppTemplate } from "./definitions/placement-drive-announced";
 import { applicationStatusChangedTemplate, applicationStatusChangedInAppTemplate } from "./definitions/application-status-changed";
+import { emailVerificationTemplate, emailVerificationInAppTemplate } from "./definitions/email-verification";
+import { passwordResetRequestedTemplate, passwordResetRequestedInAppTemplate } from "./definitions/password-reset-requested";
+import {
+  accountSignupPendingReviewTemplate,
+  accountSignupPendingReviewInAppTemplate,
+} from "./definitions/account-signup-pending-review";
+import { accountSignupDecidedTemplate, accountSignupDecidedInAppTemplate } from "./definitions/account-signup-decided";
 
 /**
  * Every known template, keyed by the id business use cases pass to
@@ -58,6 +65,10 @@ export const EMAIL_TEMPLATE_REGISTRY: Record<NotificationTemplateId, EmailTempla
   RECRUITER_INTEREST_RESPONDED: recruiterInterestRespondedTemplate,
   PLACEMENT_DRIVE_ANNOUNCED: placementDriveAnnouncedTemplate,
   APPLICATION_STATUS_CHANGED: applicationStatusChangedTemplate,
+  EMAIL_VERIFICATION: emailVerificationTemplate,
+  PASSWORD_RESET_REQUESTED: passwordResetRequestedTemplate,
+  ACCOUNT_SIGNUP_PENDING_REVIEW: accountSignupPendingReviewTemplate,
+  ACCOUNT_SIGNUP_DECIDED: accountSignupDecidedTemplate,
 };
 
 /** V4.0 E1 — the IN_APP counterpart to EMAIL_TEMPLATE_REGISTRY. */
@@ -73,6 +84,10 @@ export const IN_APP_TEMPLATE_REGISTRY: Record<NotificationTemplateId, InAppTempl
   RECRUITER_INTEREST_RESPONDED: recruiterInterestRespondedInAppTemplate,
   PLACEMENT_DRIVE_ANNOUNCED: placementDriveAnnouncedInAppTemplate,
   APPLICATION_STATUS_CHANGED: applicationStatusChangedInAppTemplate,
+  EMAIL_VERIFICATION: emailVerificationInAppTemplate,
+  PASSWORD_RESET_REQUESTED: passwordResetRequestedInAppTemplate,
+  ACCOUNT_SIGNUP_PENDING_REVIEW: accountSignupPendingReviewInAppTemplate,
+  ACCOUNT_SIGNUP_DECIDED: accountSignupDecidedInAppTemplate,
 };
 
 /**
@@ -104,4 +119,12 @@ export const NOTIFICATION_CHANNELS: Record<NotificationTemplateId, readonly Noti
   RECRUITER_INTEREST_RESPONDED: ["IN_APP"],
   PLACEMENT_DRIVE_ANNOUNCED: ["IN_APP"],
   APPLICATION_STATUS_CHANGED: ["IN_APP"],
+  // Never actually dispatched through this map — both are sent directly via
+  // sendDirectEmail + renderEmailTemplate, bypassing notify() entirely (see
+  // each definition's own doc comment). Listed as EMAIL for accuracy, not
+  // because DefaultNotificationService ever consults this entry for them.
+  EMAIL_VERIFICATION: ["EMAIL"],
+  PASSWORD_RESET_REQUESTED: ["EMAIL"],
+  ACCOUNT_SIGNUP_PENDING_REVIEW: ["IN_APP"],
+  ACCOUNT_SIGNUP_DECIDED: ["EMAIL", "IN_APP"],
 };

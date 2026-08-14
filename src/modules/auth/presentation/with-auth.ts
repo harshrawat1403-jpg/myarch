@@ -110,6 +110,7 @@ export function createAuthMiddleware(tokenService: Pick<TokenService, "verifyAcc
         userId: claims.sub,
         role: claims.role,
         batchScope: claims.batchScope,
+        permissions: claims.permissions,
         studentProfileId: claims.studentProfileId,
         mustChangePassword: claims.mustChangePassword,
       };

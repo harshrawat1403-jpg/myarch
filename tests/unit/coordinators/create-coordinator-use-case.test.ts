@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { CreateCoordinatorUseCase } from "../../../src/modules/coordinators/application/use-cases/create-coordinator";
-import { BatchNotFoundError, DuplicateEmailError } from "../../../src/modules/coordinators/domain/errors";
+import { BatchNotFoundError, DuplicateEmailError, MaxActiveCoordinatorsError } from "../../../src/modules/coordinators/domain/errors";
+import type { CoordinatorRecord } from "../../../src/modules/coordinators";
 import { NotAuthorizedError } from "../../../src/lib/errors";
 import { InMemoryCoordinatorRepository } from "../../support/fakes/in-memory-coordinator-repository";
 import { FakeCoordinatorUserProvisioner } from "../../support/fakes/fake-coordinator-user-provisioner";
@@ -84,5 +85,42 @@ describe("CreateCoordinatorUseCase", () => {
     expect(ctx.auditRecorder.entries).toContainEqual(
       expect.objectContaining({ actorUserId: "sec-1", action: "COORDINATOR_CREATED" }),
     );
+  });
+
+  it("rejects creating a third active coordinator (roadmap §2.1 — max 2 active)", async () => {
+    const existing = (id: string): CoordinatorRecord => ({
+      id,
+      userId: `${id}-user`,
+      email: `${id}@tnparch.in`,
+      fullName: id,
+      isActive: true,
+      position: null,
+      batchIds: [],
+      permissions: [],
+      createdAt: new Date(),
+    });
+    ctx.coordinatorRepository.seed(existing("coord-1"));
+    ctx.coordinatorRepository.seed(existing("coord-2"));
+
+    await expect(
+      ctx.useCase.execute({ actor: SECRETARY, email: "third@tnparch.in", fullName: "Third Coordinator" }),
+    ).rejects.toBeInstanceOf(MaxActiveCoordinatorsError);
+  });
+
+  it("still allows creating a coordinator when only inactive coordinators exist", async () => {
+    ctx.coordinatorRepository.seed({
+      id: "coord-disabled",
+      userId: "coord-disabled-user",
+      email: "disabled@tnparch.in",
+      fullName: "Disabled Coordinator",
+      isActive: false,
+      position: null,
+      batchIds: [],
+      permissions: [],
+      createdAt: new Date(),
+    });
+
+    const result = await ctx.useCase.execute({ actor: SECRETARY, email: "new@tnparch.in", fullName: "New Coordinator" });
+    expect(result.coordinator.fullName).toBe("New Coordinator");
   });
 });

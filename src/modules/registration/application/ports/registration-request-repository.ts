@@ -34,4 +34,7 @@ export interface RegistrationRequestRepository {
   search(filters: RegistrationRequestSearchFilters): Promise<RegistrationRequestRecord[]>;
   mark(id: string, data: MarkRegistrationRequestData): Promise<RegistrationRequestRecord>;
   decide(id: string, data: DecideRegistrationRequestData): Promise<RegistrationRequestRecord>;
+
+  /** MYARCH Phase 1 — called only from /api/auth/verify-email/route.ts once VerifyEmailUseCase confirms the token, never from within the auth module itself (see that route's own doc comment). */
+  markEmailVerified(id: string): Promise<void>;
 }

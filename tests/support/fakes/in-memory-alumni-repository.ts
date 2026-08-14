@@ -1,11 +1,11 @@
 import crypto from "node:crypto";
-import type { AlumniRecord, AlumniSearchFilters } from "../../../src/modules/alumni/domain/entities";
+import type { AlumniApprovalStatus, AlumniRecord, AlumniSearchFilters } from "../../../src/modules/alumni/domain/entities";
 import type {
   AlumniRepository,
   CreateAlumniData,
   UpdateAlumniData,
 } from "../../../src/modules/alumni/application/ports/alumni-repository";
-import { DuplicateAlumniLinkError } from "../../../src/modules/alumni/domain/errors";
+import { AlumniNotFoundError, DuplicateAlumniLinkError } from "../../../src/modules/alumni/domain/errors";
 
 export class InMemoryAlumniRepository implements AlumniRepository {
   private readonly byId = new Map<string, AlumniRecord>();
@@ -23,6 +23,7 @@ export class InMemoryAlumniRepository implements AlumniRepository {
     const record: AlumniRecord = {
       id: crypto.randomUUID(),
       studentProfileId: data.studentProfileId ?? null,
+      userId: data.userId ?? null,
       fullName: data.fullName,
       graduationYear: data.graduationYear,
       currentCompany: data.currentCompany ?? null,
@@ -31,6 +32,7 @@ export class InMemoryAlumniRepository implements AlumniRepository {
       portfolioUrl: data.portfolioUrl ?? null,
       linkedInUrl: data.linkedInUrl ?? null,
       mentorshipAvailable: data.mentorshipAvailable ?? false,
+      approvalStatus: data.approvalStatus ?? "APPROVED",
       createdAt: now,
       updatedAt: now,
     };
@@ -65,11 +67,28 @@ export class InMemoryAlumniRepository implements AlumniRepository {
     this.byId.delete(id);
   }
 
+  async setApprovalStatus(id: string, status: AlumniApprovalStatus): Promise<AlumniRecord> {
+    const existing = this.byId.get(id);
+    if (!existing) throw new AlumniNotFoundError();
+    const updated = { ...existing, approvalStatus: status };
+    this.byId.set(id, updated);
+    return updated;
+  }
+
+  async approveAndActivate(id: string): Promise<AlumniRecord> {
+    const existing = this.byId.get(id);
+    if (!existing) throw new AlumniNotFoundError();
+    const updated: AlumniRecord = { ...existing, approvalStatus: "APPROVED" };
+    this.byId.set(id, updated);
+    return updated;
+  }
+
   async search(filters: AlumniSearchFilters): Promise<AlumniRecord[]> {
     return [...this.byId.values()].filter((a) => {
       if (filters.name && !a.fullName.toLowerCase().includes(filters.name.toLowerCase())) return false;
       if (filters.graduationYear !== undefined && a.graduationYear !== filters.graduationYear) return false;
       if (filters.mentorshipAvailable !== undefined && a.mentorshipAvailable !== filters.mentorshipAvailable) return false;
+      if (filters.approvalStatus && a.approvalStatus !== filters.approvalStatus) return false;
       return true;
     });
   }

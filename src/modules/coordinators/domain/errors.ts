@@ -46,3 +46,19 @@ export class BatchNotAssignedError extends Error {
     this.name = "BatchNotAssignedError";
   }
 }
+
+/** MYARCH Phase 1 — roadmap §2.1: "Maximum ACTIVE Coordinators = 2," enforced server-side. */
+export class MaxActiveCoordinatorsError extends Error {
+  constructor() {
+    super("MYARCH allows a maximum of 2 active Coordinators at a time");
+    this.name = "MaxActiveCoordinatorsError";
+  }
+}
+
+/** MYARCH Phase 1 — UpdateCoordinatorPermissionsUseCase rejects any key outside COORDINATOR_PERMISSION_KEYS. */
+export class InvalidCoordinatorPermissionError extends Error {
+  constructor(key: string) {
+    super(`"${key}" is not a recognized coordinator permission`);
+    this.name = "InvalidCoordinatorPermissionError";
+  }
+}

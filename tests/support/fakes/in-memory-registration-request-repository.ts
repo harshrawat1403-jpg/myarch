@@ -26,6 +26,7 @@ export class InMemoryRegistrationRequestRepository implements RegistrationReques
       batchId: data.batchId,
       submittedData: data.submittedData,
       status: "SUBMITTED",
+      emailVerifiedAt: null,
       coordinatorComment: null,
       reviewedByUserId: null,
       reviewedAt: null,
@@ -94,5 +95,11 @@ export class InMemoryRegistrationRequestRepository implements RegistrationReques
     };
     this.byId.set(id, updated);
     return updated;
+  }
+
+  async markEmailVerified(id: string): Promise<void> {
+    const existing = this.byId.get(id);
+    if (!existing) return;
+    this.byId.set(id, { ...existing, emailVerifiedAt: new Date() });
   }
 }

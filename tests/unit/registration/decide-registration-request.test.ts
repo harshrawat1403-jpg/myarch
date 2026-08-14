@@ -4,6 +4,7 @@ import {
   DuplicateRegistrationEmailError,
   DuplicateRegistrationRollNumberError,
   InvalidRegistrationTransitionError,
+  RegistrationEmailNotVerifiedError,
   RegistrationRequestNotFoundError,
 } from "../../../src/modules/registration/domain/errors";
 import { DuplicateEmailError, DuplicateRollNumberError } from "../../../src/modules/students";
@@ -32,6 +33,11 @@ function makeRecord(overrides: Partial<RegistrationRequestRecord> = {}): Registr
     batchId: BATCH_A,
     submittedData: { phone: "9876543210", personalEmail: "priya.personal@example.com" },
     status: "REVIEWED",
+    // MYARCH Phase 1: this fixture represents a request that's ready to be
+    // decided — verified by default, matching status: "REVIEWED" already
+    // being the "ready" default. The RegistrationEmailNotVerifiedError-
+    // specific tests below override this explicitly.
+    emailVerifiedAt: now,
     coordinatorComment: "Looks good.",
     reviewedByUserId: "coord-1",
     reviewedAt: now,
@@ -122,6 +128,25 @@ describe("DecideRegistrationRequestUseCase", () => {
     await expect(
       ctx.useCase.execute({ actor: SECRETARY, requestId: "decided-1", decision: "APPROVE" }),
     ).rejects.toBeInstanceOf(InvalidRegistrationTransitionError);
+  });
+
+  it("rejects APPROVE while the applicant's email is still unverified (roadmap §2.4)", async () => {
+    ctx.repo.seed(makeRecord({ id: "unverified-1", emailVerifiedAt: null }));
+    await expect(
+      ctx.useCase.execute({ actor: SECRETARY, requestId: "unverified-1", decision: "APPROVE" }),
+    ).rejects.toBeInstanceOf(RegistrationEmailNotVerifiedError);
+    expect(ctx.createStudent).not.toHaveBeenCalled();
+  });
+
+  it("allows REJECT regardless of email verification (rejecting never creates an account)", async () => {
+    ctx.repo.seed(makeRecord({ id: "unverified-2", emailVerifiedAt: null }));
+    const result = await ctx.useCase.execute({
+      actor: SECRETARY,
+      requestId: "unverified-2",
+      decision: "REJECT",
+      rejectionReason: "Not eligible.",
+    });
+    expect(result.request.status).toBe("REJECTED");
   });
 
   describe("APPROVE", () => {

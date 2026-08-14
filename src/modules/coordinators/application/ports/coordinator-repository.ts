@@ -20,6 +20,12 @@ export interface CoordinatorRepository {
   /** Flips CoordinatorProfile.isActive and User.isActive together, in one transaction — mirrors PrismaStudentRepository.setActive. */
   setActive(id: string, isActive: boolean): Promise<CoordinatorRecord>;
 
+  /** MYARCH Phase 1 — roadmap §2.1's "maximum 2 active Coordinators," checked before creating a new one or reactivating an existing one. */
+  countActive(): Promise<number>;
+
+  /** MYARCH Phase 1 — replaces the full delegated-permission set (Technical-Secretary-only, via UpdateCoordinatorPermissionsUseCase). */
+  setPermissions(id: string, permissions: readonly string[]): Promise<CoordinatorRecord>;
+
   search(filters: CoordinatorSearchFilters): Promise<CoordinatorRecord[]>;
 
   assignBatch(id: string, batchId: string): Promise<CoordinatorRecord>;

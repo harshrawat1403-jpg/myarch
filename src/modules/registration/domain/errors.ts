@@ -39,3 +39,11 @@ export class InvalidRegistrationTransitionError extends Error {
     this.name = "InvalidRegistrationTransitionError";
   }
 }
+
+/** MYARCH Phase 1 (§2.4) — DecideRegistrationRequestUseCase refuses APPROVE until the applicant has verified their email. */
+export class RegistrationEmailNotVerifiedError extends Error {
+  constructor() {
+    super("This applicant has not yet verified their email address");
+    this.name = "RegistrationEmailNotVerifiedError";
+  }
+}

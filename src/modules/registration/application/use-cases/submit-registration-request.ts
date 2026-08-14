@@ -1,5 +1,6 @@
 import type { BatchLookup } from "@/lib/batch-lookup";
 import type { NotificationService } from "@/modules/notifications";
+import type { IssueEmailVerificationTokenInput } from "@/modules/auth";
 import type { RegistrationRequestRecord, RegistrationSubmittedData } from "../../domain/entities";
 import {
   DuplicateRegistrationEmailError,
@@ -25,6 +26,8 @@ export interface SubmitRegistrationRequestUseCaseDeps {
   existingAccountLookup: ExistingAccountLookup;
   reviewerLookup: RegistrationReviewerLookup;
   notificationService: NotificationService;
+  /** MYARCH Phase 1 (§2.4) — injected rather than importing auth's use case directly, matching this module's existing dependency-injection convention for every other cross-module primitive (runApproveTransaction, sendRejectionEmail, ...). */
+  issueEmailVerificationToken: (input: IssueEmailVerificationTokenInput) => Promise<void>;
 }
 
 /**
@@ -65,6 +68,19 @@ export class SubmitRegistrationRequestUseCase {
       rollNumber,
       batchId: input.batchId,
       submittedData: input.submittedData ?? {},
+    });
+
+    // MYARCH Phase 1 (§2.4) — the applicant must verify this email before
+    // a Secretary can approve the request (DecideRegistrationRequestUseCase
+    // enforces this). IssueEmailVerificationTokenUseCase already swallows
+    // its own email-delivery failure internally (so a mail-provider outage
+    // never blocks the submission) — a throw here would only ever be a
+    // genuine token-persistence (database) failure, which should propagate
+    // rather than be silently hidden.
+    await this.deps.issueEmailVerificationToken({
+      email,
+      recipientName: created.fullName,
+      registrationRequestId: created.id,
     });
 
     // notify() never rejects (NFR-AVAIL-03) — safe to await without a

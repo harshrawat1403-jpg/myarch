@@ -4,7 +4,7 @@
  * or Next.js imports belong here.
  */
 
-export type Role = "SECRETARY" | "COORDINATOR" | "STUDENT" | "RECRUITER";
+export type Role = "SECRETARY" | "COORDINATOR" | "STUDENT" | "RECRUITER" | "ALUMNI";
 
 /**
  * The authenticated caller, resolved from a verified access token, carrying
@@ -18,6 +18,16 @@ export interface AuthenticatedActor {
   readonly role: Role;
   /** Populated only for COORDINATOR; empty array means no batch access. */
   readonly batchScope?: readonly string[];
+  /**
+   * MYARCH Phase 1: populated only for COORDINATOR — the granular
+   * capabilities the Technical Secretary has delegated (roadmap §2.3), read
+   * from CoordinatorProfile.permissions at login/refresh (see
+   * PrismaUserRepository.loadActorScope) exactly like batchScope. The
+   * Technical Secretary (SECRETARY role) never carries this — see
+   * hasCoordinatorPermission's own doc comment for why it implicitly has
+   * every capability regardless.
+   */
+  readonly permissions?: readonly string[];
   /** Populated only for STUDENT; used for "own data" checks. */
   readonly studentProfileId?: string;
   /**

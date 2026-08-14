@@ -28,11 +28,19 @@ datasource db {
 // Enums
 // ---------------------------------------------------------------------------
 
+// MYARCH Phase 1: ALUMNI added for self-service alumni signup (see
+// AlumniProfile.userId/approvalStatus below). Purely additive — existing
+// values/ordinal positions unchanged, so this is a safe `ALTER TYPE ...
+// ADD VALUE` migration with no risk to existing rows. Unrelated to
+// CoordinatorPosition's own "ALUMNI" value below (the Alumni Coordinator
+// *position* label) — distinct Postgres enum types, never interchangeable
+// at the TypeScript level either.
 enum Role {
   SECRETARY
   COORDINATOR
   STUDENT
   RECRUITER
+  ALUMNI
 }
 
 enum BatchStatus {
@@ -161,6 +169,16 @@ model User {
   mustChangePassword Boolean   @default(false)
   lastLoginAt        DateTime?
 
+  // MYARCH Phase 1: null until the account's email has been verified via a
+  // consumed EmailVerificationToken. Only meaningful for self-signup roles
+  // (RECRUITER, ALUMNI) whose login is separately gated by `isActive`
+  // staying false until admin approval — see SignupRecruiterUseCase/
+  // SignupAlumniUseCase. Admin-provisioned accounts (Coordinator, admin-
+  // created Recruiter, Secretary, and Student-via-registration-approval)
+  // are stamped verified at creation time — the department already vouches
+  // for those addresses, so there is nothing to separately verify.
+  emailVerifiedAt DateTime?
+
   // V3.0 Account Settings: an optional profile photo, stored via the same
   // FileAsset metadata table every other upload uses (classification
   // PUBLIC — nothing sensitive about an account's own avatar). Nullable:
@@ -172,8 +190,11 @@ model User {
   coordinatorProfile CoordinatorProfile?
   studentProfile     StudentProfile?
   recruiterProfile   RecruiterProfile?
+  alumniProfile      AlumniProfile?
 
-  refreshTokens RefreshToken[]
+  refreshTokens           RefreshToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
 
   // Reverse relations for audit/traceability — who last touched a record.
   updatedPrivateProfiles       StudentPrivateProfile[]     @relation("PrivateProfileUpdatedBy")
@@ -216,6 +237,54 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+// MYARCH Phase 1: proves control of an email address before either (a) an
+// existing User's email is considered verified (RECRUITER/ALUMNI self-
+// signup — `userId` populated), or (b) a RegistrationRequest is eligible
+// for Secretary decision (STUDENT — no User exists yet at signup time, so
+// `registrationRequestId` is populated instead). Exactly one of the two FKs
+// is set per row; both are nullable because the same shape serves both
+// cases rather than three near-duplicate token tables. Single-use: consumed
+// by setting `consumedAt`, never deleted (mirrors RefreshToken's audit-
+// trail-over-deletion convention). Raw token is never persisted — only a
+// hash of it (see src/lib/opaque-token.ts), matching RefreshToken's own
+// `tokenHash` convention exactly.
+model EmailVerificationToken {
+  id        String  @id @default(uuid()) @db.Uuid
+  email     String
+  tokenHash String  @unique
+
+  userId String? @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  registrationRequestId String?              @db.Uuid
+  registrationRequest   RegistrationRequest? @relation(fields: [registrationRequestId], references: [id], onDelete: Cascade)
+
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email])
+  @@map("email_verification_tokens")
+}
+
+// MYARCH Phase 1: forgot-password. Always User-bound (a password can only
+// ever be reset for an account that already exists) — unlike
+// EmailVerificationToken, no dual-purpose shape is needed here. Same
+// single-use/audit-trail/hashed-token conventions as RefreshToken.
+model PasswordResetToken {
+  id        String @id @default(uuid()) @db.Uuid
+  userId    String @db.Uuid
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String @unique
+
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
 model SecretaryProfile {
   id     String @id @default(uuid()) @db.Uuid
   userId String @unique @db.Uuid
@@ -239,6 +308,23 @@ model CoordinatorProfile {
   isActive Boolean              @default(true)
   // V4.0 (A1): T&P vs Alumni — display/reporting label only, see enum doc comment.
   position CoordinatorPosition?
+
+  // MYARCH Phase 1: granular capabilities the Technical Secretary has
+  // delegated to this Coordinator (roadmap §2.3 — e.g. "maintenance.view",
+  // "events.create"). A flat string array, validated at the application
+  // layer against COORDINATOR_PERMISSION_KEYS (src/modules/coordinators/domain/permissions.ts)
+  // rather than a join table — matches this schema's existing convention
+  // for small tag-like sets (StudentPublicProfile.skills/software), and
+  // avoids a relational table for what is structurally a set-membership
+  // check, not a queryable relation. The Technical Secretary (SECRETARY
+  // role) always implicitly has every capability regardless of this array —
+  // see hasCoordinatorPermission's own doc comment. Most of the named keys
+  // in §2.3 have no backing feature yet (maintenance/events/etc. don't
+  // exist until later roadmap phases) — this column stores the grant
+  // itself, which is real and functional (audited, Secretary-editable,
+  // visible on the Coordinator's own record) even before a later phase's
+  // module has anything to check it against.
+  permissions String[] @default([])
 
   batchScopes CoordinatorBatchScope[]
 
@@ -497,6 +583,16 @@ model RegistrationRequest {
   submittedData Json                      @default("{}")
   status        RegistrationRequestStatus @default(SUBMITTED)
 
+  // MYARCH Phase 1: null until the applicant clicks the link from their
+  // EmailVerificationToken. DecideRegistrationRequestUseCase refuses to
+  // APPROVE (create the real account) while this is null — the existing
+  // submit → Coordinator-review → Secretary-decide pipeline is otherwise
+  // completely unchanged; this is an added precondition on the final step,
+  // not a new pipeline.
+  emailVerifiedAt DateTime?
+
+  emailVerificationTokens EmailVerificationToken[]
+
   coordinatorComment String?
   reviewedByUserId   String?   @db.Uuid
   reviewedBy         User?     @relation("RegistrationRequestReviewedBy", fields: [reviewedByUserId], references: [id])
@@ -714,6 +810,13 @@ model AlumniProfile {
   studentProfileId String?         @unique @db.Uuid
   studentProfile   StudentProfile? @relation(fields: [studentProfileId], references: [id])
 
+  // MYARCH Phase 1: nullable — existing directory-only records (created via
+  // the admin CRUD in src/modules/alumni, no self-signup involved) have no
+  // login account and never will unless someone later signs up with that
+  // exact email. Populated only by SignupAlumniUseCase.
+  userId String? @unique @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   fullName            String
   graduationYear      Int
   currentCompany      String?
@@ -722,6 +825,15 @@ model AlumniProfile {
   portfolioUrl        String?
   linkedInUrl         String?
   mentorshipAvailable Boolean @default(false)
+
+  // MYARCH Phase 1: reuses RecruiterApprovalStatus rather than a duplicate
+  // three-value enum (PENDING/APPROVED/REJECTED means the same thing here
+  // as it does for a self-signed-up Recruiter). Defaults APPROVED so every
+  // existing admin-created directory row (and any future admin-created row)
+  // is unaffected — only SignupAlumniUseCase ever creates a PENDING row,
+  // mirroring CreateRecruiterAccountUseCase/SignupRecruiterUseCase's exact
+  // split.
+  approvalStatus RecruiterApprovalStatus @default(APPROVED)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

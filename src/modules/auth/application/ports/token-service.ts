@@ -6,6 +6,8 @@ export interface AccessTokenClaims {
   readonly sub: string;
   readonly role: Role;
   readonly batchScope?: readonly string[];
+  /** See AuthenticatedActor.permissions's doc comment (domain/entities.ts). */
+  readonly permissions?: readonly string[];
   readonly studentProfileId?: string;
   readonly mustChangePassword?: boolean;
 }

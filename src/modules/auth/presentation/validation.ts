@@ -25,6 +25,31 @@ export const ChangePasswordRequestSchema = z
     path: ["newPassword"],
   });
 
+/** MYARCH Phase 1 — always accepted regardless of whether the email exists (ForgotPasswordUseCase's own anti-enumeration behavior handles that, not this schema). */
+export const ForgotPasswordRequestSchema = z.object({
+  email: z.string().trim().email(),
+});
+
+export const ResetPasswordRequestSchema = z.object({
+  token: z.string().min(1),
+  newPassword: z.string().refine(isStrongEnough, {
+    message: "Password must be at least 10 characters and include at least 3 of: lowercase, uppercase, digit, symbol",
+  }),
+});
+
+/** MYARCH Phase 1 — signup's own password floor, identical policy, same reuse as ChangePasswordRequestSchema/ResetPasswordRequestSchema above. */
+export const SignupPasswordSchema = z.string().refine(isStrongEnough, {
+  message: "Password must be at least 10 characters and include at least 3 of: lowercase, uppercase, digit, symbol",
+});
+
+export const VerifyEmailRequestSchema = z.object({
+  token: z.string().min(1),
+});
+
+export const ResendVerificationRequestSchema = z.object({
+  email: z.string().trim().email(),
+});
+
 export const UpdateProfileRequestSchema = z
   .object({
     fullName: z.string().trim().min(1).max(200).optional(),

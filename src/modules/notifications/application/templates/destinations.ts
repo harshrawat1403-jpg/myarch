@@ -61,5 +61,22 @@ export function resolveNotificationDestination(
     case "ACCOUNT_CREDENTIALS_ISSUED":
     case "INTEREST_FACILITATION_REQUIRED":
       return null;
+
+    // MYARCH Phase 1 (§2.4). EMAIL_VERIFICATION and PASSWORD_RESET_REQUESTED
+    // are never delivered IN_APP (see each definition's own doc comment) —
+    // this function is never actually called for them, but a case is still
+    // required for exhaustiveness.
+    case "EMAIL_VERIFICATION":
+    case "PASSWORD_RESET_REQUESTED":
+      return null;
+
+    case "ACCOUNT_SIGNUP_PENDING_REVIEW":
+      return context.accountType === "ALUMNI" ? "/dashboard/alumni" : "/dashboard/admin/recruiters";
+
+    case "ACCOUNT_SIGNUP_DECIDED":
+      // Mirrors REGISTRATION_DECIDED's own reasoning exactly: only
+      // meaningful on APPROVED, where a real, now-usable account exists.
+      if (context.decision !== "APPROVED") return null;
+      return context.accountType === "ALUMNI" ? "/alumni" : "/recruiter";
   }
 }

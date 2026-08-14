@@ -21,7 +21,17 @@ export type NotificationTemplateId =
   | "RECRUITER_INTEREST_RECEIVED"
   | "RECRUITER_INTEREST_RESPONDED"
   | "PLACEMENT_DRIVE_ANNOUNCED"
-  | "APPLICATION_STATUS_CHANGED";
+  | "APPLICATION_STATUS_CHANGED"
+  // MYARCH Phase 1 (§2.4/§10). EMAIL_VERIFICATION and PASSWORD_RESET_REQUESTED
+  // are never delivered via notify() — they carry a one-time secret token
+  // and are sent directly via sendDirectEmail + renderEmailTemplate (see
+  // each definition's own doc comment for why, mirroring
+  // REGISTRATION_DECIDED's rejection-path precedent). ACCOUNT_SIGNUP_* use
+  // the normal notify() path.
+  | "EMAIL_VERIFICATION"
+  | "PASSWORD_RESET_REQUESTED"
+  | "ACCOUNT_SIGNUP_PENDING_REVIEW"
+  | "ACCOUNT_SIGNUP_DECIDED";
 
 /**
  * The one thing a business use case knows about a notification: who should

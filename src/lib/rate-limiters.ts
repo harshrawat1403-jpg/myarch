@@ -55,3 +55,30 @@ export const publicDirectoryRateLimiter = new PrismaTokenBucketRateLimiter(prism
   capacity: 60,
   refillRatePerSecond: 1,
 });
+
+// MYARCH Phase 1 (§2.4) — self-signup (/api/recruiters/signup,
+// /api/alumni/signup). Same shape as publicRegistrationRateLimiter — a real
+// applicant signs up once, per-IP since no account exists yet to key on.
+export const signupRateLimiter = new PrismaTokenBucketRateLimiter(prisma, {
+  capacity: 5,
+  refillRatePerSecond: 5 / (60 * 60),
+});
+
+// MYARCH Phase 1 — /api/auth/verify-email and /api/auth/reset-password
+// (token-consuming). Tighter than login: the whole point is bounding
+// brute-force guessing of another user's opaque token, not accommodating
+// repeated legitimate use (each real token is single-use by design).
+export const tokenConsumptionRateLimiter = new PrismaTokenBucketRateLimiter(prisma, {
+  capacity: 10,
+  refillRatePerSecond: 10 / (15 * 60),
+});
+
+// MYARCH Phase 1 — /api/auth/forgot-password and /api/auth/resend-verification.
+// Deliberately tight and per-email+IP (mirrors loginRateLimiter's two-key
+// shape) — both are cheap-to-call, no-account-required triggers for an
+// outbound email, the exact kind of endpoint abuse would use to spam a
+// third party's inbox.
+export const emailTriggerRateLimiter = new PrismaTokenBucketRateLimiter(prisma, {
+  capacity: 5,
+  refillRatePerSecond: 5 / (15 * 60),
+});

@@ -26,4 +26,22 @@ export class PrismaRecruiterUserProvisioner implements RecruiterUserProvisioner 
 
     return { userId: user.id, tempPassword };
   }
+
+  async provisionSelfSignupRecruiterUser(email: string, passwordHash: string): Promise<{ userId: string }> {
+    const user = await this.prisma.user.create({
+      data: {
+        email: email.trim().toLowerCase(),
+        passwordHash,
+        role: "RECRUITER",
+        // Blocks login (LoginUseCase's isActive check) until
+        // ApproveRecruiterUseCase flips this — see that port method's own
+        // doc comment.
+        isActive: false,
+        mustChangePassword: false,
+      },
+      select: { id: true },
+    });
+
+    return { userId: user.id };
+  }
 }

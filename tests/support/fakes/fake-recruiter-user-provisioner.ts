@@ -19,4 +19,15 @@ export class FakeRecruiterUserProvisioner implements RecruiterUserProvisioner {
     this.provisionedEmails.push(normalized);
     return { userId: crypto.randomUUID(), tempPassword: crypto.randomBytes(9).toString("base64url") };
   }
+
+  async provisionSelfSignupRecruiterUser(email: string, _passwordHash: string): Promise<{ userId: string }> {
+    const normalized = email.trim().toLowerCase();
+    if (this.existingEmails.has(normalized)) {
+      const err = new Error("Unique constraint failed") as Error & { code: string };
+      err.code = "P2002";
+      throw err;
+    }
+    this.provisionedEmails.push(normalized);
+    return { userId: crypto.randomUUID() };
+  }
 }

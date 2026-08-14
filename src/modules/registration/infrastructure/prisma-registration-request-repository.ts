@@ -95,6 +95,13 @@ export class PrismaRegistrationRequestRepository implements RegistrationRequestR
     });
     return toDomain(row);
   }
+
+  async markEmailVerified(id: string): Promise<void> {
+    await this.prisma.registrationRequest.update({
+      where: { id },
+      data: { emailVerifiedAt: new Date() },
+    });
+  }
 }
 
 function toDomain(row: PrismaRegistrationRequest): RegistrationRequestRecord {
@@ -106,6 +113,7 @@ function toDomain(row: PrismaRegistrationRequest): RegistrationRequestRecord {
     batchId: row.batchId,
     submittedData: row.submittedData as RegistrationRequestRecord["submittedData"],
     status: row.status,
+    emailVerifiedAt: row.emailVerifiedAt,
     coordinatorComment: row.coordinatorComment,
     reviewedByUserId: row.reviewedByUserId,
     reviewedAt: row.reviewedAt,

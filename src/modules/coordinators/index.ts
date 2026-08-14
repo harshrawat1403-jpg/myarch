@@ -12,11 +12,15 @@ export {
   CoordinatorAlreadyDisabledError,
   BatchAlreadyAssignedError,
   BatchNotAssignedError,
+  MaxActiveCoordinatorsError,
+  InvalidCoordinatorPermissionError,
 } from "./domain/errors";
+export { COORDINATOR_PERMISSION_KEYS, hasCoordinatorPermission, type CoordinatorPermissionKey } from "./domain/permissions";
 
 export { createCoordinatorRouteHandler } from "./presentation/route-handlers/create";
 export { getCoordinatorRouteHandler } from "./presentation/route-handlers/get";
 export { updateCoordinatorRouteHandler } from "./presentation/route-handlers/update";
+export { updateCoordinatorPermissionsRouteHandler } from "./presentation/route-handlers/update-permissions";
 export { disableCoordinatorRouteHandler, enableCoordinatorRouteHandler } from "./presentation/route-handlers/set-active";
 export { searchCoordinatorsRouteHandler } from "./presentation/route-handlers/search";
 export { assignBatchRouteHandler, removeBatchRouteHandler } from "./presentation/route-handlers/batches";

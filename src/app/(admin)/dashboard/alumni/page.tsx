@@ -83,6 +83,31 @@ export default function AlumniPage() {
     }
   }
 
+  // MYARCH Phase 1 (§2.4) — approves/rejects a self-signed-up (PENDING)
+  // alumni account. Dormant for admin-created rows, which default to
+  // APPROVED — mirrors RecruitersPage's handleApprove/handleReject exactly.
+  async function handleApprove(alumniId: string) {
+    if (!accessToken) return;
+    try {
+      await apiClient.post(`/api/alumni/${alumniId}/approve`, undefined, accessToken);
+      toast.success("Alumni account approved.");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to approve this account.");
+    }
+  }
+
+  async function handleReject(alumniId: string) {
+    if (!accessToken) return;
+    try {
+      await apiClient.post(`/api/alumni/${alumniId}/reject`, undefined, accessToken);
+      toast.success("Alumni account rejected.");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to reject this account.");
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -138,9 +163,16 @@ export default function AlumniPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {alumni.map((record) => (
             <Card key={record.id} className="border-t-2 border-t-(--color-accent)">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <CardTitle>{record.fullName}</CardTitle>
-                {record.mentorshipAvailable && <Badge variant="active">Mentorship</Badge>}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {record.mentorshipAvailable && <Badge variant="active">Mentorship</Badge>}
+                  {record.approvalStatus !== "APPROVED" && (
+                    <Badge variant={record.approvalStatus === "PENDING" ? "pending" : "rejected"}>
+                      {record.approvalStatus === "PENDING" ? "Pending" : "Rejected"}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <p className="mt-0.5 text-xs text-(--color-text-secondary)">Class of {record.graduationYear}</p>
               {record.currentCompany && (
@@ -150,7 +182,25 @@ export default function AlumniPage() {
               )}
               {record.location && <p className="text-xs text-(--color-text-secondary)">{record.location}</p>}
 
-              <div className="mt-4 flex gap-2 border-t border-(--color-border) pt-3">
+              <div className="mt-4 flex flex-wrap gap-2 border-t border-(--color-border) pt-3">
+                {record.approvalStatus === "PENDING" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleApprove(record.id)}
+                      className="text-sm font-medium text-(--color-accent) hover:underline"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleReject(record.id)}
+                      className="text-sm font-medium text-(--color-danger) hover:underline"
+                    >
+                      Reject
+                    </button>
+                  </>
+                )}
                 <Button type="button" variant="secondary" onClick={() => setEditingAlumni(record)}>
                   Edit
                 </Button>

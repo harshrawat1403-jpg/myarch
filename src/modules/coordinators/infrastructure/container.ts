@@ -12,6 +12,7 @@ import { SearchCoordinatorsUseCase } from "../application/use-cases/search-coord
 import { GetCoordinatorUseCase } from "../application/use-cases/get-coordinator";
 import { BulkSetCoordinatorsActiveUseCase } from "../application/use-cases/bulk-set-coordinators-active";
 import { ResetCoordinatorPasswordUseCase } from "../application/use-cases/reset-password";
+import { UpdateCoordinatorPermissionsUseCase } from "../application/use-cases/update-coordinator-permissions";
 import { PrismaCoordinatorRepository } from "./prisma-coordinator-repository";
 import { PrismaCoordinatorUserProvisioner } from "./prisma-coordinator-user-provisioner";
 
@@ -43,6 +44,10 @@ export const bulkSetCoordinatorsActiveUseCase = new BulkSetCoordinatorsActiveUse
 export const resetCoordinatorPasswordUseCase = new ResetCoordinatorPasswordUseCase({
   coordinatorRepository,
   resetPassword: (input) => getAdminResetPasswordUseCase().execute(input),
+});
+export const updateCoordinatorPermissionsUseCase = new UpdateCoordinatorPermissionsUseCase({
+  coordinatorRepository,
+  auditRecorder,
 });
 
 // Depends on getEnv() (bcrypt cost factor) — lazily constructed and cached,

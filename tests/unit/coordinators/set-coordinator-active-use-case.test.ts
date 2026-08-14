@@ -4,6 +4,7 @@ import {
   CoordinatorAlreadyActiveError,
   CoordinatorAlreadyDisabledError,
   CoordinatorNotFoundError,
+  MaxActiveCoordinatorsError,
 } from "../../../src/modules/coordinators/domain/errors";
 import { NotAuthorizedError } from "../../../src/lib/errors";
 import { InMemoryCoordinatorRepository } from "../../support/fakes/in-memory-coordinator-repository";
@@ -23,6 +24,7 @@ function seedRecord(overrides: Partial<CoordinatorRecord> = {}): CoordinatorReco
     isActive: true,
     position: null,
     batchIds: [],
+    permissions: [],
     createdAt: new Date(),
     ...overrides,
   };
@@ -80,6 +82,16 @@ describe("SetCoordinatorActiveUseCase", () => {
   it("revokes every session when disabling, but not when enabling", async () => {
     await ctx.useCase.execute({ actor: SECRETARY, coordinatorId: "target-coordinator", isActive: false });
     expect(ctx.revokedUserIds).toEqual(["target-user"]);
+  });
+
+  it("rejects reactivating when 2 other coordinators are already active (roadmap §2.1 — max 2 active)", async () => {
+    ctx.coordinatorRepository.seed(seedRecord({ isActive: false }));
+    ctx.coordinatorRepository.seed(seedRecord({ id: "already-active-1", userId: "u1", isActive: true }));
+    ctx.coordinatorRepository.seed(seedRecord({ id: "already-active-2", userId: "u2", isActive: true }));
+
+    await expect(
+      ctx.useCase.execute({ actor: SECRETARY, coordinatorId: "target-coordinator", isActive: true }),
+    ).rejects.toBeInstanceOf(MaxActiveCoordinatorsError);
   });
 
   it("records COORDINATOR_DISABLED on disable and COORDINATOR_ENABLED on enable", async () => {

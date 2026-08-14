@@ -25,7 +25,7 @@ export class InMemoryRecruiterAccountRepository implements RecruiterAccountRepos
       fullName: data.fullName,
       companyName: data.companyName,
       isActive: true,
-      approvalStatus: "APPROVED",
+      approvalStatus: data.approvalStatus ?? "APPROVED",
       createdAt: new Date(),
     };
     this.byId.set(record.id, record);
@@ -60,6 +60,14 @@ export class InMemoryRecruiterAccountRepository implements RecruiterAccountRepos
     const existing = this.byId.get(id);
     if (!existing) throw new Error("not found");
     const updated = { ...existing, approvalStatus: status };
+    this.byId.set(id, updated);
+    return updated;
+  }
+
+  async approveAndActivate(id: string): Promise<RecruiterAccountRecord> {
+    const existing = this.byId.get(id);
+    if (!existing) throw new Error("not found");
+    const updated: RecruiterAccountRecord = { ...existing, approvalStatus: "APPROVED", isActive: true };
     this.byId.set(id, updated);
     return updated;
   }

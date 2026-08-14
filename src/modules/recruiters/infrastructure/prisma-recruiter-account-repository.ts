@@ -13,7 +13,12 @@ export class PrismaRecruiterAccountRepository implements RecruiterAccountReposit
 
   async create(data: CreateRecruiterAccountData): Promise<RecruiterAccountRecord> {
     const row = await this.prisma.recruiterProfile.create({
-      data: { userId: data.userId, fullName: data.fullName, companyName: data.companyName },
+      data: {
+        userId: data.userId,
+        fullName: data.fullName,
+        companyName: data.companyName,
+        approvalStatus: data.approvalStatus,
+      },
       include: { user: true },
     });
     return toDomain(row);
@@ -48,6 +53,19 @@ export class PrismaRecruiterAccountRepository implements RecruiterAccountReposit
       data: { approvalStatus: status },
       include: { user: true },
     });
+    return toDomain(row);
+  }
+
+  async approveAndActivate(id: string): Promise<RecruiterAccountRecord> {
+    // Mirrors setActive's own transaction shape.
+    const [row] = await this.prisma.$transaction([
+      this.prisma.recruiterProfile.update({
+        where: { id },
+        data: { approvalStatus: "APPROVED" },
+        include: { user: true },
+      }),
+      this.prisma.user.updateMany({ where: { recruiterProfile: { id } }, data: { isActive: true } }),
+    ]);
     return toDomain(row);
   }
 

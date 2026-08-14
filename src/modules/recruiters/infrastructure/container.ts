@@ -1,7 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { getEnv } from "@/config/env";
 import { PrismaAuditRecorder } from "@/lib/audit";
-import { getAdminResetPasswordUseCase, revokeUserSessions } from "@/modules/auth";
+import {
+  getAdminResetPasswordUseCase,
+  revokeUserSessions,
+  hashPassword,
+  getIssueEmailVerificationTokenUseCase,
+} from "@/modules/auth";
 import { notificationService } from "@/modules/notifications";
 import { SearchDirectoryUseCase } from "../application/use-cases/search-directory";
 import { GetRecruiterStudentProfileUseCase } from "../application/use-cases/get-student-profile";
@@ -24,6 +29,7 @@ import { SearchRecruiterAccountsUseCase } from "../application/use-cases/admin/s
 import { GetRecruiterAccountUseCase } from "../application/use-cases/admin/get-recruiter-account";
 import { BulkSetRecruitersActiveUseCase } from "../application/use-cases/admin/bulk-set-recruiters-active";
 import { ResetRecruiterPasswordUseCase } from "../application/use-cases/admin/reset-password";
+import { SignupRecruiterUseCase } from "../application/use-cases/signup-recruiter";
 import { PrismaRecruiterDirectoryRepository } from "./prisma-recruiter-directory-repository";
 import { PrismaRecruiterAccountRepository } from "./prisma-recruiter-account-repository";
 import { PrismaRecruiterUserProvisioner } from "./prisma-recruiter-user-provisioner";
@@ -110,8 +116,16 @@ export const setRecruiterActiveUseCase = new SetRecruiterActiveUseCase({
   auditRecorder,
   revokeUserSessions,
 });
-export const approveRecruiterUseCase = new ApproveRecruiterUseCase({ recruiterAccountRepository, auditRecorder });
-export const rejectRecruiterUseCase = new RejectRecruiterUseCase({ recruiterAccountRepository, auditRecorder });
+export const approveRecruiterUseCase = new ApproveRecruiterUseCase({
+  recruiterAccountRepository,
+  auditRecorder,
+  notificationService,
+});
+export const rejectRecruiterUseCase = new RejectRecruiterUseCase({
+  recruiterAccountRepository,
+  auditRecorder,
+  notificationService,
+});
 export const searchRecruiterAccountsUseCase = new SearchRecruiterAccountsUseCase({ recruiterAccountRepository });
 export const getRecruiterAccountUseCase = new GetRecruiterAccountUseCase({ recruiterAccountRepository });
 export const bulkSetRecruitersActiveUseCase = new BulkSetRecruitersActiveUseCase({
@@ -134,5 +148,18 @@ export function getCreateRecruiterAccountUseCase(): CreateRecruiterAccountUseCas
     recruiterAccountRepository,
     recruiterUserProvisioner: getRecruiterUserProvisioner(),
     auditRecorder,
+  }));
+}
+
+let cachedSignupRecruiterUseCase: SignupRecruiterUseCase | undefined;
+export function getSignupRecruiterUseCase(): SignupRecruiterUseCase {
+  return (cachedSignupRecruiterUseCase ??= new SignupRecruiterUseCase({
+    recruiterAccountRepository,
+    recruiterUserProvisioner: getRecruiterUserProvisioner(),
+    secretaryRecipientLookup,
+    notificationService,
+    auditRecorder,
+    hashPassword,
+    issueEmailVerificationToken: (input) => getIssueEmailVerificationTokenUseCase().execute(input),
   }));
 }

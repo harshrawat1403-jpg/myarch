@@ -8,6 +8,7 @@ export class InMemoryUserRepository implements UserRepository {
     Pick<AuthenticatedActor, "batchScope" | "studentProfileId">
   >();
   private readonly lastLoginByUserId = new Map<string, Date>();
+  private readonly emailVerifiedUserIds = new Set<string>();
 
   seed(
     user: AuthUserRecord,
@@ -70,5 +71,14 @@ export class InMemoryUserRepository implements UserRepository {
   /** Test-only accessor. */
   getAvatarFileId(userId: string): string | null | undefined {
     return this.usersById.get(userId)?.avatarFileId;
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    this.emailVerifiedUserIds.add(userId);
+  }
+
+  /** Test-only accessor for asserting markEmailVerified was called. */
+  isEmailVerified(userId: string): boolean {
+    return this.emailVerifiedUserIds.has(userId);
   }
 }

@@ -2,6 +2,7 @@ import type { AuthenticatedActor } from "@/modules/auth";
 import { NotAuthorizedError } from "@/lib/errors";
 import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import type { AuditRecorder } from "@/lib/audit";
+import type { NotificationService } from "@/modules/notifications";
 import type { RecruiterAccountRecord } from "../../../domain/entities";
 import { RecruiterAccountNotFoundError, RecruiterNotPendingError } from "../../../domain/errors";
 import type { RecruiterAccountRepository } from "../../ports/recruiter-account-repository";
@@ -11,9 +12,14 @@ export interface RejectRecruiterInput {
   recruiterId: string;
 }
 
+/** Deliberately never touches User.isActive — it was created false (see SignupRecruiterUseCase) and a rejection must never grant access. */
 export class RejectRecruiterUseCase {
   constructor(
-    private readonly deps: { recruiterAccountRepository: RecruiterAccountRepository; auditRecorder: AuditRecorder },
+    private readonly deps: {
+      recruiterAccountRepository: RecruiterAccountRepository;
+      auditRecorder: AuditRecorder;
+      notificationService: NotificationService;
+    },
   ) {}
 
   async execute(input: RejectRecruiterInput): Promise<RecruiterAccountRecord> {
@@ -32,6 +38,12 @@ export class RejectRecruiterUseCase {
       action: AUDIT_ACTIONS.RECRUITER_REJECTED,
       targetEntityType: "User",
       targetEntityId: existing.userId,
+    });
+
+    await this.deps.notificationService.notify({
+      recipientUserId: existing.userId,
+      template: "ACCOUNT_SIGNUP_DECIDED",
+      context: { accountType: "RECRUITER", decision: "REJECTED" },
     });
 
     return updated;

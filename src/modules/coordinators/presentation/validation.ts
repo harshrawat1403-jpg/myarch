@@ -33,3 +33,8 @@ export const BulkSetActiveRequestSchema = z.object({
   coordinatorIds: z.array(z.string().uuid()).min(1),
   isActive: z.boolean(),
 });
+
+/** MYARCH Phase 1 — key format checked here; membership in COORDINATOR_PERMISSION_KEYS is checked by the use case (the source of truth, so validation and the use case can never drift). */
+export const UpdateCoordinatorPermissionsRequestSchema = z.object({
+  permissions: z.array(z.string().trim().min(1)),
+});

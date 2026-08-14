@@ -4,8 +4,8 @@ import { NotAuthorizedError } from "@/lib/errors";
 import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import type { AuditRecorder } from "@/lib/audit";
 import type { BatchLookup } from "@/lib/batch-lookup";
-import type { CoordinatorPosition, CoordinatorRecord } from "../../domain/entities";
-import { BatchNotFoundError, DuplicateEmailError } from "../../domain/errors";
+import { MAX_ACTIVE_COORDINATORS, type CoordinatorPosition, type CoordinatorRecord } from "../../domain/entities";
+import { BatchNotFoundError, DuplicateEmailError, MaxActiveCoordinatorsError } from "../../domain/errors";
 import type { CoordinatorRepository } from "../ports/coordinator-repository";
 import type { CoordinatorUserProvisioner } from "../ports/coordinator-user-provisioner";
 
@@ -38,6 +38,15 @@ export class CreateCoordinatorUseCase {
   async execute(input: CreateCoordinatorInput): Promise<CreateCoordinatorResult> {
     if (!canManageCoordinatorAccounts(input.actor)) {
       throw new NotAuthorizedError("Not authorized to create coordinator accounts");
+    }
+
+    // A newly created Coordinator is always active (no isActive input exists
+    // on this use case), so the cap applies unconditionally here — checked
+    // before the batch-existence loop since it is the cheaper, no-I/O-per-id
+    // failure to surface first.
+    const activeCount = await this.deps.coordinatorRepository.countActive();
+    if (activeCount >= MAX_ACTIVE_COORDINATORS) {
+      throw new MaxActiveCoordinatorsError();
     }
 
     for (const batchId of input.batchIds ?? []) {

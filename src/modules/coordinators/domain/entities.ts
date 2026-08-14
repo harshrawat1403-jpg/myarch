@@ -21,9 +21,14 @@ export interface CoordinatorRecord {
   readonly isActive: boolean;
   readonly position: CoordinatorPosition | null;
   readonly batchIds: readonly string[];
+  /** MYARCH Phase 1 — granular capabilities delegated by the Technical Secretary. See domain/permissions.ts. */
+  readonly permissions: readonly string[];
   /** Sourced from User.createdAt — CoordinatorProfile itself has no createdAt column. */
   readonly createdAt: Date;
 }
+
+/** Roadmap §2.1 — "Maximum ACTIVE Coordinators = 2," enforced server-side, not merely a UI limit. Shared by CreateCoordinatorUseCase and SetCoordinatorActiveUseCase (reactivation). */
+export const MAX_ACTIVE_COORDINATORS = 2;
 
 export interface CoordinatorSearchFilters {
   readonly name?: string;

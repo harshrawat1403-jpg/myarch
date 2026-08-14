@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { PrismaTransactionClient } from "@/lib/prisma";
 import { PrismaBatchLookup } from "@/lib/batch-lookup";
 import { PrismaAuditRecorder } from "@/lib/audit";
-import { buildAdminResetPasswordUseCase } from "@/modules/auth";
+import { buildAdminResetPasswordUseCase, getIssueEmailVerificationTokenUseCase } from "@/modules/auth";
 import { buildCreateStudentUseCase } from "@/modules/students";
 import { sendDirectEmail, notificationService } from "@/modules/notifications";
 import type { NotificationRequest, NotificationService } from "@/modules/notifications";
@@ -34,7 +34,13 @@ export const submitRegistrationRequestUseCase = new SubmitRegistrationRequestUse
   existingAccountLookup,
   reviewerLookup,
   notificationService,
+  issueEmailVerificationToken: (input) => getIssueEmailVerificationTokenUseCase().execute(input),
 });
+
+/** MYARCH Phase 1 — called only from /api/auth/verify-email/route.ts, never from within the auth module (see that route's own doc comment for why). */
+export async function markRegistrationRequestEmailVerified(registrationRequestId: string): Promise<void> {
+  await registrationRequestRepository.markEmailVerified(registrationRequestId);
+}
 
 export const listRegisterableBatchesUseCase = new ListRegisterableBatchesUseCase({
   registerableBatchLookup,

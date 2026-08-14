@@ -3,8 +3,13 @@ import { canManageCoordinatorAccounts } from "@/modules/auth";
 import { NotAuthorizedError } from "@/lib/errors";
 import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import type { AuditRecorder } from "@/lib/audit";
-import type { CoordinatorRecord } from "../../domain/entities";
-import { CoordinatorAlreadyActiveError, CoordinatorAlreadyDisabledError, CoordinatorNotFoundError } from "../../domain/errors";
+import { MAX_ACTIVE_COORDINATORS, type CoordinatorRecord } from "../../domain/entities";
+import {
+  CoordinatorAlreadyActiveError,
+  CoordinatorAlreadyDisabledError,
+  CoordinatorNotFoundError,
+  MaxActiveCoordinatorsError,
+} from "../../domain/errors";
 import type { CoordinatorRepository } from "../ports/coordinator-repository";
 
 export interface SetCoordinatorActiveInput {
@@ -43,6 +48,13 @@ export class SetCoordinatorActiveUseCase {
 
     if (input.isActive && existing.isActive) throw new CoordinatorAlreadyActiveError();
     if (!input.isActive && !existing.isActive) throw new CoordinatorAlreadyDisabledError();
+
+    if (input.isActive) {
+      const activeCount = await this.deps.coordinatorRepository.countActive();
+      if (activeCount >= MAX_ACTIVE_COORDINATORS) {
+        throw new MaxActiveCoordinatorsError();
+      }
+    }
 
     const updated = await this.deps.coordinatorRepository.setActive(input.coordinatorId, input.isActive);
 

@@ -23,6 +23,7 @@ export class InMemoryCoordinatorRepository implements CoordinatorRepository {
       isActive: true,
       position: data.position ?? null,
       batchIds: [],
+      permissions: [],
       createdAt: new Date(),
     };
     this.byId.set(record.id, record);
@@ -56,6 +57,18 @@ export class InMemoryCoordinatorRepository implements CoordinatorRepository {
     const existing = this.byId.get(id);
     if (!existing) throw new Error("not found");
     const updated = { ...existing, isActive };
+    this.byId.set(id, updated);
+    return updated;
+  }
+
+  async countActive(): Promise<number> {
+    return [...this.byId.values()].filter((record) => record.isActive).length;
+  }
+
+  async setPermissions(id: string, permissions: readonly string[]): Promise<CoordinatorRecord> {
+    const existing = this.byId.get(id);
+    if (!existing) throw new Error("not found");
+    const updated = { ...existing, permissions };
     this.byId.set(id, updated);
     return updated;
   }

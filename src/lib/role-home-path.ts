@@ -13,6 +13,8 @@ export function roleHomePath(role: string | null): string {
       return "/student";
     case "RECRUITER":
       return "/recruiter";
+    case "ALUMNI":
+      return "/alumni";
     default:
       return "/login";
   }

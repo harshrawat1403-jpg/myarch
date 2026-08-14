@@ -20,3 +20,23 @@ export class DuplicateAlumniLinkError extends Error {
     this.name = "DuplicateAlumniLinkError";
   }
 }
+
+// MYARCH Phase 1 (§2.4) — self-signup + admin approve/reject. Mirrors
+// recruiters/domain/errors.ts's DuplicateEmailError/RecruiterNotPendingError
+// exactly (deliberately re-declared here rather than imported, per this
+// module's own isolation convention above).
+
+export class DuplicateEmailError extends Error {
+  constructor(email: string) {
+    super(`An account with email "${email}" already exists`);
+    this.name = "DuplicateEmailError";
+  }
+}
+
+/** ApproveAlumniUseCase/RejectAlumniUseCase only operate on a PENDING account — admin-created directory rows default to APPROVED and never reach this path. */
+export class AlumniNotPendingError extends Error {
+  constructor() {
+    super("This alumni account is not pending approval");
+    this.name = "AlumniNotPendingError";
+  }
+}

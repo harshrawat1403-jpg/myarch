@@ -62,5 +62,8 @@ export {
   rejectRecruiterRouteHandler,
 } from "./presentation/route-handlers/admin/approve-reject";
 export { resetRecruiterPasswordRouteHandler } from "./presentation/route-handlers/admin/reset-password";
+
+// MYARCH Phase 1 (§2.4) — public self-signup.
+export { signupRecruiterRouteHandler } from "./presentation/route-handlers/signup";
 export { bulkSetRecruitersActiveRouteHandler } from "./presentation/route-handlers/admin/bulk-set-active";
 export { getRecruiterActivityRouteHandler } from "./presentation/route-handlers/admin/activity";

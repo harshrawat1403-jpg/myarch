@@ -77,3 +77,35 @@ export class InvalidAvatarFileError extends Error {
     this.name = "InvalidAvatarFileError";
   }
 }
+
+/** MYARCH Phase 1 — VerifyEmailUseCase, the presented token doesn't match any issued token (never issued, or a garbage value). */
+export class InvalidVerificationTokenError extends Error {
+  constructor() {
+    super("This verification link is invalid");
+    this.name = "InvalidVerificationTokenError";
+  }
+}
+
+/** MYARCH Phase 1 — VerifyEmailUseCase, a real but already-consumed or expired token. */
+export class VerificationTokenExpiredError extends Error {
+  constructor() {
+    super("This verification link has expired or was already used. Request a new one.");
+    this.name = "VerificationTokenExpiredError";
+  }
+}
+
+/** MYARCH Phase 1 — ResetPasswordUseCase, the presented token doesn't match any issued token. */
+export class InvalidPasswordResetTokenError extends Error {
+  constructor() {
+    super("This password reset link is invalid");
+    this.name = "InvalidPasswordResetTokenError";
+  }
+}
+
+/** MYARCH Phase 1 — ResetPasswordUseCase, a real but already-consumed or expired token. */
+export class PasswordResetTokenExpiredError extends Error {
+  constructor() {
+    super("This password reset link has expired or was already used. Request a new one.");
+    this.name = "PasswordResetTokenExpiredError";
+  }
+}

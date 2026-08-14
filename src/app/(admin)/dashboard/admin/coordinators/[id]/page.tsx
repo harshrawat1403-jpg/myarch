@@ -3,18 +3,20 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, History, KeyRound, Layers, Plus, X } from "lucide-react";
+import { ChevronLeft, History, KeyRound, Layers, Plus, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { formatAuditAction } from "@/lib/format-audit-action";
-import type { CoordinatorPosition, CoordinatorRecord } from "@/modules/coordinators";
+import type { CoordinatorPermissionKey, CoordinatorPosition, CoordinatorRecord } from "@/modules/coordinators";
 import type { Batch } from "@/modules/batches";
 import type { AuditLogEntry } from "@/lib/audit";
 import { COORDINATOR_POSITION_OPTIONS } from "@/lib/coordinator-position";
+import { COORDINATOR_PERMISSION_KEYS, coordinatorPermissionLabel } from "@/lib/coordinator-permissions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { DataLabel } from "@/components/ui/typography";
 import { DashboardPanel } from "@/components/dashboard-panel";
@@ -22,6 +24,15 @@ import { RevealPasswordModal } from "@/components/ui/reveal-password-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { useToast } from "@/components/ui/toast";
+
+// MYARCH Phase 1 (§2.3) — grouped by the domain prefix before the first
+// "." (e.g. "maintenance.view" → "maintenance") so the editor reads as a
+// handful of labeled clusters rather than one flat list of 17 checkboxes.
+const PERMISSION_GROUPS: Record<string, CoordinatorPermissionKey[]> = {};
+for (const key of COORDINATOR_PERMISSION_KEYS) {
+  const domain = key.split(".")[0]!;
+  (PERMISSION_GROUPS[domain] ??= []).push(key);
+}
 
 export default function CoordinatorDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -42,6 +53,8 @@ export default function CoordinatorDetailPage() {
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [isSavingPermissions, setIsSavingPermissions] = useState(false);
 
   const load = useCallback(async () => {
     if (!accessToken || !id) return;
@@ -54,6 +67,7 @@ export default function CoordinatorDetailPage() {
       setCoordinator(record);
       setFullName(record.fullName);
       setPosition(record.position ?? "");
+      setSelectedPermissions([...record.permissions]);
       setBatches(batchList);
       setActivity(activityEntries);
     } catch (err) {
@@ -117,6 +131,28 @@ export default function CoordinatorDetailPage() {
       toast.error(err instanceof ApiError ? err.message : "Unable to update status.");
     } finally {
       setIsActionWorking(false);
+    }
+  }
+
+  function togglePermission(key: CoordinatorPermissionKey) {
+    setSelectedPermissions((prev) => (prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]));
+  }
+
+  async function handleSavePermissions() {
+    if (!coordinator || !accessToken) return;
+    setIsSavingPermissions(true);
+    try {
+      await apiClient.patch(
+        `/api/coordinators/${coordinator.id}/permissions`,
+        { permissions: selectedPermissions },
+        accessToken,
+      );
+      toast.success("Permissions updated.");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to update permissions.");
+    } finally {
+      setIsSavingPermissions(false);
     }
   }
 
@@ -257,6 +293,43 @@ export default function CoordinatorDetailPage() {
               </Button>
             </div>
           )}
+        </div>
+      </DashboardPanel>
+
+      <DashboardPanel title="Delegated Permissions" icon={ShieldCheck}>
+        <p className="text-sm text-(--color-text-secondary)">
+          Granular capabilities this Coordinator may use. Unselected capabilities remain Secretary-only.
+        </p>
+        <div className="mt-4 space-y-4">
+          {Object.entries(PERMISSION_GROUPS).map(([domain, keys]) => (
+            <div key={domain}>
+              <DataLabel>{domain}</DataLabel>
+              <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2">
+                {keys.map((key) => (
+                  <Checkbox
+                    key={key}
+                    id={`perm-${key}`}
+                    label={coordinatorPermissionLabel(key)}
+                    checked={selectedPermissions.includes(key)}
+                    onChange={() => togglePermission(key)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 border-t border-(--color-border) pt-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleSavePermissions}
+            disabled={
+              isSavingPermissions ||
+              JSON.stringify([...selectedPermissions].sort()) === JSON.stringify([...coordinator.permissions].sort())
+            }
+          >
+            {isSavingPermissions ? "Saving…" : "Save permissions"}
+          </Button>
         </div>
       </DashboardPanel>
 

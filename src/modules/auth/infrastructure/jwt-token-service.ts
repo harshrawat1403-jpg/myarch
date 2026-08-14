@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import type { Role } from "../domain/entities";
 import type { AccessTokenClaims, TokenService } from "../application/ports/token-service";
 
-const VALID_ROLES: readonly Role[] = ["SECRETARY", "COORDINATOR", "STUDENT", "RECRUITER"];
+const VALID_ROLES: readonly Role[] = ["SECRETARY", "COORDINATOR", "STUDENT", "RECRUITER", "ALUMNI"];
 
 function isRole(value: unknown): value is Role {
   return typeof value === "string" && (VALID_ROLES as readonly string[]).includes(value);
@@ -25,6 +25,7 @@ export class JwtTokenService implements TokenService {
       {
         role: claims.role,
         batchScope: claims.batchScope,
+        permissions: claims.permissions,
         studentProfileId: claims.studentProfileId,
         mustChangePassword: claims.mustChangePassword,
       },
@@ -56,6 +57,7 @@ export class JwtTokenService implements TokenService {
       sub: decoded.sub,
       role: decoded["role"],
       batchScope: decoded["batchScope"] as readonly string[] | undefined,
+      permissions: decoded["permissions"] as readonly string[] | undefined,
       studentProfileId: decoded["studentProfileId"] as string | undefined,
       mustChangePassword: decoded["mustChangePassword"] as boolean | undefined,
     };

@@ -21,6 +21,8 @@ export interface RegistrationRequestRecord {
   readonly batchId: string;
   readonly submittedData: RegistrationSubmittedData;
   readonly status: RegistrationRequestStatus;
+  /** MYARCH Phase 1 (§2.4) — null until the applicant verifies their email. DecideRegistrationRequestUseCase refuses to APPROVE while this is null. */
+  readonly emailVerifiedAt: Date | null;
   readonly coordinatorComment: string | null;
   readonly reviewedByUserId: string | null;
   readonly reviewedAt: Date | null;

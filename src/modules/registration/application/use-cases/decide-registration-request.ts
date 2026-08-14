@@ -19,6 +19,7 @@ import {
   DuplicateRegistrationEmailError,
   DuplicateRegistrationRollNumberError,
   InvalidRegistrationTransitionError,
+  RegistrationEmailNotVerifiedError,
   RegistrationRequestNotFoundError,
 } from "../../domain/errors";
 import type { RegistrationRequestRepository } from "../ports/registration-request-repository";
@@ -154,6 +155,13 @@ export class DecideRegistrationRequestUseCase {
       });
 
       return { request: updated };
+    }
+
+    // MYARCH Phase 1 (§2.4) — a real account (and userId) is about to be
+    // created for this email; it must be verified first. Only gates
+    // APPROVE — REJECT above never creates an account, so it's unaffected.
+    if (!existing.emailVerifiedAt) {
+      throw new RegistrationEmailNotVerifiedError();
     }
 
     // Create the student account, reset its password, and mark the request

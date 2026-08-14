@@ -121,7 +121,7 @@ const ACCOUNT_NAV_ITEM: NavItem = {
 };
 
 const ROLE_LABELS: Record<string, string> = {
-  SECRETARY: "Secretary",
+  SECRETARY: "Technical Secretary",
   COORDINATOR: "Coordinator",
 };
 

@@ -35,7 +35,7 @@ function buildHandler() {
     assignBatch: async (input) => {
       if (input.coordinatorId === failingAssignCoordinatorId) throw new Error("Batch already assigned");
       assignedPairs.push({ coordinatorId: input.coordinatorId, batchId: input.batchId });
-      return { id: input.coordinatorId, userId: "u", email: "x@x.com", fullName: "x", isActive: true, position: null, batchIds: [input.batchId], createdAt: new Date() } as CoordinatorRecord;
+      return { id: input.coordinatorId, userId: "u", email: "x@x.com", fullName: "x", isActive: true, position: null, batchIds: [input.batchId], permissions: [], createdAt: new Date() } as CoordinatorRecord;
     },
   });
 

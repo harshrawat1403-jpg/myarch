@@ -18,7 +18,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
 
 const ROLE_LABELS: Record<DirectoryRole, string> = {
-  SECRETARY: "Secretary",
+  SECRETARY: "Technical Secretary",
   COORDINATOR: "Coordinator",
   STUDENT: "Student",
   RECRUITER: "Recruiter",

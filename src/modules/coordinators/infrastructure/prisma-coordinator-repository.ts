@@ -63,6 +63,19 @@ export class PrismaCoordinatorRepository implements CoordinatorRepository {
     return toDomain(row);
   }
 
+  async countActive(): Promise<number> {
+    return this.prisma.coordinatorProfile.count({ where: { isActive: true } });
+  }
+
+  async setPermissions(id: string, permissions: readonly string[]): Promise<CoordinatorRecord> {
+    const row = await this.prisma.coordinatorProfile.update({
+      where: { id },
+      data: { permissions: [...permissions] },
+      include: { user: true, batchScopes: true },
+    });
+    return toDomain(row);
+  }
+
   async search(filters: CoordinatorSearchFilters): Promise<CoordinatorRecord[]> {
     const where: Prisma.CoordinatorProfileWhereInput = {
       isActive: filters.includeInactive ? undefined : true,
@@ -104,6 +117,7 @@ function toDomain(row: CoordinatorProfileWithUser): CoordinatorRecord {
     isActive: row.isActive,
     position: row.position,
     batchIds: row.batchScopes.map((scope) => scope.batchId),
+    permissions: row.permissions,
     createdAt: row.user.createdAt,
   };
 }

@@ -26,15 +26,15 @@
 
 
 
-CURRENT\_PHASE: 0
+CURRENT\_PHASE: 2
 
 STATUS: NOT\_STARTED
 
-LAST\_COMPLETED\_PHASE: NONE
+LAST\_COMPLETED\_PHASE: 1
 
 BLOCKED: FALSE
 
-BLOCK\_REASON: NONE
+BLOCK\_REASON: none — Phase 1's two required decisions (hierarchy, authentication scope) were answered by the Technical Secretary on 2026-08-14; Phase 1 is implemented, tested, migrated to production, and verified. See the Phase Report under "\# 2. PHASE 1 — MYARCH FOUNDATION" below. Phase 2 has not yet started.
 
 
 
@@ -794,7 +794,7 @@ Then update this roadmap.
 
 
 
-STATUS: NOT\_STARTED
+STATUS: COMPLETE
 
 
 
@@ -976,6 +976,184 @@ DO NOT implement features during this phase.
 
 
 
+\## AUDIT RESULTS (completed 2026-08-14)
+
+
+
+\### ARCHITECTURE SUMMARY
+
+
+
+Next.js 16 App Router, React 19, TypeScript strict, Prisma 6 + PostgreSQL (Neon in production), Tailwind v4, Vitest (184 test files / 1415 tests, all passing), Playwright installed but no committed e2e suite. Feature-first Clean Architecture under \`src/modules/\<name\>/{domain,application,infrastructure,presentation}\`, enforced by an ESLint \`no-restricted-imports\` module-boundary rule — outside code may only import a module's \`index.ts\` barrel. JWT access token (short-lived, kept in React memory only) + httpOnly rotating refresh-token cookie. A single \`withAuth\` higher-order function (not Next middleware.ts) wraps every API route: Authentication → JWT Validation → mustChangePassword gate → Role Validation → Batch Scope Validation → optional rate limit → handler. No dead code, no duplicate systems, no broken build found — the existing application is production-deployed (Vercel + Neon) and in good health.
+
+Existing modules: \`auth\`, \`students\`, \`batches\`, \`coordinators\`, \`recruiters\`, \`companies\`, \`placements\`, \`registration\`, \`profiles\`, \`alumni\`, \`publications\`, \`notifications\`, \`jobs\`, \`academic-year\`, \`administration\`, \`exports\`, \`reports\`, \`search\`, \`public-directory\`.
+
+
+
+\### EXISTING FUNCTIONALITY MAP (DONE)
+
+
+
+\- Authentication: login, logout, refresh (rotating), self-service password change, self-service email change, avatar upload — \`src/modules/auth/\*\`, routes under \`src/app/api/auth/\*\`. Bcrypt cost \>= 12 enforced (\`src/modules/auth/infrastructure/bcrypt-password-hasher.ts\`). Password policy (\>=10 chars, \>=3 of 4 classes) enforced server-side.
+
+\- Roles: SECRETARY, COORDINATOR, STUDENT, RECRUITER (\`prisma/schema.prisma\` \`enum Role\`). Secretary = unscoped "Super Admin" per \`docs/security/09\_User\_Roles\_and\_Permissions.md\`. Coordinator = batch-scoped via \`CoordinatorBatchScope\` join table ("zero rows = zero access").
+
+\- Authorization: centrally in \`src/modules/auth/domain/permissions.ts\` — one hand-written boolean function per capability (e.g. \`canManageCoordinatorAccounts\`, \`canManageAlumni\`), never a generic delegated/granular permission-string system.
+
+\- Student domain: \`StudentProfile\` + \`StudentPrivateProfile\` (CGPA, backlog, phone, confidential remarks) + \`StudentPublicProfile\`/\`StudentPublicProfileDraft\` (bio, skills, software, portfolioLinks, selectedProjects/certifications/internships as JSON, resume file, visibility flags \`isPubliclyDiscoverable\`/\`showCgpa\`) + draft/approve/publish workflow with Secretary-only final approval.
+
+\- Recruiter domain: directory browsing, save/shortlist, interest requests, admin-managed accounts.
+
+\- Placement domain: \`Company\`, \`PlacementDrive\` (PLACEMENT/INTERNSHIP type), \`Application\` lifecycle with append-only \`ApplicationStatusEvent\` audit trail, interview scheduling, internship outcomes.
+
+\- Registration: public self-registration REQUEST (not an account) → Coordinator review/mark → Secretary approve/reject → account provisioned with a system-generated temp password.
+
+\- Publications: a report/newsletter authoring studio (\`PublicationTemplate\`/\`Publication\`/\`PublicationVersion\`/\`PublicationExport\`) with PPTX/PDF export — 10 template kinds, versioning.
+
+\- Alumni: \`AlumniProfile\` with a static \`mentorshipAvailable\` boolean flag only.
+
+\- Notifications: in-app + email, read/unread, a template registry (\`src/modules/notifications/application/templates/\*\`) covering 11 placement/registration-domain events, backed by a generic background \`Job\` queue/worker (\`scripts/run-worker.ts\`).
+
+\- Audit: \`AuditLog\` model + \`AuditRecorder\` port, recording actor/action/entity/entityId/metadata for admin actions across every existing module.
+
+\- Academic year: an "Academic Year Transition Wizard" (\`src/modules/academic-year\`) that transitions \`Batch.status\` (ACTIVE→GRADUATED→ARCHIVED) and creates the next intake batch from a Secretary-reviewed plan — not a first-class \`AcademicYear\` entity with its own activate/close/archive lifecycle.
+
+\- Search: \`src/modules/search\` — global search across Students/Companies/Drives/Publications only (permission-aware, role-appropriate field whitelisting).
+
+\- Reports: \`src/modules/reports\` — placement funnel, my-placement-activity (student), my-recruiting-activity (recruiter), alumni, publications-usage. PPTX export.
+
+\- File storage: local-disk (\`src/lib/file-storage.ts\`), path-traversal-safe, behind authenticated routes only — no object storage configured yet (env vars reserved, unused).
+
+\- Rate limiting: login, refresh, recruiter-discovery, public-registration, public-directory (\`src/lib/rate-limiters.ts\`, Postgres token-bucket).
+
+\- Deployment: Vercel + Neon Postgres, 17 migrations applied to production, \`next.config.ts\` clean (no \`output: standalone\`), \`DATABASE\_URL\`/\`JWT\_\*\` env vars validated via Zod in \`src/config/env.ts\` (lazy, first-use).
+
+
+
+\### MISSING FUNCTIONALITY (roadmap-required, does not exist at any layer)
+
+
+
+Confirmed by the complete Prisma model list (\`enum Role/BatchStatus/ProfileDraftStatus/FileClassification/NotificationChannel/NotificationStatus/JobStatus/RecruiterApprovalStatus/RegistrationRequestStatus/CoordinatorPosition/BulkRunStatus/AcademicYearTransitionStatus/PlacementDriveType/PlacementDriveStatus/ApplicationStatus/InterviewMode/RecruiterInterestStatus/PublicationType/PublicationTemplateStatus/PublicationStatus/PublicationPageSize/PublicationExportFormat/PublicationExportStatus\` and \`model User/RefreshToken/SecretaryProfile/CoordinatorProfile/CoordinatorBatchScope/RecruiterProfile/RecruiterStudentInteraction/RecruiterInterestRequest/Batch/StudentProfile/StudentPrivateProfile/StudentPublicProfile/StudentPublicProfileDraft/RegistrationRequest/FileAsset/Company/PlacementDrive/Application/InternshipOutcome/AlumniProfile/ApplicationStatusEvent/AuditLog/Notification/Job/BulkImportRun/AcademicYearTransitionRun/RateLimitBucket/PublicationTemplate/Publication/PublicationVersion/PublicationExport\` — this is the entire schema, 46 models/enums, all inspected) — none of the following exist as data, service, route, or UI layers:
+
+
+
+\- Self-service signup + email verification + resend verification (MISSING — accounts today are only admin-provisioned or created via the RegistrationRequest approval flow; there is no public "create your own account and verify by email" path).
+
+\- Forgot password / password-reset-by-email (MISSING — only an authenticated self-service change, and an admin-triggered temp-password reset, exist; no unauthenticated "email me a reset link" flow).
+
+\- Granular delegated Coordinator permissions (\`maintenance.view\`, \`events.create\`, etc.) (MISSING — permissions are hardcoded per-capability functions, not a stored, delegable permission set).
+
+\- Maximum-2-active-Coordinators enforcement (MISSING — \`CreateCoordinatorUseCase\` has no count check of any kind).
+
+\- Maintenance issue tracking (category/priority/lifecycle/SLA/escalation) (MISSING — no model).
+
+\- Generic Request system (MISSING — no model; \`RegistrationRequest\` is registration-specific, not generic).
+
+\- Generic Task/follow-up engine (MISSING — no model; nothing to attach maintenance/events/meetings/elections/projects to).
+
+\- Calendar, Events, Meetings, Announcements (MISSING — no models).
+
+\- Council, Committees (incl. Core Committee), historical membership (MISSING — no models).
+
+\- Generic Form builder + Application pipeline + Scrutiny + Interview management (MISSING — no models; the existing \`Application\`/interview-scheduling is placement-domain-specific, not reusable for council/committee/election applications).
+
+\- Elections: lifecycle, ballots, voting, secret-ballot separation, counting, results (MISSING — no models; this is also the single highest-risk domain in the whole roadmap and needs its own dedicated security design pass before any schema work begins).
+
+\- Projects (technical-ops), Assets/Equipment, Facilities/Bookings, Inventory (MISSING — no models).
+
+\- Generic Resource Repository (forms/regulations/manuals/archives with versioning) (MISSING — \`FileAsset\` only backs avatars + private student documents + resumes + publication exports today, not a browsable document library).
+
+\- Mentorship workflow (request/acceptance/session/history/feedback) (PARTIAL — only \`AlumniProfile.mentorshipAvailable: Boolean\` exists; no request/session model).
+
+\- Direct messaging / discussion threads (MISSING — no model).
+
+\- Activity feed distinct from the audit log (MISSING).
+
+\- Archive-by-academic-year across the new domains (MISSING — depends on the domains above existing first).
+
+\- "Technical Secretary" / "MYARCH" terminology in the UI (PARTIAL — backend/DB already say "MYARCH" per prior work; the Secretary role is not labeled "Technical Secretary" anywhere in the UI copy today).
+
+\- Student profile fields the roadmap names but the schema doesn't have: preferred name, program (single-program department today), semester, SGPA, specialization, coursework, structured achievements (only a \`certifications\` JSON blob), activities (council/committee/clubs — blocked on those domains existing), interests, structured professional links (LinkedIn/GitHub/Behance — today one generic \`portfolioLinks\` string array), profile-completion percentage, a general document wallet (today: one resume + a confidential-documents relation, not a typed multi-document wallet with visibility/replace), student activity timeline, per-category notification preferences (PARTIAL/MISSING).
+
+\- Image optimization pipeline: resizing, compression, thumbnail generation, dimension caps, WebP/AVIF (MISSING — \`UploadAvatarUseCase\` validates declared MIME type and a 2MB size ceiling only; no resize/compress/thumbnail step, no dimension check, no file-signature/magic-byte verification).
+
+\- Opportunity Hub, Student/Coordinator/Technical-Secretary dashboards as specified in \# 18 (PARTIAL — role-specific dashboards exist today but surface only placement/profile/registration data; none of the new-domain widgets can exist until their data models do).
+
+\- Dashboard Edit Mode / widget configuration (MISSING).
+
+\- Demo Mode (REMOVED — a public demo-login feature existed and was deliberately and fully removed in a prior session at explicit user request; re-adding it would require a new decision, not a revival of old code).
+
+
+
+\### BROKEN FUNCTIONALITY
+
+
+
+None found. Full verification this session: \`npm run typecheck\` clean, \`npm run lint\` clean, \`npm test\` 184/184 files passing (1415/1415 tests), \`npm run build\` succeeds, \`git status\` clean.
+
+
+
+\### DUPLICATE SYSTEMS
+
+
+
+None found. No parallel user/role/notification/task/upload/audit/search/form systems exist to consolidate — because the systems this roadmap wants (task engine, form builder, etc.) do not exist yet at all, "reuse before create" applies going forward, not retroactively.
+
+
+
+\### SECURITY RISKS / ARCHITECTURAL CONFLICTS (none are current vulnerabilities — flagged because Phase 1 cannot safely start without resolving them)
+
+
+
+\- ARCHITECTURAL CONFLICT — hierarchy ambiguity: \# 2.1's diagram shows \`Technical Secretary → Super Admin → Coordinators\` (three tiers), but \# 2.2 immediately describes the Technical Secretary directly performing every Super Admin action ("creates Coordinators," "delegates permissions"), with no separate mention of who "Super Admin" is if not the Technical Secretary. The existing codebase already treats \`SECRETARY\` as the "Super Admin" title (\`docs/security/09\_User\_Roles\_and\_Permissions.md\`, "Secretary (Super Admin)") — i.e. today, Technical Secretary and Super Admin are the SAME role, not two tiers. Implementing \# 2.1 literally (as a real fourth role/tier) versus implementing it as a rename (Secretary becomes "Technical Secretary," "Super Admin" stays a title, not a tier) produces two structurally different Role models, migrations, and permission systems. This cannot be guessed — see \# 0.4 "NEVER GUESS" and \# 0.14's "missing information required for a safe decision."
+
+\- SECURITY-SENSITIVE, NOT YET A VULNERABILITY — \# 2.4 requires signup, email verification, resend verification, and forgot-password to be "implemented/verified." None exist today. Adding them means adding brand-new, unauthenticated, public attack surface (account creation, email-based token verification/reset) to a production system that currently has none. \# 28's "AUTOMATED EXECUTION RULE" explicitly requires stopping for human approval before "changing authentication architecture" — this qualifies.
+
+\- LOW-SEVERITY HARDENING GAP — \`UploadAvatarUseCase\` trusts the client-declared MIME type (Content-Type header) with no file-signature/magic-byte check. Not a new risk (pre-existing, already in production), but \# 21/\# 9.6 explicitly ask for this to be verified/hardened — noted for the Storage/Hardening phases (\# 14, \# 15), not Phase 1.
+
+\- ELECTION DOMAIN FLAGGED EARLY — \# 7 (Election Management) has the strictest security requirements in the entire roadmap (secret ballot, one-person-one-vote, immutable finalized votes, election-lock). No election infrastructure exists today. When Phase 6 is reached, this needs its own dedicated design/threat-model pass before schema work, not an incidental extension of the existing \`Application\`/\`RegistrationRequest\` patterns.
+
+
+
+\### DATABASE CHANGES REQUIRED (by future phase — none made during this audit)
+
+
+
+\- Phase 1: possibly a Role/hierarchy change (pending the conflict above), a delegated-permission table for Coordinators, a max-2-active-Coordinators constraint, email-verification-token + password-reset-token tables.
+
+\- Phase 2: MaintenanceIssue, generic Request, generic Task (reused by every later phase per \# 3.8 — build it once, correctly, here).
+
+\- Phase 3: CalendarEvent/Event, Meeting, Announcement.
+
+\- Phase 4: Council/Committee + historical membership.
+
+\- Phase 5: Form/FormField/FormSubmission, generic Application pipeline, Scrutiny, Interview (generic, not placement-specific).
+
+\- Phase 6: Election, Position, Candidate, Ballot/Vote (with the secret-ballot separation \# 7.6 requires — voter-eligibility/audit records must be structurally incapable of joining to an individual's ballot choice).
+
+\- Phase 7: Project (technical-ops), Asset, Facility, Booking, InventoryItem, Resource/Document (generic, versioned).
+
+\- Phase 8: StudentDocument (wallet), StudentActivityTimeline entry, NotificationPreference; new StudentPrivateProfile/StudentPublicProfile fields (preferred name, program, semester, SGPA, structured professional links, profile-completion tracking).
+
+\- Phase 10: MentorshipRequest, MentorshipSession.
+
+\- Phase 12: ActivityFeed entry (distinct from AuditLog).
+
+
+
+Every addition above is additive (new tables/columns), consistent with \# 0.7's "safe additive migrations" — nothing inspected during this audit requires altering or dropping an existing table.
+
+
+
+\### RECOMMENDED IMPLEMENTATION ORDER
+
+
+
+Follow the roadmap's own phase order (0 → 16) — it is already correctly sequenced: foundation/auth/permissions first, then the reusable Task engine (Phase 2, explicitly designed for reuse by Phases 3–7 per \# 3.8), then the domains that build on it, then cross-cutting concerns (search/reports, archive, security hardening, performance, backup, final verification) last. No reordering is recommended. The one deviation to flag now: Phase 1 as written cannot be started without two decisions from the Technical Secretary/product owner first (see BLOCKED note on Phase 1 below) — everything from Phase 2 onward is unaffected by those two decisions and could in principle proceed once Phase 1's foundation work is unblocked and complete.
+
+
+
 \## ACCEPTANCE
 
 
@@ -1000,7 +1178,233 @@ DO NOT implement features during this phase.
 
 
 
-STATUS: NOT\_STARTED
+STATUS: COMPLETE
+
+
+
+\## BLOCKED (2026-08-14)
+
+
+
+PROBLEM:
+
+Phase 1 cannot be implemented without guessing on two points that \# 0.4 ("NEVER GUESS") and \# 0.14 ("missing information required for a safe decision") both forbid guessing on.
+
+
+
+1\. Hierarchy ambiguity (\# 2.1 vs \# 2.2): \# 2.1's diagram shows three tiers — \`Technical Secretary → Super Admin → Coordinators\`. \# 2.2 then describes the Technical Secretary performing every Super Admin action directly, with no separate description of a distinct "Super Admin" actor. The existing codebase already uses "Super Admin" as a TITLE for the Secretary role, not a separate tier (\`docs/security/09\_User\_Roles\_and\_Permissions.md\`: "Secretary (Super Admin)"). Two genuinely different implementations follow from the two readings: (a) Technical Secretary = Super Admin, one role, renamed — a straightforward relabel; or (b) a real new fourth role/tier sits between them — a new Role enum value, new permission model, new hierarchy logic, and a materially different Phase 1. These are not reconcilable without a decision from you.
+
+
+
+2\. \# 2.4 requires signup, email verification, resend verification, and forgot-password to be "implemented/verified." The audit (\# 1) confirmed none of these exist today — accounts are only admin-provisioned or created via the existing RegistrationRequest-then-Secretary-approval flow. Adding self-service signup with email verification and an unauthenticated forgot-password flow means adding brand-new public, unauthenticated attack surface to a live production system. \# 28's "AUTOMATED EXECUTION RULE" explicitly lists "changing authentication architecture" as a condition requiring a stop for human approval before proceeding — this qualifies squarely, not marginally.
+
+
+
+AFFECTED FILES (would be, once unblocked):
+
+\`prisma/schema.prisma\` (Role enum and/or a new hierarchy table; new email-verification-token and password-reset-token tables), \`src/modules/auth/\*\` (new use cases: signup, verify-email, resend-verification, forgot-password, reset-password), new public API routes under \`src/app/api/auth/\*\`, \`src/modules/coordinators/\*\` (max-2-active-coordinator enforcement, granular permission storage), UI copy referencing "Secretary" (would become "Technical Secretary" if reading (a) above is confirmed).
+
+
+
+CAUSE:
+
+The roadmap document itself is internally ambiguous on point 1, and point 2 is a roadmap requirement that structurally requires expanding authentication's public attack surface — both are pre-conditions the roadmap's own rules (\# 0.4, \# 0.14, \# 28) require a human decision on before writing code, not an implementation difficulty.
+
+
+
+ATTEMPTED SOLUTION:
+
+None attempted — per \# 0.3 and \# 0.4, no source files, schema, or migrations were touched. This audit was read-only, as instructed.
+
+
+
+RECOMMENDED SOLUTION:
+
+Resolve point 1 first, in isolation (it is the cheaper, lower-risk decision and affects how point 2's tables are scoped). Once resolved: implement \# 2.4's authentication additions as net-new, isolated use cases that do not modify \`LoginUseCase\`, \`RefreshAccessTokenUseCase\`, or \`withAuth\` — matching the pattern already used for every other auth extension in this codebase (e.g. self-service password/email change were added as new use cases alongside the original login/refresh, not by rewriting them). Enforce max-2-active-Coordinators and build the granular Coordinator-permission model in the same pass, since both live in \`src/modules/coordinators\`/\`src/modules/auth\` alongside the hierarchy decision.
+
+
+
+REQUIRED DECISION (from you):
+
+1\. Is "Super Admin" in \# 2.1 the same role as "Technical Secretary" (a rename/relabel of the existing SECRETARY role), or a genuinely separate role/tier that does not exist today?
+
+2\. Confirm you want self-service signup + email verification + forgot-password added now, in Phase 1, as new public authentication surface — or whether that should be deferred/scoped differently (e.g. admin-provisioned accounts only, no public signup, matching how the system works today).
+
+
+
+Phase 1 will resume immediately once these are answered — no further audit work is needed first.
+
+
+
+\## RESOLVED (2026-08-14)
+
+
+
+Both required decisions were answered by the Technical Secretary in a single message:
+
+
+
+1\. HIERARCHY: "Super Admin" is NOT a separate role — Technical Secretary IS the Super Admin authority. The existing SECRETARY role is used as-is (reading (a) from the BLOCKED note above). No SUPER\_ADMIN role was created. Maximum 2 active Coordinators, enforced server-side. Coordinators receive granular permissions delegated by the Technical Secretary.
+
+
+
+2\. AUTHENTICATION: Self-service signup, email verification, resend-verification, forgot-password and reset-password ARE to be implemented now, with explicit per-role rules — STUDENT/ALUMNI/RECRUITER self-signup allowed (email verification required; RECRUITER and ALUMNI additionally require admin approval before functional access); COORDINATOR and TECHNICAL SECRETARY accounts remain admin-provisioned only, never self-registrable. The client can never select an administrative role on any public signup form — the account type is fixed per-endpoint server-side.
+
+
+
+Implementation proceeded exactly as scoped in RECOMMENDED SOLUTION above: net-new, isolated use cases layered onto the existing LoginUseCase/RefreshAccessTokenUseCase/withAuth without modifying their internals, plus the coordinators changes in the same pass.
+
+
+
+\---
+
+
+
+\## PHASE REPORT
+
+
+
+PHASE: 1 — MYARCH Foundation
+
+
+
+STATUS: COMPLETE
+
+
+
+IMPLEMENTED:
+
+\- Technical Secretary display label (SECRETARY role identifier unchanged) — "Super Admin" is a description of the Secretary's authority, not a separate role.
+
+\- Coordinator hierarchy: max 2 ACTIVE Coordinators enforced server-side (\`MaxActiveCoordinatorsError\`, checked in \`CreateCoordinatorUseCase\` and on the reactivation branch of \`SetCoordinatorActiveUseCase\`).
+
+\- Granular Coordinator permission delegation: a fixed, forward-declared catalog of capability keys (\`COORDINATOR\_PERMISSION\_KEYS\`), stored as \`CoordinatorProfile.permissions String[]\`, Secretary-editable via a dedicated endpoint and admin UI, threaded through JWT claims → \`AuthenticatedActor.permissions\` → \`hasCoordinatorPermission()\` for future phases to gate on.
+
+\- \`Role.ALUMNI\` added (purely additive enum value); \`AlumniProfile\` gained an optional \`userId\`/\`user\` relation and an \`approvalStatus\` (reusing the existing PENDING/APPROVED/REJECTED enum) so an Alumni row can optionally back a real login account.
+
+\- Email verification: opaque, HMAC-hashed, single-use tokens (24h TTL) covering three signup shapes (Student registration request, Recruiter self-signup, Alumni self-signup) via one shared \`EmailVerificationToken\` table with nullable \`userId\`/\`registrationRequestId\`. Issue/verify/resend use cases, rate-limited public routes.
+
+\- Forgot-password / reset-password: opaque HMAC-hashed tokens (1h TTL), anti-enumeration (identical response whether or not the account exists), all existing refresh tokens revoked on a successful reset, audited as \`PASSWORD\_CHANGED\` with \`metadata: { via: "email\_reset" }\`.
+
+\- Student registration: \`RegistrationRequest.emailVerifiedAt\` gate — \`DecideRegistrationRequestUseCase\` now refuses to APPROVE an unverified request (\`RegistrationEmailNotVerifiedError\`); REJECT is unaffected.
+
+\- Recruiter self-signup: public, rate-limited endpoint creates an inactive User + PENDING RecruiterProfile, reuses the pre-existing (previously dormant) \`ApproveRecruiterUseCase\`/\`RejectRecruiterUseCase\`, extended to flip \`User.isActive\` on approval and notify the applicant.
+
+\- Alumni self-signup: same shape as Recruiter, built from scratch (the module previously had only directory CRUD, no account lifecycle) — new \`SignupAlumniUseCase\`, \`ApproveAlumniUseCase\`, \`RejectAlumniUseCase\`, \`AlumniUserProvisioner\` port.
+
+\- Public UI: \`/verify-email\`, \`/forgot-password\`, \`/reset-password\`, \`/recruiters/signup\`, \`/alumni/signup\`; an honest "Coming Soon" Alumni holding dashboard at \`/alumni\` (no fabricated features, per \# 0.12); a Coordinator permission editor on the admin Coordinator detail page; inline Approve/Reject affordances added to the admin Alumni page for PENDING self-signups (mirroring the existing Recruiters admin page).
+
+\- All administrative roles (COORDINATOR, SECRETARY) remain fully admin-provisioned — no public endpoint accepts a client-supplied role.
+
+
+
+FILES CHANGED:
+
+\- \`prisma/schema.prisma\`: \`Role.ALUMNI\`; \`EmailVerificationToken\`, \`PasswordResetToken\` (new tables); \`User.emailVerifiedAt\`; \`CoordinatorProfile.permissions\`; \`RegistrationRequest.emailVerifiedAt\`; \`AlumniProfile.userId\`/\`approvalStatus\`.
+
+\- \`src/modules/auth/\*\`: new use cases (issue/verify/resend email verification, forgot-password, reset-password), new token-repository ports + Prisma implementations, \`permissions\` threaded through JWT claims and \`AuthenticatedActor\`, \`hashPassword\` exported for reuse by recruiters/alumni signup.
+
+\- \`src/modules/coordinators/\*\`: \`domain/permissions.ts\` (new), max-active-coordinator checks, \`updateCoordinatorPermissionsUseCase\`, permissions route + validation.
+
+\- \`src/modules/registration/\*\`: email-verification gate on approval, \`markRegistrationRequestEmailVerified\`.
+
+\- \`src/modules/recruiters/\*\`: \`SignupRecruiterUseCase\`, self-signup provisioner, \`approveAndActivate\`, notification wiring on approve/reject.
+
+\- \`src/modules/alumni/\*\`: full account-lifecycle vertical added (signup, approve, reject, provisioner, new ports/errors) alongside the existing directory CRUD.
+
+\- \`src/modules/notifications/\*\`: 4 new template IDs (\`EMAIL\_VERIFICATION\`, \`PASSWORD\_RESET\_REQUESTED\`, \`ACCOUNT\_SIGNUP\_PENDING\_REVIEW\`, \`ACCOUNT\_SIGNUP\_DECIDED\`).
+
+\- \`src/lib/rate-limiters.ts\`: \`signupRateLimiter\`, \`tokenConsumptionRateLimiter\`, \`emailTriggerRateLimiter\`.
+
+\- \`src/lib/coordinator-permissions.ts\` (new): client-safe mirror of the permission-key catalog — a client component importing a runtime value from a module's barrel (\`@/modules/coordinators\`) pulls in that module's Prisma/Node-only route handlers and breaks the browser bundle; this file exists specifically to avoid that (matches the pre-existing \`coordinator-position.ts\` precedent).
+
+\- New app routes: \`/api/auth/{verify-email,resend-verification,forgot-password,reset-password}\`, \`/api/recruiters/signup\`, \`/api/alumni/{signup,[id]/approve,[id]/reject}\`, and public pages listed above.
+
+
+
+DATABASE:
+
+\- Migration \`20260814130715\_myarch\_phase1\_auth\_roles\_signup\`, generated via \`prisma migrate diff\` against the pre-Phase-1 schema.
+
+\- Rehearsed against a local Docker Postgres container (18 migrations applied cleanly, \`prisma migrate status\` confirmed up to date) before being applied to production.
+
+\- Applied to the production Neon database via \`prisma migrate deploy\` — 18/18 migrations, up to date, zero errors.
+
+\- The raw \`prisma migrate diff\` output included 4 spurious \`DROP INDEX\`/\`ALTER COLUMN ... DROP DEFAULT\` statements against the \`searchVector\` GIN-indexed generated columns (companies/placement\_drives/publications/student\_profiles) — a known Prisma limitation diffing \`Unsupported("tsvector")\` \`GENERATED ALWAYS AS ... STORED\` columns, unrelated to any Phase 1 change. These were manually excluded from the applied migration file; re-running the diff after applying confirms only that same pre-existing, harmless drift remains (full-text search is unaffected).
+
+\- Every schema change is additive (new tables, new nullable/defaulted columns, one new enum value) — no data loss, no destructive operation, no backfill required.
+
+
+
+APIS:
+
+\- \`POST /api/auth/verify-email\`, \`POST /api/auth/resend-verification\`, \`POST /api/auth/forgot-password\`, \`POST /api/auth/reset-password\` — all public, rate-limited.
+
+\- \`POST /api/recruiters/signup\`, \`POST /api/alumni/signup\` — public, rate-limited, server-fixed role (client cannot select an administrative account type).
+
+\- \`POST /api/alumni/[id]/approve\`, \`POST /api/alumni/[id]/reject\` — Secretary-only (mirrors the existing recruiter admin routes).
+
+\- \`PATCH /api/coordinators/[id]/permissions\` — Secretary-only.
+
+
+
+PERMISSIONS:
+
+\- COORDINATOR and TECHNICAL SECRETARY (SECRETARY role) accounts remain 100% admin-provisioned; no code path allows a public request to create either.
+
+\- Every new self-signup use case hard-codes its own target role/account type server-side — the request schemas never accept a role field.
+
+\- Coordinator granular permissions default to empty (zero rows = zero access, matching the existing \`batchScope\` convention) and are visible/editable only by SECRETARY.
+
+
+
+TESTS:
+
+\- 194 test files / 1483 tests passing (full suite, \`vitest run\`), zero live-DB dependency (in-memory fakes throughout).
+
+\- New coverage: email verification, forgot/reset-password, registration email-gate, recruiter signup + extended approve/reject, alumni signup + approve/reject (30 new alumni tests alone).
+
+\- One pre-existing, unrelated flaky test (\`jwt-token-service.test.ts\` "rejects a tampered token") observed once across many full-suite runs — a base64url single-character-mutation edge case, reproducibility not confirmed, not caused by this phase's changes (traced and documented, not modified).
+
+
+
+BUILD:
+
+\- \`npx tsc --noEmit\`: clean.
+
+\- \`npm run lint\`: clean.
+
+\- \`npx next build\` (Turbopack): clean — first attempt failed (\`TurbopackInternalError\`: a client component pulling \`node:fs/promises\` into the browser bundle via a runtime import from \`@/modules/coordinators\`'s barrel); fixed by moving the permission-key catalog to a client-safe \`src/lib\` file (see FILES CHANGED) and re-verified clean.
+
+
+
+SECURITY:
+
+\- Tokens: opaque, cryptographically random, HMAC-SHA256 hashed at rest (never stored raw), single-use, expiring (24h email verification, 1h password reset).
+
+\- Anti-enumeration: forgot-password and resend-verification return an identical response regardless of whether the target account/email exists.
+
+\- Rate limiting on every new public endpoint (signup, token consumption, email-triggering actions).
+
+\- A successful password reset revokes every existing refresh token for that user.
+
+\- No administrative role is ever self-registrable; server-side validation enforces the requested account type on every signup endpoint.
+
+
+
+KNOWN ISSUES:
+
+\- None blocking. UI for the new public flows is minimal/utility-styled (consistent with the existing \`/login\`, \`/change-password\` pages) rather than a full editorial treatment — acceptable for a Phase 1 foundation pass.
+
+\- The Alumni Portal itself is an honest "Coming Soon" holding page — no alumni-specific features exist yet; later phases will build on the account/auth foundation laid here.
+
+
+
+NEXT PHASE: 2 — see \# 3 below. Not yet started.
+
+
+
+\---
 
 
 

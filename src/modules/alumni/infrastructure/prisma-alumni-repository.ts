@@ -1,7 +1,7 @@
 import { Prisma, type AlumniProfile as PrismaAlumniProfile, type PrismaClient } from "@prisma/client";
-import type { AlumniRecord, AlumniSearchFilters } from "../domain/entities";
+import type { AlumniApprovalStatus, AlumniRecord, AlumniSearchFilters } from "../domain/entities";
 import type { AlumniRepository, CreateAlumniData, UpdateAlumniData } from "../application/ports/alumni-repository";
-import { DuplicateAlumniLinkError, StudentProfileNotFoundError } from "../domain/errors";
+import { AlumniNotFoundError, DuplicateAlumniLinkError, StudentProfileNotFoundError } from "../domain/errors";
 
 export class PrismaAlumniRepository implements AlumniRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -11,6 +11,7 @@ export class PrismaAlumniRepository implements AlumniRepository {
       const row = await this.prisma.alumniProfile.create({
         data: {
           studentProfileId: data.studentProfileId ?? null,
+          userId: data.userId ?? null,
           fullName: data.fullName,
           graduationYear: data.graduationYear,
           currentCompany: data.currentCompany ?? null,
@@ -19,6 +20,7 @@ export class PrismaAlumniRepository implements AlumniRepository {
           portfolioUrl: data.portfolioUrl ?? null,
           linkedInUrl: data.linkedInUrl ?? null,
           mentorshipAvailable: data.mentorshipAvailable ?? false,
+          approvalStatus: data.approvalStatus,
         },
       });
       return toDomain(row);
@@ -59,11 +61,29 @@ export class PrismaAlumniRepository implements AlumniRepository {
     });
   }
 
+  async setApprovalStatus(id: string, status: AlumniApprovalStatus): Promise<AlumniRecord> {
+    const row = await this.prisma.alumniProfile.update({ where: { id }, data: { approvalStatus: status } });
+    return toDomain(row);
+  }
+
+  async approveAndActivate(id: string): Promise<AlumniRecord> {
+    // Mirrors PrismaRecruiterAccountRepository.approveAndActivate exactly.
+    const existing = await this.prisma.alumniProfile.findUnique({ where: { id }, select: { userId: true } });
+    if (!existing) throw new AlumniNotFoundError();
+
+    const [row] = await this.prisma.$transaction([
+      this.prisma.alumniProfile.update({ where: { id }, data: { approvalStatus: "APPROVED" } }),
+      this.prisma.user.updateMany({ where: { alumniProfile: { id } }, data: { isActive: true } }),
+    ]);
+    return toDomain(row);
+  }
+
   async search(filters: AlumniSearchFilters): Promise<AlumniRecord[]> {
     const where: Prisma.AlumniProfileWhereInput = {
       fullName: filters.name ? { contains: filters.name, mode: "insensitive" } : undefined,
       graduationYear: filters.graduationYear,
       mentorshipAvailable: filters.mentorshipAvailable,
+      approvalStatus: filters.approvalStatus,
     };
 
     const rows = await this.prisma.alumniProfile.findMany({
@@ -86,6 +106,7 @@ function toDomain(row: PrismaAlumniProfile): AlumniRecord {
   return {
     id: row.id,
     studentProfileId: row.studentProfileId,
+    userId: row.userId,
     fullName: row.fullName,
     graduationYear: row.graduationYear,
     currentCompany: row.currentCompany,
@@ -94,6 +115,7 @@ function toDomain(row: PrismaAlumniProfile): AlumniRecord {
     portfolioUrl: row.portfolioUrl,
     linkedInUrl: row.linkedInUrl,
     mentorshipAvailable: row.mentorshipAvailable,
+    approvalStatus: row.approvalStatus,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

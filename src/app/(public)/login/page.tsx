@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/modules/auth/client";
 import { ApiError } from "@/lib/api-client";
@@ -82,6 +83,12 @@ export default function LoginPage() {
             {isSubmitting ? "Signing in…" : "Sign in"}
           </Button>
         </form>
+
+        <p className="mt-4 text-center text-sm text-(--color-text-secondary)">
+          <Link href="/forgot-password" className="font-medium text-(--color-accent) hover:underline">
+            Forgot your password?
+          </Link>
+        </p>
       </div>
     </main>
   );

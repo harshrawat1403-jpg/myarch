@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { scorePasswordStrength } from "@/lib/password-strength";
 
 export const RecruiterSearchQuerySchema = z.object({
   query: z.string().trim().min(1).optional(),
@@ -64,4 +65,16 @@ export const SearchRecruiterAccountsQuerySchema = z.object({
 export const BulkSetRecruitersActiveRequestSchema = z.object({
   recruiterIds: z.array(z.string().uuid()).min(1),
   isActive: z.boolean(),
+});
+
+// MYARCH Phase 1 (§2.4) — public self-signup. Same password policy as
+// auth's ChangePasswordRequestSchema, reused via scorePasswordStrength
+// (src/lib/password-strength.ts) rather than a third copy of the regex.
+export const SignupRecruiterRequestSchema = z.object({
+  email: z.string().trim().email(),
+  fullName: z.string().trim().min(1).max(200),
+  companyName: z.string().trim().min(1).max(200),
+  password: z.string().refine((pw) => scorePasswordStrength(pw).meetsMinimum, {
+    message: "Password must be at least 10 characters and include at least 3 of: lowercase, uppercase, digit, symbol",
+  }),
 });

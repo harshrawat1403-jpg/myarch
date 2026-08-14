@@ -26,7 +26,7 @@ export interface UserRepository {
    */
   loadActorScope(
     user: AuthUserRecord,
-  ): Promise<Pick<AuthenticatedActor, "batchScope" | "studentProfileId">>;
+  ): Promise<Pick<AuthenticatedActor, "batchScope" | "permissions" | "studentProfileId">>;
 
   /** Stamps the moment a login succeeds — V3.0 Administration Platform's "Last Login" column. */
   recordSuccessfulLogin(userId: string, at: Date): Promise<void>;
@@ -48,4 +48,7 @@ export interface UserRepository {
 
   /** V3.0 Account Settings: sets or clears (null) the user's avatar FileAsset reference. */
   setAvatarFileId(userId: string, avatarFileId: string | null): Promise<void>;
+
+  /** MYARCH Phase 1 — VerifyEmailUseCase, only for the self-signup case (a User already exists — see EmailVerificationToken's dual shape). Idempotent: verifying twice is a no-op, not an error. */
+  markEmailVerified(userId: string): Promise<void>;
 }
