@@ -78,5 +78,18 @@ export function resolveNotificationDestination(
       // meaningful on APPROVED, where a real, now-usable account exists.
       if (context.decision !== "APPROVED") return null;
       return context.accountType === "ALUMNI" ? "/alumni" : "/recruiter";
+
+    // MYARCH Phase 2 (§3.8) — every Task notification links to that task's
+    // own detail view; role-specific task list pages don't exist yet, so
+    // this is the one destination that works for every recipient role.
+    case "TASK_ASSIGNED":
+    case "TASK_REASSIGNED":
+    case "TASK_DEADLINE_APPROACHING":
+    case "TASK_OVERDUE":
+    case "TASK_COMPLETED":
+    case "TASK_ESCALATED": {
+      const taskId = context.taskId;
+      return typeof taskId === "string" && taskId.length > 0 ? `/tasks/${taskId}` : null;
+    }
   }
 }

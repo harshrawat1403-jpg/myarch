@@ -27,6 +27,15 @@ import {
   accountSignupPendingReviewInAppTemplate,
 } from "./definitions/account-signup-pending-review";
 import { accountSignupDecidedTemplate, accountSignupDecidedInAppTemplate } from "./definitions/account-signup-decided";
+import { taskAssignedTemplate, taskAssignedInAppTemplate } from "./definitions/task-assigned";
+import { taskReassignedTemplate, taskReassignedInAppTemplate } from "./definitions/task-reassigned";
+import {
+  taskDeadlineApproachingTemplate,
+  taskDeadlineApproachingInAppTemplate,
+} from "./definitions/task-deadline-approaching";
+import { taskOverdueTemplate, taskOverdueInAppTemplate } from "./definitions/task-overdue";
+import { taskCompletedTemplate, taskCompletedInAppTemplate } from "./definitions/task-completed";
+import { taskEscalatedTemplate, taskEscalatedInAppTemplate } from "./definitions/task-escalated";
 
 /**
  * Every known template, keyed by the id business use cases pass to
@@ -69,6 +78,12 @@ export const EMAIL_TEMPLATE_REGISTRY: Record<NotificationTemplateId, EmailTempla
   PASSWORD_RESET_REQUESTED: passwordResetRequestedTemplate,
   ACCOUNT_SIGNUP_PENDING_REVIEW: accountSignupPendingReviewTemplate,
   ACCOUNT_SIGNUP_DECIDED: accountSignupDecidedTemplate,
+  TASK_ASSIGNED: taskAssignedTemplate,
+  TASK_REASSIGNED: taskReassignedTemplate,
+  TASK_DEADLINE_APPROACHING: taskDeadlineApproachingTemplate,
+  TASK_OVERDUE: taskOverdueTemplate,
+  TASK_COMPLETED: taskCompletedTemplate,
+  TASK_ESCALATED: taskEscalatedTemplate,
 };
 
 /** V4.0 E1 — the IN_APP counterpart to EMAIL_TEMPLATE_REGISTRY. */
@@ -88,6 +103,12 @@ export const IN_APP_TEMPLATE_REGISTRY: Record<NotificationTemplateId, InAppTempl
   PASSWORD_RESET_REQUESTED: passwordResetRequestedInAppTemplate,
   ACCOUNT_SIGNUP_PENDING_REVIEW: accountSignupPendingReviewInAppTemplate,
   ACCOUNT_SIGNUP_DECIDED: accountSignupDecidedInAppTemplate,
+  TASK_ASSIGNED: taskAssignedInAppTemplate,
+  TASK_REASSIGNED: taskReassignedInAppTemplate,
+  TASK_DEADLINE_APPROACHING: taskDeadlineApproachingInAppTemplate,
+  TASK_OVERDUE: taskOverdueInAppTemplate,
+  TASK_COMPLETED: taskCompletedInAppTemplate,
+  TASK_ESCALATED: taskEscalatedInAppTemplate,
 };
 
 /**
@@ -127,4 +148,14 @@ export const NOTIFICATION_CHANNELS: Record<NotificationTemplateId, readonly Noti
   PASSWORD_RESET_REQUESTED: ["EMAIL"],
   ACCOUNT_SIGNUP_PENDING_REVIEW: ["IN_APP"],
   ACCOUNT_SIGNUP_DECIDED: ["EMAIL", "IN_APP"],
+  // MYARCH Phase 2 (§3.8) — deadline/overdue/escalation are time-sensitive
+  // (dual-channel, matching this file's own "email for anything time-
+  // sensitive" rule above); assignment/reassignment/completion are routine,
+  // IN_APP-only, matching REGISTRATION_SUBMITTED's precedent.
+  TASK_ASSIGNED: ["IN_APP"],
+  TASK_REASSIGNED: ["IN_APP"],
+  TASK_DEADLINE_APPROACHING: ["EMAIL", "IN_APP"],
+  TASK_OVERDUE: ["EMAIL", "IN_APP"],
+  TASK_COMPLETED: ["IN_APP"],
+  TASK_ESCALATED: ["EMAIL", "IN_APP"],
 };

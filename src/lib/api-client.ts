@@ -53,6 +53,32 @@ async function request<T>(method: string, path: string, options: RequestOptions 
   return (envelope?.data ?? envelope) as T;
 }
 
+/**
+ * MYARCH Phase 2 (§3.8) — the one caller (tasks list, paginated via
+ * SearchTasksUseCase) that needs the envelope's `meta` alongside `data`;
+ * every other endpoint's meta (if any) has been discardable so far. A
+ * second `request()`-shaped function rather than changing `request()`
+ * itself, which every existing call site relies on returning bare `data`.
+ */
+async function getWithMeta<T, M = Record<string, unknown>>(
+  path: string,
+  accessToken?: string,
+): Promise<{ data: T; meta: M }> {
+  const headers: Record<string, string> = {};
+  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+
+  const response = await fetch(path, { method: "GET", headers, credentials: "include" });
+  const json: unknown = await response.json().catch(() => null);
+  const envelope = json as { data?: T; meta?: M; error?: { code: string; message: string; details?: unknown } } | null;
+
+  if (!response.ok) {
+    const err = envelope?.error ?? { code: "UNKNOWN_ERROR", message: "Request failed" };
+    throw new ApiError(response.status, err.code, err.message, err.details);
+  }
+
+  return { data: envelope?.data as T, meta: (envelope?.meta ?? {}) as M };
+}
+
 function parseFilenameFromContentDisposition(header: string | null): string | null {
   if (!header) return null;
   const match = /filename="?([^"]+)"?/.exec(header);
@@ -119,4 +145,5 @@ export const apiClient = {
   delete: <T>(path: string, accessToken?: string) => request<T>("DELETE", path, { accessToken }),
   download,
   upload,
+  getWithMeta,
 };

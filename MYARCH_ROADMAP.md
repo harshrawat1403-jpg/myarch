@@ -28,13 +28,13 @@
 
 CURRENT\_PHASE: 2
 
-STATUS: NOT\_STARTED
+STATUS: IN\_PROGRESS
 
 LAST\_COMPLETED\_PHASE: 1
 
 BLOCKED: FALSE
 
-BLOCK\_REASON: none — Phase 1's two required decisions (hierarchy, authentication scope) were answered by the Technical Secretary on 2026-08-14; Phase 1 is implemented, tested, migrated to production, and verified. See the Phase Report under "\# 2. PHASE 1 — MYARCH FOUNDATION" below. Phase 2 has not yet started.
+BLOCK\_REASON: none. Phase 2 (\# 3, "MAINTENANCE & REQUESTS") is partially complete: at the Technical Secretary's explicit direction, \#3.8's Task/Follow-up Engine was extracted and built FIRST, as standalone reusable infrastructure, deliberately BEFORE Maintenance (\#3.1–3.6), the Generic Request System (\#3.7), or the Maintenance Dashboard (\#3.9) — none of those have been started. See the Phase 2 report under "\# 3. PHASE 2 — MAINTENANCE & REQUESTS" below for exactly what is and isn't done. \*\*Phase 3 must not begin\*\* until the remainder of Phase 2 (\#3.1–3.7, \#3.9) is implemented and this section reads COMPLETE.
 
 
 
@@ -1724,7 +1724,7 @@ Support:
 
 
 
-STATUS: NOT\_STARTED
+STATUS: IN\_PROGRESS — \#3.8 (Task/Follow-up Engine) COMPLETE; \#3.1–\#3.7 and \#3.9 NOT\_STARTED. See the Phase Report under \#3.8 below for full detail. Built out of the section's own internal order at the Technical Secretary's explicit instruction: the reusable engine \#3.7's Generic Request System and every later Maintenance workflow are expected to build on (per \#3.8's own "Use this system for... Do not create separate task systems") had to exist first.
 
 
 
@@ -2069,6 +2069,94 @@ Use this system for:
 
 
 Do not create separate task systems.
+
+
+
+\---
+
+
+
+\## 3.8 PHASE REPORT (2026-08-14)
+
+
+
+STATUS: COMPLETE (this sub-section only — \#3.1–\#3.7 and \#3.9 are separate, NOT\_STARTED work covered by the rest of \# 3)
+
+
+
+IMPLEMENTED:
+
+\- A new, standalone \`tasks\` module (\`src/modules/tasks\`) — the full Task/Follow-up Engine: title, description, owner, creator, priority (LOW/MEDIUM/HIGH/URGENT), status (TODO/IN\_PROGRESS/BLOCKED/DONE/CANCELLED), deadline, reminder, escalation (escalatedAt/escalatedToId), a polymorphic relatedEntityType/relatedEntityId link for future domains, comments, createdAt/updatedAt/completedAt/cancelledAt, and full audit/history via the existing AuditLog/AuditRecorder.
+
+\- Use cases: create, update, reassign, set-status (handles IN\_PROGRESS/BLOCKED/DONE/CANCELLED — "complete" and "cancel" are simply targeting DONE/CANCELLED), reopen (the one action that escapes a terminal DONE/CANCELLED state), escalate, add-comment, get, search (filter/sort/paginate).
+
+\- Reminder and overdue detection ride the EXISTING Background Job Processing System (\`src/modules/jobs\`) via one-shot jobs scheduled at Task.reminderAt/Task.deadline — no second scheduler was built. This is also the "reusable escalation engine" \#3.6 calls for: the overdue-check job handler auto-escalates to the Technical Secretary and is generic across every future domain that creates a Task, not maintenance-specific.
+
+\- Each scheduled job handler re-reads the task's CURRENT state at fire time and no-ops if it's since been completed/cancelled or its deadline/reminderAt has moved — a later edit doesn't need to cancel the now-stale job, it simply schedules a fresh one and lets the old one self-correct.
+
+\- 6 new notification templates (TASK\_ASSIGNED, TASK\_REASSIGNED, TASK\_DEADLINE\_APPROACHING, TASK\_OVERDUE, TASK\_COMPLETED, TASK\_ESCALATED) added to the EXISTING notification system (templates/registry, IN\_APP + EMAIL channels per the existing time-sensitive-vs-routine convention) — no second notification system was built.
+
+\- Minimal UI at \`/tasks\` (list: filter by status/overdue, paginated, create) and \`/tasks/[id]\` (detail: status actions, reassign, reopen, escalate, comments) — its own thin route group (not nested inside (admin)/(student)) since Secretary, Coordinator, and Student all use the same two pages, each scoped server-side. Loading/empty/error/unauthorized/success states all present; no fake data.
+
+\- Owner picker in the Create Task UI reuses the EXISTING User Directory search endpoint rather than a new lookup.
+
+
+
+FILES CHANGED (full list intentionally not duplicated here — see \`git diff\`/\`git log\` for this phase's commit): \`prisma/schema.prisma\` (Task, TaskComment, TaskStatus, TaskPriority — fully additive); \`src/modules/tasks/\*\*\` (new module: domain, application, infrastructure, presentation); \`src/modules/notifications/\*\` (6 new template definitions + registry/destinations/entities wiring); \`src/lib/audit-actions.ts\` (7 new TASK\_\* actions); \`src/lib/api-client.ts\` (added \`getWithMeta\` — the one existing shared file touched, additive, every other call site unaffected); \`scripts/run-worker.ts\` (registers the tasks module's job handlers, the one place adding a background job type touches outside its own module, per that file's own documented convention); \`src/app/(tasks)/tasks/\*\*\` and \`src/app/api/tasks/\*\*\` (new).
+
+
+
+DATABASE:
+
+\- Migration \`20260814143408\_myarch\_phase2\_task\_engine\` — 2 new enums, 2 new tables (\`tasks\`, \`task\_comments\`), 5 indexes, 5 foreign keys. Fully additive — no existing table, column, or constraint touched.
+
+\- Rehearsed against local Docker Postgres first (19 migrations applied cleanly, verified up to date), then applied to production Neon — 19/19 migrations, zero errors.
+
+\- As with Phase 1's migration, \`prisma migrate diff\`'s raw output included the same 4 spurious \`DROP INDEX\`/\`ALTER COLUMN ... DROP DEFAULT\` statements against the pre-existing \`searchVector\` generated columns (the known Prisma limitation with \`Unsupported("tsvector")\` columns, documented in the Phase 1 migration file) — manually excluded again; re-diffing after applying confirms only that same harmless, pre-existing drift remains.
+
+
+
+APIS: \`POST /api/tasks\`, \`GET /api/tasks\` (search/filter/sort/paginate), \`GET/PATCH /api/tasks/[id]\`, \`POST /api/tasks/[id]/reassign\`, \`PATCH /api/tasks/[id]/status\`, \`POST /api/tasks/[id]/reopen\`, \`POST /api/tasks/[id]/escalate\`, \`POST /api/tasks/[id]/comments\`. Every route follows Route → withAuth (Authentication) → domain permission function (Authorization) → Zod schema (Validation) → use case (Service) → Prisma repository (Database) → NextResponse (Response); no business logic lives in a route handler.
+
+
+
+PERMISSIONS:
+
+\- Technical Secretary: unscoped full administration of every task (matches "full task administration").
+
+\- Coordinator: \`canManageTask\` restricts full management (update/reassign/status/reopen/escalate) to tasks they own or created — never an arbitrary task between two other people ("only tasks they are authorized to manage... can manage assigned/delegated tasks").
+
+\- "Coordinator... cannot escalate privileges": \`canAssignTaskTo\` lets a Coordinator assign/reassign only to a Student or to THEMSELVES (an identity check on userId, not a role check — comparing roles alone would be trivially true for any two Coordinators, since both hold role "COORDINATOR"; this exact bug was caught by the test suite before being fixed) — never to the Secretary or to a different Coordinator. Escalation always targets the Secretary, resolved server-side, never client-chosen.
+
+\- Student: \`canViewTask\`/\`canUpdateOwnTaskStatus\` restrict a Student to their own tasks (owner only, never creator — Students cannot create tasks), and only to moving it forward through TODO/IN\_PROGRESS/BLOCKED/DONE — never CANCELLED, never reassignment, never escalation.
+
+\- Every check happens server-side inside a use case; the UI hides actions it expects to fail, but the real enforcement never depends on that.
+
+
+
+TESTS: 13 new test files, 112 tests — domain (state machine, permissions, isTaskOverdue), every use case (create, update-implicit-via-reassign, reassign, set-status, reopen, escalate, comment, get, search), both job handlers (reminder + overdue/auto-escalation, including their self-correction-against-stale-state behavior), and Zod validation schemas (invalid input). Explicitly covers: creation, assignment, reassignment, authorization (including the Coordinator/Student permission boundaries), status transitions, completion, cancellation, deadline scheduling, overdue detection, filtering, pagination, and invalid input. Full repo suite: 206 test files / 1576 tests passing.
+
+
+
+BUILD: \`npx tsc --noEmit\` clean; \`npm run lint\` clean; \`npx next build\` (Turbopack) clean.
+
+
+
+SECURITY: Every write use case re-derives authorization from the loaded task record, never trusts a client-supplied role/ownership claim. The privilege-escalation guard above was verified by a failing test before the fix, not merely asserted. Every task mutation is audited (\`AUDIT\_ACTIONS.TASK\_\*\`) via the existing AuditLog, including automated overdue escalation (attributed to the task's creator, mirroring the existing precedent for automated-completion audit entries with no human actor in the loop).
+
+
+
+KNOWN ISSUES / DEFERRED (by design, not oversight):
+
+\- \`/tasks\` is not yet linked from the (admin) or (student) sidebar navigation — reachable today only by direct URL or a notification's destination link. Skipped to avoid touching those two already-tested, carefully-ordered nav files for a phase whose explicit scope was infrastructure, not integration; wiring it in is a natural, low-risk follow-up once a real caller (e.g. Maintenance) exists.
+
+\- The overdue auto-escalation job's "already escalated" guard is a best-effort idempotency check, not a hard lock — two overlapping fires are a low-probability, low-consequence edge case (an extra notification), not something this phase builds dedicated locking infrastructure to fully rule out.
+
+\- \#3.1–\#3.7 (Maintenance categories/report/lifecycle/complainant-tracking/assignment/SLA, the Generic Request System) and \#3.9 (Maintenance Dashboard) are NOT implemented. This report covers \#3.8 only.
+
+
+
+NEXT: Implement \#3.1–\#3.7 and \#3.9 (Maintenance & Requests) on top of this Task Engine — per \#3.8's own instruction, as Task rows with \`relatedEntityType: "MaintenanceIssue"\` / \`"Request"\`, not a second parallel system. Only once that full Phase 2 section is complete should \# 4 (PHASE 3 — CALENDAR, EVENTS \& MEETINGS) begin.
 
 
 

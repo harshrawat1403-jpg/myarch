@@ -31,7 +31,14 @@ export type NotificationTemplateId =
   | "EMAIL_VERIFICATION"
   | "PASSWORD_RESET_REQUESTED"
   | "ACCOUNT_SIGNUP_PENDING_REVIEW"
-  | "ACCOUNT_SIGNUP_DECIDED";
+  | "ACCOUNT_SIGNUP_DECIDED"
+  // MYARCH Phase 2 (§3.8) — Task/Follow-up Engine.
+  | "TASK_ASSIGNED"
+  | "TASK_REASSIGNED"
+  | "TASK_DEADLINE_APPROACHING"
+  | "TASK_OVERDUE"
+  | "TASK_COMPLETED"
+  | "TASK_ESCALATED";
 
 /**
  * The one thing a business use case knows about a notification: who should

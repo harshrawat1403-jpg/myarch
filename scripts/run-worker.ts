@@ -26,6 +26,7 @@ import { createJobWorker } from "@/modules/jobs";
 import { registerJobHandlers as registerNotificationJobHandlers } from "@/modules/notifications";
 import { registerBulkImportJobHandlers } from "@/modules/students";
 import { registerAcademicYearJobHandlers } from "@/modules/academic-year";
+import { registerJobHandlers as registerTaskJobHandlers } from "@/modules/tasks";
 // Deliberately a direct path, not the `@/modules/publications` barrel — see
 // that module's infrastructure/register-job-handlers.ts for why: this is
 // the one place in the whole app allowed to pull in the Playwright/
@@ -39,6 +40,7 @@ function registerAllJobHandlers(): void {
   registerBulkImportJobHandlers();
   registerAcademicYearJobHandlers();
   registerPublicationJobHandlers();
+  registerTaskJobHandlers();
   // Future modules with background jobs register here too, e.g.:
   // registerCleanupJobHandlers();
 }

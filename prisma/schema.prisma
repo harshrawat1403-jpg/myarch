@@ -43,6 +43,22 @@ enum Role {
   ALUMNI
 }
 
+// MYARCH Phase 2 (§3.8) — the reusable Task/Follow-up Engine.
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 enum BatchStatus {
   ACTIVE
   GRADUATED
@@ -214,6 +230,12 @@ model User {
   lastEditedPublications       Publication[]               @relation("PublicationLastEditedBy")
   createdPublicationVersions   PublicationVersion[]        @relation("PublicationVersionCreatedBy")
   generatedPublicationExports  PublicationExport[]         @relation("PublicationExportGeneratedBy")
+
+  // MYARCH Phase 2 (§3.8) — Task/Follow-up Engine.
+  tasksOwned         Task[]        @relation("TaskOwner")
+  tasksCreated       Task[]        @relation("TaskCreator")
+  tasksEscalatedToMe Task[]        @relation("TaskEscalatedTo")
+  taskComments       TaskComment[] @relation("TaskCommentAuthor")
 
   @@map("users")
 }
@@ -932,6 +954,75 @@ model Job {
 
   @@index([status, runAt])
   @@map("jobs")
+}
+
+// ---------------------------------------------------------------------------
+// MYARCH Phase 2 (§3.8) — Task / Follow-up Engine. Reusable infrastructure:
+// every future domain the roadmap names (maintenance, generic requests,
+// events, meetings, applications, interviews, elections, projects) is
+// expected to create rows here via relatedEntityType/relatedEntityId rather
+// than building its own task/assignment/deadline/escalation system — the
+// same FK-less polymorphic-reference shape AuditLog.targetEntityType/
+// targetEntityId already established, reused rather than reinvented.
+// Reminder/overdue-detection/escalation ride the existing Background Job
+// Processing System (Job model above) via one-shot scheduled jobs — see
+// src/modules/tasks's job handlers — rather than a second scheduler.
+// ---------------------------------------------------------------------------
+
+model Task {
+  id          String       @id @default(uuid()) @db.Uuid
+  title       String
+  description String?
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+
+  ownerId   String @db.Uuid
+  owner     User   @relation("TaskOwner", fields: [ownerId], references: [id])
+  creatorId String @db.Uuid
+  creator   User   @relation("TaskCreator", fields: [creatorId], references: [id])
+
+  deadline   DateTime?
+  reminderAt DateTime?
+
+  escalatedAt   DateTime?
+  escalatedToId String?   @db.Uuid
+  escalatedTo   User?     @relation("TaskEscalatedTo", fields: [escalatedToId], references: [id])
+
+  // Polymorphic link to the future domain entity this task belongs to (a
+  // maintenance issue, an application, an election, ...) — FK-less by
+  // design, mirroring AuditLog above; a Task with both fields null is a
+  // standalone to-do with no owning domain entity.
+  relatedEntityType String?
+  relatedEntityId   String? @db.Uuid
+
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  comments TaskComment[]
+
+  @@index([ownerId])
+  @@index([creatorId])
+  @@index([status])
+  @@index([deadline])
+  @@index([relatedEntityType, relatedEntityId])
+  @@map("tasks")
+}
+
+model TaskComment {
+  id       String @id @default(uuid()) @db.Uuid
+  taskId   String @db.Uuid
+  task     Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId String @db.Uuid
+  author   User   @relation("TaskCommentAuthor", fields: [authorId], references: [id])
+  body     String
+
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+  @@map("task_comments")
 }
 
 // ---------------------------------------------------------------------------
