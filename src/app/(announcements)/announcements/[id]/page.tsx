@@ -1,11 +1,15 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Pencil } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input, Label, FieldError } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { CardTitle } from "@/components/ui/typography";
 import { useToast } from "@/components/ui/toast";
@@ -43,6 +47,14 @@ export default function AnnouncementDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [editPriority, setEditPriority] = useState<AnnouncementDetailDto["announcement"]["priority"]>("MEDIUM");
+  const [editExpiresAt, setEditExpiresAt] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
   const load = useCallback(async () => {
     if (!accessToken || !announcementId) return;
     setIsLoading(true);
@@ -78,6 +90,49 @@ export default function AnnouncementDetailPage() {
     }
   }
 
+  function openEdit() {
+    setEditTitle(announcement.title);
+    setEditContent(announcement.content);
+    setEditPriority(announcement.priority);
+    setEditExpiresAt(announcement.expiresAt ? announcement.expiresAt.slice(0, 16) : "");
+    setEditError(null);
+    setIsEditing(true);
+  }
+
+  /**
+   * MYARCH Phase 1–3 product-completion pass — covers the content fields
+   * (title/content/priority/expiresAt) UpdateAnnouncementUseCase already
+   * supports. Audience/publishAt editing is deliberately not exposed here:
+   * that use case's own doc comment already documents "no re-notification
+   * on edit" — widening an audience post-publish wouldn't notify the newly
+   * added recipients, a real gap this pass doesn't attempt to paper over
+   * with an edit control that would silently under-deliver.
+   */
+  async function handleSaveEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setEditError(null);
+    setIsSavingEdit(true);
+    try {
+      await apiClient.patch(
+        `/api/announcements/${announcementId}`,
+        {
+          title: editTitle.trim(),
+          content: editContent.trim(),
+          priority: editPriority,
+          expiresAt: editExpiresAt ? new Date(editExpiresAt).toISOString() : null,
+        },
+        accessToken ?? undefined,
+      );
+      toast.success("Announcement updated.");
+      setIsEditing(false);
+      await load();
+    } catch (err) {
+      setEditError(err instanceof ApiError ? err.message : "Unable to update this announcement.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -96,7 +151,66 @@ export default function AnnouncementDetailPage() {
       </div>
 
       <Card>
-        <p className="whitespace-pre-wrap text-sm text-(--color-text-primary)">{announcement.content}</p>
+        {isManager && !isEditing && (
+          <div className="mb-3 flex justify-end">
+            <Button type="button" variant="ghost" className="gap-1.5" onClick={openEdit}>
+              <Pencil aria-hidden="true" size={14} strokeWidth={1.75} />
+              Edit
+            </Button>
+          </div>
+        )}
+
+        {isEditing ? (
+          <form onSubmit={handleSaveEdit} className="space-y-3">
+            <div>
+              <Label htmlFor="announcement-edit-title">Title</Label>
+              <Input id="announcement-edit-title" required value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="announcement-edit-content">Content</Label>
+              <Textarea
+                id="announcement-edit-content"
+                rows={5}
+                required
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="announcement-edit-priority">Priority</Label>
+              <Select
+                id="announcement-edit-priority"
+                value={editPriority}
+                onChange={(e) => setEditPriority(e.target.value as AnnouncementDetailDto["announcement"]["priority"])}
+              >
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+                <option value="URGENT">Urgent</option>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="announcement-edit-expires">Expires at (optional)</Label>
+              <Input
+                id="announcement-edit-expires"
+                type="datetime-local"
+                value={editExpiresAt}
+                onChange={(e) => setEditExpiresAt(e.target.value)}
+              />
+            </div>
+            <FieldError>{editError ?? undefined}</FieldError>
+            <div className="flex gap-2">
+              <Button type="submit" variant="primary" disabled={isSavingEdit || !editTitle.trim() || !editContent.trim()}>
+                {isSavingEdit ? "Saving…" : "Save changes"}
+              </Button>
+              <Button type="button" variant="ghost" disabled={isSavingEdit} onClick={() => setIsEditing(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <p className="whitespace-pre-wrap text-sm text-(--color-text-primary)">{announcement.content}</p>
+        )}
       </Card>
 
       <Card>

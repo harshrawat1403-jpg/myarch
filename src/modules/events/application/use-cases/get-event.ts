@@ -5,8 +5,9 @@ import type {
   EventChecklistItemRecord,
   EventParticipantRecord,
   EventRecord,
+  EventRegistrationRecord,
 } from "../../domain/entities";
-import { canViewEvent } from "../../domain/permissions";
+import { canManageEvent, canViewEvent } from "../../domain/permissions";
 import { EventNotFoundError } from "../../domain/errors";
 import type { EventRepository } from "../ports/event-repository";
 import type { EventParticipantRepository } from "../ports/event-participant-repository";
@@ -26,6 +27,16 @@ export interface EventDetail {
   attachments: EventAttachmentRecord[];
   registrationCount: number;
   isSelfRegistered: boolean;
+  /**
+   * The full registrant roster — populated only for whoever manages this
+   * event (same canManageEvent gate as every write action on it), empty
+   * otherwise. A self-registered Student still gets registrationCount/
+   * isSelfRegistered above; the roster of OTHER registrants' identities is
+   * only exposed to management, not to every attendee, since nothing in
+   * §4.2 asks for a public attendee list and this keeps the response's own
+   * information disclosure surface minimal.
+   */
+  registrations: EventRegistrationRecord[];
 }
 
 export class GetEventUseCase {
@@ -46,12 +57,15 @@ export class GetEventUseCase {
       throw new NotAuthorizedError("Not authorized to view this event");
     }
 
-    const [participants, checklist, attachments, registrationCount, selfRegistration] = await Promise.all([
+    const isManager = canManageEvent(input.actor, event);
+
+    const [participants, checklist, attachments, registrationCount, selfRegistration, registrations] = await Promise.all([
       this.deps.eventParticipantRepository.listForEvent(event.id),
       this.deps.eventChecklistRepository.listForEvent(event.id),
       this.deps.eventAttachmentRepository.listForEvent(event.id),
       this.deps.eventRegistrationRepository.countForEvent(event.id),
       this.deps.eventRegistrationRepository.findByEventAndUser(event.id, input.actor.userId),
+      isManager ? this.deps.eventRegistrationRepository.listForEvent(event.id) : Promise.resolve([]),
     ]);
 
     return {
@@ -61,6 +75,7 @@ export class GetEventUseCase {
       attachments,
       registrationCount,
       isSelfRegistered: selfRegistration !== null,
+      registrations,
     };
   }
 }

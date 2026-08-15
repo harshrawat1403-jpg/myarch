@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, Lock, MessageSquare } from "lucide-react";
+import { ChevronLeft, Lock, MessageSquare, Pencil, UserCog } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Label } from "@/components/ui/input";
+import { Input, Label, FieldError } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { DataLabel } from "@/components/ui/typography";
@@ -17,6 +18,13 @@ import { EmptyState } from "@/components/empty-state";
 import { useToast } from "@/components/ui/toast";
 
 type TaskStatus = "TODO" | "IN_PROGRESS" | "BLOCKED" | "DONE" | "CANCELLED";
+type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+interface DirectoryEntry {
+  userId: string;
+  fullName: string;
+  role: string;
+}
 
 interface TaskDetail {
   id: string;
@@ -80,6 +88,22 @@ export default function TaskDetailPage() {
   const [isCommenting, setIsCommenting] = useState(false);
   const [isActing, setIsActing] = useState(false);
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editPriority, setEditPriority] = useState<TaskPriority>("MEDIUM");
+  const [editDeadline, setEditDeadline] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const [isReassigning, setIsReassigning] = useState(false);
+  const [reassignQuery, setReassignQuery] = useState("");
+  const [reassignResults, setReassignResults] = useState<DirectoryEntry[]>([]);
+  const [selectedReassignee, setSelectedReassignee] = useState<DirectoryEntry | null>(null);
+  const [isSearchingReassignee, setIsSearchingReassignee] = useState(false);
+  const [isSavingReassign, setIsSavingReassign] = useState(false);
+  const [reassignError, setReassignError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     if (!accessToken || !id) return;
     setLoadState("loading");
@@ -107,6 +131,104 @@ export default function TaskDetailPage() {
 
   const canManage = task !== null && (role === "SECRETARY" || (role === "COORDINATOR" && (task.ownerId === userId || task.creatorId === userId)));
   const canUpdateOwnStatus = task !== null && role === "STUDENT" && task.ownerId === userId;
+
+  // MYARCH Phase 1–3 product-completion pass — mirrors create-task-modal's
+  // own owner-search directory lookup exactly (same endpoint, same 300ms
+  // debounce, same role narrowing). The server-side canAssignTaskTo check
+  // inside ReassignTaskUseCase is the real enforcement regardless of what
+  // this picker offers — a Coordinator who somehow submitted a Secretary or
+  // peer-Coordinator's id would still be rejected there.
+  useEffect(() => {
+    if (!accessToken || !isReassigning || reassignQuery.trim().length < 2 || selectedReassignee) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setReassignResults([]);
+      return;
+    }
+    let cancelled = false;
+    setIsSearchingReassignee(true);
+    const timeout = setTimeout(() => {
+      (async () => {
+        try {
+          const params = new URLSearchParams({ query: reassignQuery.trim() });
+          if (role === "COORDINATOR") params.set("role", "STUDENT");
+          const results = await apiClient.get<DirectoryEntry[]>(
+            `/api/administration/directory?${params.toString()}`,
+            accessToken,
+          );
+          if (!cancelled) setReassignResults(results);
+        } catch {
+          if (!cancelled) setReassignResults([]);
+        } finally {
+          if (!cancelled) setIsSearchingReassignee(false);
+        }
+      })();
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [accessToken, isReassigning, reassignQuery, selectedReassignee, role]);
+
+  function openEdit() {
+    if (!task) return;
+    setEditTitle(task.title);
+    setEditDescription(task.description ?? "");
+    setEditPriority(task.priority);
+    setEditDeadline(task.deadline ? task.deadline.slice(0, 16) : "");
+    setEditError(null);
+    setIsEditing(true);
+  }
+
+  async function handleSaveEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!task || !accessToken) return;
+    setEditError(null);
+    setIsSavingEdit(true);
+    try {
+      await apiClient.patch(
+        `/api/tasks/${task.id}`,
+        {
+          title: editTitle.trim(),
+          description: editDescription.trim() ? editDescription.trim() : null,
+          priority: editPriority,
+          deadline: editDeadline ? new Date(editDeadline).toISOString() : null,
+        },
+        accessToken,
+      );
+      toast.success("Task updated.");
+      setIsEditing(false);
+      await load();
+    } catch (err) {
+      setEditError(err instanceof ApiError ? err.message : "Unable to update this task.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
+  function openReassign() {
+    setReassignQuery("");
+    setReassignResults([]);
+    setSelectedReassignee(null);
+    setReassignError(null);
+    setIsReassigning(true);
+  }
+
+  async function handleReassignSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!task || !accessToken || !selectedReassignee) return;
+    setReassignError(null);
+    setIsSavingReassign(true);
+    try {
+      await apiClient.post(`/api/tasks/${task.id}/reassign`, { newOwnerId: selectedReassignee.userId }, accessToken);
+      toast.success(`Task reassigned to ${selectedReassignee.fullName}.`);
+      setIsReassigning(false);
+      await load();
+    } catch (err) {
+      setReassignError(err instanceof ApiError ? err.message : "Unable to reassign this task.");
+    } finally {
+      setIsSavingReassign(false);
+    }
+  }
 
   async function handleSetStatus(status: TaskStatus) {
     if (!task || !accessToken) return;
@@ -218,6 +340,137 @@ export default function TaskDetailPage() {
         {task.cancelledAt && <p>Cancelled {new Date(task.cancelledAt).toLocaleString()}</p>}
         <p>Created {new Date(task.createdAt).toLocaleString()}</p>
       </Card>
+
+      {canManage && (
+        <Card>
+          <div className="flex items-center justify-between">
+            <DataLabel>Task details</DataLabel>
+            {!isEditing && (
+              <Button type="button" variant="ghost" className="gap-1.5" onClick={openEdit}>
+                <Pencil aria-hidden="true" size={14} strokeWidth={1.75} />
+                Edit
+              </Button>
+            )}
+          </div>
+
+          {isEditing && (
+            <form onSubmit={handleSaveEdit} className="mt-3 space-y-3">
+              <div>
+                <Label htmlFor="edit-title">Title</Label>
+                <Input id="edit-title" required value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+              </div>
+              <div>
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  rows={3}
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-priority">Priority</Label>
+                <Select id="edit-priority" value={editPriority} onChange={(e) => setEditPriority(e.target.value as TaskPriority)}>
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="URGENT">Urgent</option>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-deadline">Deadline</Label>
+                <Input
+                  id="edit-deadline"
+                  type="datetime-local"
+                  value={editDeadline}
+                  onChange={(e) => setEditDeadline(e.target.value)}
+                />
+              </div>
+              <FieldError>{editError ?? undefined}</FieldError>
+              <div className="flex gap-2">
+                <Button type="submit" variant="primary" disabled={isSavingEdit || !editTitle.trim()}>
+                  {isSavingEdit ? "Saving…" : "Save changes"}
+                </Button>
+                <Button type="button" variant="ghost" disabled={isSavingEdit} onClick={() => setIsEditing(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
+        </Card>
+      )}
+
+      {canManage && (
+        <Card>
+          <div className="flex items-center justify-between">
+            <DataLabel>Owner</DataLabel>
+            {!isReassigning && (
+              <Button type="button" variant="ghost" className="gap-1.5" onClick={openReassign}>
+                <UserCog aria-hidden="true" size={14} strokeWidth={1.75} />
+                Reassign
+              </Button>
+            )}
+          </div>
+
+          {isReassigning && (
+            <form onSubmit={handleReassignSubmit} className="mt-3 space-y-3">
+              {selectedReassignee ? (
+                <div className="flex items-center justify-between rounded-md border border-(--color-border) px-4 py-2.5 text-sm">
+                  <span>
+                    {selectedReassignee.fullName}{" "}
+                    <span className="text-(--color-text-secondary)">({selectedReassignee.role})</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedReassignee(null)}
+                    className="text-xs font-medium text-(--color-accent) hover:underline"
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <Label htmlFor="reassign-query">New owner</Label>
+                  <Input
+                    id="reassign-query"
+                    placeholder="Search by name…"
+                    value={reassignQuery}
+                    onChange={(e) => setReassignQuery(e.target.value)}
+                  />
+                  {isSearchingReassignee && <p className="mt-1 text-xs text-(--color-text-secondary)">Searching…</p>}
+                  {reassignResults.length > 0 && (
+                    <ul className="mt-1 max-h-40 overflow-y-auto rounded-md border border-(--color-border)">
+                      {reassignResults.map((entry) => (
+                        <li key={entry.userId}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedReassignee(entry);
+                              setReassignResults([]);
+                            }}
+                            className="block w-full px-4 py-2 text-left text-sm hover:bg-(--color-surface-muted)"
+                          >
+                            {entry.fullName} <span className="text-(--color-text-secondary)">({entry.role})</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
+              <FieldError>{reassignError ?? undefined}</FieldError>
+              <div className="flex gap-2">
+                <Button type="submit" variant="primary" disabled={isSavingReassign || !selectedReassignee}>
+                  {isSavingReassign ? "Reassigning…" : "Reassign"}
+                </Button>
+                <Button type="button" variant="ghost" disabled={isSavingReassign} onClick={() => setIsReassigning(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
+        </Card>
+      )}
 
       {(canManage || canUpdateOwnStatus) && FORWARD_TRANSITIONS[task.status].length > 0 && (
         <Card>

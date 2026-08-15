@@ -33,6 +33,7 @@ interface EventDetailDto {
   attachments: { id: string; kind: "DOCUMENT" | "MEDIA"; mimeType: string }[];
   registrationCount: number;
   isSelfRegistered: boolean;
+  registrations: { id: string; userId: string; registeredAt: string; attendedAt: string | null }[];
 }
 
 interface RelatedTask {
@@ -284,8 +285,47 @@ export default function EventDetailPage() {
       </Card>
 
       <Card>
-        <CardTitle>Registration</CardTitle>
-        <p className="mt-1 text-sm text-(--color-text-secondary)">{detail.registrationCount} registered.</p>
+        <CardTitle>Registration ({detail.registrationCount})</CardTitle>
+        {isManager ? (
+          <ul className="mt-2 space-y-2">
+            {detail.registrations.map((registration) => (
+              <li key={registration.id} className="flex items-center justify-between gap-3 text-sm">
+                <span>
+                  {registration.userId}{" "}
+                  <span className="text-xs text-(--color-text-secondary)">
+                    · registered {new Date(registration.registeredAt).toLocaleDateString()}
+                  </span>
+                </span>
+                {registration.attendedAt ? (
+                  <Badge variant="approved">Attended</Badge>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() =>
+                      runAction(
+                        () =>
+                          apiClient.post(
+                            `/api/events/${eventId}/attendance`,
+                            { userId: registration.userId },
+                            accessToken ?? undefined,
+                          ),
+                        "Attendance marked.",
+                      )
+                    }
+                  >
+                    Mark attended
+                  </Button>
+                )}
+              </li>
+            ))}
+            {detail.registrations.length === 0 && (
+              <li className="text-(--color-text-secondary)">No registrations yet.</li>
+            )}
+          </ul>
+        ) : (
+          <p className="mt-1 text-sm text-(--color-text-secondary)">{detail.registrationCount} registered.</p>
+        )}
       </Card>
 
       {isManager && event.status === "COMPLETED" && (
