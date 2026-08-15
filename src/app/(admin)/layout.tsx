@@ -18,6 +18,13 @@ import {
   Target,
   Contact,
   BookOpen,
+  ListTodo,
+  Wrench,
+  Gauge,
+  Inbox,
+  CalendarDays,
+  CalendarRange,
+  Megaphone,
 } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { useRequireRole } from "@/lib/use-require-role";
@@ -75,6 +82,28 @@ const BASE_NAV_ITEMS: NavItem[] = [
   // same contiguity rule as "Placement" above: placed before Directory so it
   // never splits an existing group's concatenation-adjacent chunks.
   { href: "/dashboard/publications", label: "Publications", icon: BookOpen, group: "Publications" },
+  // MYARCH Phase 2/3 product-completion pass — these seven route groups
+  // ((tasks)/(maintenance)/(requests)/(calendar)/(events)/(meetings)/
+  // (announcements)) have existed, fully built and server-authorized,
+  // since their respective phases shipped; only the nav entry pointing at
+  // them was missing. Visible to both Secretary and Coordinator here,
+  // matching the same "nav shows it, the page's own use cases gate what a
+  // Coordinator can actually do inside it" split every other BASE_NAV_ITEMS
+  // entry above already uses (e.g. Companies) — a Coordinator without
+  // maintenance.manage/requests.manage/etc. still sees these pages, but
+  // canManage*/hasCoordinatorPermission inside each one still applies
+  // exactly as before. Placed here, before Directory, for the same
+  // group-contiguity reason as Placement/Publications above (Directory's
+  // own "Administration" group must stay adjacent to
+  // SECRETARY_ONLY_NAV_ITEMS's own "Administration" run once concatenated).
+  { href: "/tasks", label: "Tasks", icon: ListTodo, group: "Operations" },
+  { href: "/maintenance", label: "Maintenance", icon: Wrench, group: "Operations" },
+  { href: "/maintenance/dashboard", label: "Maintenance Dashboard", icon: Gauge, group: "Operations" },
+  { href: "/requests", label: "Requests", icon: Inbox, group: "Operations" },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays, group: "Activities" },
+  { href: "/events", label: "Events", icon: CalendarRange, group: "Activities" },
+  { href: "/meetings", label: "Meetings", icon: Users, group: "Activities" },
+  { href: "/announcements", label: "Announcements", icon: Megaphone, group: "Activities" },
   // Directory is visible to both roles (matches its own route handler's
   // { roles: ["SECRETARY", "COORDINATOR"] } gate) — placed in BASE_NAV_ITEMS,
   // not SECRETARY_ONLY_NAV_ITEMS, even though it shares the "Administration"

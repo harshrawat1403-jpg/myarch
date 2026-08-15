@@ -1,6 +1,18 @@
 "use client";
 
-import { BarChart3, Briefcase, LayoutDashboard, Mail, UserCircle } from "lucide-react";
+import {
+  BarChart3,
+  Briefcase,
+  CalendarDays,
+  CalendarRange,
+  Inbox,
+  LayoutDashboard,
+  ListTodo,
+  Mail,
+  Megaphone,
+  UserCircle,
+  Wrench,
+} from "lucide-react";
 import { useRequireRole } from "@/lib/use-require-role";
 import { SheetLayout, type NavItem } from "@/components/sheet-layout";
 import { LoadingScreen } from "@/components/loading-screen";
@@ -16,6 +28,23 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/student/interests", label: "Interests", icon: Mail },
   { href: "/student/reports", label: "My Reports", icon: BarChart3 },
   { href: "/student/profile", label: "My Profile", icon: UserCircle },
+  // MYARCH Phase 2/3 product-completion pass — same routes the admin shell
+  // now links to, each already self-scoped server-side to "this student's
+  // own records" by its own use case (SearchTasksUseCase/
+  // SearchMaintenanceIssuesUseCase/SearchRequestsUseCase force
+  // ownerId/requesterId = self for a STUDENT actor; the Calendar/Events/
+  // Announcements sources apply their own equivalent per-actor scoping).
+  // No admin-only surface is linked here: no Maintenance Dashboard, no
+  // Meetings (its route group's own guard technically admits STUDENT, but
+  // it has no student-facing purpose — meetings are staff/council business;
+  // a student added as a participant can still be reached via a direct
+  // link, just not from this nav), no request/event/meeting administration.
+  { href: "/tasks", label: "My Tasks", icon: ListTodo },
+  { href: "/maintenance", label: "Maintenance", icon: Wrench },
+  { href: "/requests", label: "My Requests", icon: Inbox },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/events", label: "Events", icon: CalendarRange },
+  { href: "/announcements", label: "Announcements", icon: Megaphone },
 ];
 
 /**
