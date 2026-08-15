@@ -50,7 +50,11 @@ async function request<T>(method: string, path: string, options: RequestOptions 
     throw new ApiError(response.status, err.code, err.message, err.details);
   }
 
-  return (envelope?.data ?? envelope) as T;
+  // `envelope?.data ?? envelope` previously collapsed a legitimate `{ data: null }`
+  // response (e.g. "no Maintenance Coordinator assigned yet") into the raw envelope
+  // object itself, since `??` can't tell "data is null" apart from "no data key" —
+  // callers expecting `null` got `{ data: null }` instead. Check key presence instead.
+  return (envelope && "data" in envelope ? envelope.data : envelope) as T;
 }
 
 /**
