@@ -16,6 +16,7 @@ function record(id: string): CoordinatorRecord {
     fullName: `Coordinator ${id}`,
     isActive: true,
     position: null,
+    customPosition: null,
     batchIds: [],
     permissions: [],
     maintenanceRole: null,

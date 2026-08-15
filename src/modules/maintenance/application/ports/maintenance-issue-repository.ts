@@ -14,7 +14,10 @@ export interface CreateMaintenanceIssueData {
   location: string;
   description: string;
   priority?: MaintenancePriority;
-  requesterId: string;
+  /** Exactly one of requesterId or the publicReporter* pair is provided — enforced by the calling use case (ReportMaintenanceIssueUseCase vs. ReportPublicMaintenanceIssueUseCase), not by this port. */
+  requesterId?: string;
+  publicReporterName?: string;
+  publicReporterEmail?: string;
 }
 
 export interface UpdateMaintenanceIssueData {

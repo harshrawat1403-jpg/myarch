@@ -26,7 +26,9 @@ interface IssueDetail {
   description: string;
   priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
   status: IssueStatus;
-  requesterId: string;
+  requesterId: string | null;
+  publicReporterName: string | null;
+  publicReporterEmail: string | null;
   assigneeId: string | null;
   deadline: string | null;
   taskId: string | null;
@@ -215,6 +217,14 @@ export default function MaintenanceIssueDetailPage() {
       </div>
 
       <Card>{issue.description}</Card>
+
+      {isStaff && !issue.requesterId && (issue.publicReporterName || issue.publicReporterEmail) && (
+        <Card className="space-y-1 text-sm text-(--color-text-secondary)">
+          <DataLabel>Reported by (public submission)</DataLabel>
+          {issue.publicReporterName && <p className="text-(--color-text-primary)">{issue.publicReporterName}</p>}
+          {issue.publicReporterEmail && <p>{issue.publicReporterEmail}</p>}
+        </Card>
+      )}
 
       <Card className="space-y-2 text-sm text-(--color-text-secondary)">
         {task?.deadline && <p>Expected resolution: {new Date(task.deadline).toLocaleString()}</p>}

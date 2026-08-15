@@ -1,4 +1,5 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import type { PrismaTransactionClient } from "@/lib/prisma";
 import type { CoordinatorRecord, CoordinatorSearchFilters, MaintenanceCoordinatorRole } from "../domain/entities";
 import type {
   CoordinatorRepository,
@@ -11,11 +12,16 @@ type CoordinatorProfileWithUser = Prisma.CoordinatorProfileGetPayload<{
 }>;
 
 export class PrismaCoordinatorRepository implements CoordinatorRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaTransactionClient) {}
 
   async create(data: CreateCoordinatorData): Promise<CoordinatorRecord> {
     const row = await this.prisma.coordinatorProfile.create({
-      data: { userId: data.userId, fullName: data.fullName, position: data.position },
+      data: {
+        userId: data.userId,
+        fullName: data.fullName,
+        position: data.position,
+        customPosition: data.customPosition,
+      },
       include: { user: true, batchScopes: true },
     });
     return toDomain(row);
@@ -40,7 +46,7 @@ export class PrismaCoordinatorRepository implements CoordinatorRepository {
   async update(id: string, data: UpdateCoordinatorData): Promise<CoordinatorRecord> {
     const row = await this.prisma.coordinatorProfile.update({
       where: { id },
-      data: { fullName: data.fullName, position: data.position },
+      data: { fullName: data.fullName, position: data.position, customPosition: data.customPosition },
       include: { user: true, batchScopes: true },
     });
     return toDomain(row);
@@ -48,18 +54,36 @@ export class PrismaCoordinatorRepository implements CoordinatorRepository {
 
   async setActive(id: string, isActive: boolean): Promise<CoordinatorRecord> {
     // Mirrors PrismaStudentRepository.setActive: the roster record and the
-    // login flip together in one transaction.
-    const [row] = await this.prisma.$transaction([
-      this.prisma.coordinatorProfile.update({
-        where: { id },
-        data: { isActive },
-        include: { user: true, batchScopes: true },
-      }),
-      this.prisma.user.updateMany({
-        where: { coordinatorProfile: { id } },
-        data: { isActive },
-      }),
-    ]);
+    // login flip together in one transaction. When this repository is
+    // itself already scoped to an interactive transaction (constructed
+    // with a `tx` — see CreateCoordinatorUseCase's runCreateCoordinatorTransaction),
+    // `$transaction` isn't available (Prisma doesn't support nesting one),
+    // but it's also unnecessary: both writes below already share that
+    // outer transaction simply by running on the same `tx` client.
+    if ("$transaction" in this.prisma) {
+      const [row] = await this.prisma.$transaction([
+        this.prisma.coordinatorProfile.update({
+          where: { id },
+          data: { isActive },
+          include: { user: true, batchScopes: true },
+        }),
+        this.prisma.user.updateMany({
+          where: { coordinatorProfile: { id } },
+          data: { isActive },
+        }),
+      ]);
+      return toDomain(row);
+    }
+
+    const row = await this.prisma.coordinatorProfile.update({
+      where: { id },
+      data: { isActive },
+      include: { user: true, batchScopes: true },
+    });
+    await this.prisma.user.updateMany({
+      where: { coordinatorProfile: { id } },
+      data: { isActive },
+    });
     return toDomain(row);
   }
 
@@ -139,6 +163,7 @@ function toDomain(row: CoordinatorProfileWithUser): CoordinatorRecord {
     fullName: row.fullName,
     isActive: row.isActive,
     position: row.position,
+    customPosition: row.customPosition,
     batchIds: row.batchScopes.map((scope) => scope.batchId),
     permissions: row.permissions,
     maintenanceRole: row.maintenanceRole,

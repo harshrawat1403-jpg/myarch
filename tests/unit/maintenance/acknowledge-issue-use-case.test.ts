@@ -20,6 +20,8 @@ function record(overrides: Partial<MaintenanceIssueRecord> = {}): MaintenanceIss
     priority: "MEDIUM",
     status: "SUBMITTED",
     requesterId: "stu-1",
+    publicReporterName: null,
+    publicReporterEmail: null,
     assigneeId: null,
     deadline: null,
     taskId: null,

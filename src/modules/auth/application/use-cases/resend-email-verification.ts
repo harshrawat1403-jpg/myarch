@@ -57,8 +57,11 @@ export class ResendEmailVerificationUseCase {
 
     const verifyUrl = `${this.deps.appBaseUrl}/verify-email?token=${rawToken}`;
     const rendered = renderEmailTemplate("EMAIL_VERIFICATION", { verifyUrl }, email);
-    await this.deps.sendEmail(rendered).catch(() => {
-      // Best-effort, matching IssueEmailVerificationTokenUseCase.
+    // Best-effort, matching IssueEmailVerificationTokenUseCase — logged
+    // (never the token/URL) so a misconfigured/failing provider is visible
+    // in server logs instead of silently vanishing.
+    await this.deps.sendEmail(rendered).catch((err: unknown) => {
+      console.error("[auth] failed to send email-verification email", err);
     });
   }
 }

@@ -214,12 +214,23 @@ enum RegistrationRequestStatus {
   REJECTED
 }
 
-// V4.0 (A1): display/reporting label only — both positions have
-// byte-for-byte identical permissions (§4 of the V4.0 PRD). Never read by
-// any permission function; only ever branch on `role === "COORDINATOR"`.
+// V4.0 (A1) + MYARCH unified Coordinator Position system: display/reporting
+// label only — no value here is ever read by any permission function; only
+// ever branch on `role === "COORDINATOR"`. Authorization for the Maintenance
+// functional hierarchy is driven entirely by CoordinatorProfile.maintenanceRole
+// (a separate field, unchanged by this enum), never by this one — MAINTENANCE_
+// SECRETARY/MAINTENANCE_COORDINATOR were deliberately NOT added as values here
+// to avoid two fields representing the same fact. T_AND_P/ALUMNI are legacy
+// values, preserved for existing data and no longer offered to new Coordinators
+// (superseded by TECHNICAL/OTHER) — never removed, never backfilled/rewritten.
+// OTHER pairs with CoordinatorProfile.customPosition (its free-text label,
+// e.g. "Cultural Coordinator"); customPosition is meaningless for every other
+// value and MUST be null/ignored whenever position is not OTHER.
 enum CoordinatorPosition {
   T_AND_P
   ALUMNI
+  TECHNICAL
+  OTHER
 }
 
 // MYARCH — Maintenance functional hierarchy (architecture amendment, not a
@@ -438,8 +449,14 @@ model CoordinatorProfile {
   // for the template). "Disable" and "Delete (soft delete)" are the same
   // toggle, not two independent states.
   isActive Boolean              @default(true)
-  // V4.0 (A1): T&P vs Alumni — display/reporting label only, see enum doc comment.
+  // V4.0 (A1) + MYARCH unified Coordinator Position — display/reporting label
+  // only, see CoordinatorPosition's own doc comment.
   position CoordinatorPosition?
+
+  // Free-text label, meaningful only when position = OTHER (e.g. "Cultural
+  // Coordinator") — null/ignored for every other position value. Descriptive
+  // only; no permission function ever reads it.
+  customPosition String?
 
   // MYARCH — Maintenance functional hierarchy (see MaintenanceCoordinatorRole's
   // own doc comment). Null for every ordinary Coordinator (the overwhelming
@@ -1167,8 +1184,21 @@ model MaintenanceIssue {
   priority    TaskPriority            @default(MEDIUM)
   status      MaintenanceIssueStatus  @default(SUBMITTED)
 
-  requesterId String @db.Uuid
-  requester   User   @relation("MaintenanceIssueRequester", fields: [requesterId], references: [id])
+  // Nullable — MYARCH public Maintenance reporting amendment. Null means
+  // this issue was reported anonymously via the public, unauthenticated
+  // /maintenance/report flow (ReportPublicMaintenanceIssueUseCase); in that
+  // case publicReporterName/publicReporterEmail carry the complainant's
+  // contact info instead. Never both null and unset — exactly one of
+  // {requesterId} or {publicReporterName + publicReporterEmail} is present,
+  // enforced at the application layer (no DB constraint expresses an XOR).
+  requesterId String? @db.Uuid
+  requester   User?   @relation("MaintenanceIssueRequester", fields: [requesterId], references: [id])
+  // Meaningful only when requesterId is null — the anonymous complainant's
+  // own name/email, collected once at submission time. Never used for
+  // authorization (an anonymous complainant has no session to authorize
+  // with); staff-visible only, for contacting them about their report.
+  publicReporterName  String?
+  publicReporterEmail String?
   assigneeId  String? @db.Uuid
   assignee    User?   @relation("MaintenanceIssueAssignee", fields: [assigneeId], references: [id])
 

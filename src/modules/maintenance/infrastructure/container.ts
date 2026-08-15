@@ -6,12 +6,13 @@
 import { prisma } from "@/lib/prisma";
 import { PrismaAuditRecorder } from "@/lib/audit";
 import { saveFile } from "@/lib/file-storage";
-import { notificationService } from "@/modules/notifications";
+import { notificationService, sendDirectEmail } from "@/modules/notifications";
 import { PrismaMaintenanceIssueRepository } from "./prisma-maintenance-issue-repository";
 import { PrismaMaintenanceAttachmentRepository } from "./prisma-maintenance-attachment-repository";
 import { PrismaUserRoleLookup } from "./prisma-user-role-lookup";
 import { PrismaSecretaryRecipientLookup } from "./prisma-secretary-recipient-lookup";
 import { ReportMaintenanceIssueUseCase } from "../application/use-cases/report-issue";
+import { ReportPublicMaintenanceIssueUseCase } from "../application/use-cases/report-public-issue";
 import { AcknowledgeMaintenanceIssueUseCase } from "../application/use-cases/acknowledge-issue";
 import { AssignMaintenanceIssueUseCase } from "../application/use-cases/assign-issue";
 import { ReassignMaintenanceIssueUseCase } from "../application/use-cases/reassign-issue";
@@ -39,6 +40,11 @@ export const reportMaintenanceIssueUseCase = new ReportMaintenanceIssueUseCase({
   notificationService,
   auditRecorder,
 });
+export const reportPublicMaintenanceIssueUseCase = new ReportPublicMaintenanceIssueUseCase({
+  maintenanceIssueRepository,
+  secretaryRecipientLookup,
+  notificationService,
+});
 export const acknowledgeMaintenanceIssueUseCase = new AcknowledgeMaintenanceIssueUseCase({
   maintenanceIssueRepository,
   auditRecorder,
@@ -62,6 +68,7 @@ export const resolveMaintenanceIssueUseCase = new ResolveMaintenanceIssueUseCase
   maintenanceIssueRepository,
   notificationService,
   auditRecorder,
+  sendPublicReporterEmail: sendDirectEmail,
 });
 export const confirmMaintenanceResolutionUseCase = new ConfirmMaintenanceResolutionUseCase({
   maintenanceIssueRepository,

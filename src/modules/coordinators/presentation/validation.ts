@@ -1,18 +1,25 @@
 import { z } from "zod";
 
-const CoordinatorPositionSchema = z.enum(["T_AND_P", "ALUMNI"]);
+/** MYARCH unified Coordinator Position — T_AND_P/ALUMNI are legacy values (existing data only, no longer offered to new Coordinators); TECHNICAL/OTHER are current. See CoordinatorPosition's own doc comment (domain/entities.ts). */
+const CoordinatorPositionSchema = z.enum(["T_AND_P", "ALUMNI", "TECHNICAL", "OTHER"]);
 
 export const CreateCoordinatorRequestSchema = z.object({
   email: z.string().trim().email(),
   fullName: z.string().trim().min(1).max(200),
   position: CoordinatorPositionSchema.optional(),
+  /** Required (checked by the use case) when position is "OTHER". */
+  customPosition: z.string().trim().min(1).max(200).optional(),
   batchIds: z.array(z.string().uuid()).optional(),
+  /** MYARCH unified Coordinator Position — designates the Maintenance functional role atomically with creation. See CreateCoordinatorUseCase. */
+  maintenanceRole: z.enum(["MAINTENANCE_SECRETARY", "MAINTENANCE_COORDINATOR"]).nullable().optional(),
 });
 
 export const UpdateCoordinatorRequestSchema = z
   .object({
     fullName: z.string().trim().min(1).max(200).optional(),
     position: CoordinatorPositionSchema.nullable().optional(),
+    /** Only consulted when `position` is also provided — see UpdateCoordinatorUseCase. */
+    customPosition: z.string().trim().min(1).max(200).nullable().optional(),
   })
   .refine((value) => value.fullName !== undefined || value.position !== undefined, {
     message: "At least one field must be provided",

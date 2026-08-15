@@ -73,6 +73,16 @@ export const tokenConsumptionRateLimiter = new PrismaTokenBucketRateLimiter(pris
   refillRatePerSecond: 10 / (15 * 60),
 });
 
+// MYARCH — public Maintenance reporting (/api/maintenance/issues/public).
+// Same shape as publicRegistrationRateLimiter: a real complainant submits an
+// issue occasionally, not repeatedly; per-IP since no account exists yet to
+// key on. Bounds junk/spam submissions to this unauthenticated,
+// no-account-required endpoint.
+export const publicMaintenanceReportRateLimiter = new PrismaTokenBucketRateLimiter(prisma, {
+  capacity: 5,
+  refillRatePerSecond: 5 / (60 * 60),
+});
+
 // MYARCH Phase 1 — /api/auth/forgot-password and /api/auth/resend-verification.
 // Deliberately tight and per-email+IP (mirrors loginRateLimiter's two-key
 // shape) — both are cheap-to-call, no-account-required triggers for an

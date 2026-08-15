@@ -21,6 +21,10 @@ const NAV_ITEMS = [
   // for discoverability, the same reasoning the PRD gives for
   // "Student Directory" above.
   { href: "/register", label: "Register" },
+  // MYARCH — the public entry point for Maintenance reporting (§3.1). Links
+  // to a plain public utility page (/maintenance/report), never the
+  // authenticated /maintenance workspace — see that page's own doc comment.
+  { href: "/maintenance/report", label: "Maintenance" },
   { href: "/contact", label: "Contact" },
 ] as const;
 

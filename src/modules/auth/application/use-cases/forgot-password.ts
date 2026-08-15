@@ -48,8 +48,13 @@ export class ForgotPasswordUseCase {
 
     const resetUrl = `${this.deps.appBaseUrl}/reset-password?token=${rawToken}`;
     const rendered = renderEmailTemplate("PASSWORD_RESET_REQUESTED", { resetUrl }, email);
-    await this.deps.sendEmail(rendered).catch(() => {
-      // Best-effort, matching every other direct-send call site in this module.
+    // Best-effort, matching every other direct-send call site in this
+    // module — the token is already stored, so a delivery failure must
+    // never surface here (would break anti-enumeration). Logged (never the
+    // token/URL) so a misconfigured/failing provider is at least visible in
+    // server logs instead of silently vanishing.
+    await this.deps.sendEmail(rendered).catch((err: unknown) => {
+      console.error("[auth] failed to send password-reset email", err);
     });
   }
 }

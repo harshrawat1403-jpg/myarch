@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaTransactionClient } from "@/lib/prisma";
 import { generateTempPassword } from "@/modules/auth/domain/temp-password";
 import type { CoordinatorUserProvisioner } from "../application/ports/coordinator-user-provisioner";
 
@@ -13,7 +13,7 @@ import type { CoordinatorUserProvisioner } from "../application/ports/coordinato
  */
 export class PrismaCoordinatorUserProvisioner implements CoordinatorUserProvisioner {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaTransactionClient,
     private readonly bcryptCostFactor: number,
   ) {}
 

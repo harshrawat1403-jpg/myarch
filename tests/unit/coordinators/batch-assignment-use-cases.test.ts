@@ -25,6 +25,7 @@ function seedRecord(overrides: Partial<CoordinatorRecord> = {}): CoordinatorReco
     fullName: "Target Coordinator",
     isActive: true,
     position: null,
+    customPosition: null,
     batchIds: [],
     permissions: [],
     maintenanceRole: null,

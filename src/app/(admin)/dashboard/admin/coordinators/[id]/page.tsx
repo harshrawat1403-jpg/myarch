@@ -3,19 +3,20 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, History, KeyRound, Layers, Plus, ShieldCheck, Wrench, X } from "lucide-react";
+import { ChevronLeft, History, KeyRound, Layers, Plus, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { formatAuditAction } from "@/lib/format-audit-action";
-import type {
-  CoordinatorPermissionKey,
-  CoordinatorPosition,
-  CoordinatorRecord,
-  MaintenanceCoordinatorRole,
-} from "@/modules/coordinators";
+import type { CoordinatorPermissionKey, CoordinatorRecord } from "@/modules/coordinators";
 import type { Batch } from "@/modules/batches";
 import type { AuditLogEntry } from "@/lib/audit";
-import { COORDINATOR_POSITION_OPTIONS } from "@/lib/coordinator-position";
+import {
+  UNIFIED_COORDINATOR_POSITION_OPTIONS,
+  deriveUnifiedPosition,
+  derivedCustomPositionText,
+  resolveUnifiedPosition,
+  type UnifiedCoordinatorPosition,
+} from "@/lib/coordinator-position";
 import { COORDINATOR_PERMISSION_KEYS, coordinatorPermissionLabel } from "@/lib/coordinator-permissions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -49,7 +50,8 @@ export default function CoordinatorDetailPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [activity, setActivity] = useState<AuditLogEntry[]>([]);
   const [fullName, setFullName] = useState("");
-  const [position, setPosition] = useState<CoordinatorPosition | "">("");
+  const [unifiedPosition, setUnifiedPosition] = useState<UnifiedCoordinatorPosition>("TECHNICAL");
+  const [customPositionText, setCustomPositionText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedNewBatchId, setSelectedNewBatchId] = useState("");
@@ -60,9 +62,6 @@ export default function CoordinatorDetailPage() {
   const [isResetting, setIsResetting] = useState(false);
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
-  const [maintenanceRole, setMaintenanceRole] = useState<MaintenanceCoordinatorRole | "">("");
-  const [maintenanceRoleError, setMaintenanceRoleError] = useState<string | null>(null);
-  const [isSavingMaintenanceRole, setIsSavingMaintenanceRole] = useState(false);
 
   const load = useCallback(async () => {
     if (!accessToken || !id) return;
@@ -74,9 +73,9 @@ export default function CoordinatorDetailPage() {
       ]);
       setCoordinator(record);
       setFullName(record.fullName);
-      setPosition(record.position ?? "");
+      setUnifiedPosition(deriveUnifiedPosition(record));
+      setCustomPositionText(derivedCustomPositionText(record));
       setSelectedPermissions([...record.permissions]);
-      setMaintenanceRole(record.maintenanceRole ?? "");
       setBatches(batchList);
       setActivity(activityEntries);
     } catch (err) {
@@ -89,13 +88,53 @@ export default function CoordinatorDetailPage() {
     void load();
   }, [load]);
 
+  /**
+   * MYARCH unified Coordinator Position — one Save action driving two
+   * independent, already-authorized endpoints: PATCH /api/coordinators/[id]
+   * for name/position/customPosition, and the existing (Secretary-gated)
+   * POST /api/coordinators/[id]/maintenance-role for the Maintenance
+   * Secretary/Coordinator designation. Each is only called when its own
+   * piece actually changed — comparing the live form state against what
+   * `load()` derived from the record, not against the *resolved* target
+   * value, is deliberate: for a legacy T_AND_P/ALUMNI Coordinator the
+   * derived display bucket is "Other Coordinator", but resolving that
+   * unconditionally back to position "OTHER" on every save (even when
+   * untouched) would silently overwrite the legacy value — comparing
+   * against the derived-from-record baseline instead means an untouched
+   * selection never gets rewritten.
+   */
   async function handleSaveDetails(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!coordinator || !accessToken) return;
     setIsSaving(true);
     setError(null);
     try {
-      await apiClient.patch(`/api/coordinators/${coordinator.id}`, { fullName, position: position || null }, accessToken);
+      const isNameDirty = fullName.trim() !== coordinator.fullName;
+      const isPositionDirty =
+        unifiedPosition !== deriveUnifiedPosition(coordinator) ||
+        customPositionText.trim() !== derivedCustomPositionText(coordinator);
+      const resolved = resolveUnifiedPosition(unifiedPosition, customPositionText);
+
+      if (isNameDirty || isPositionDirty) {
+        await apiClient.patch(
+          `/api/coordinators/${coordinator.id}`,
+          {
+            fullName,
+            ...(isPositionDirty ? { position: resolved.position, customPosition: resolved.customPosition } : {}),
+          },
+          accessToken,
+        );
+      }
+
+      const isMaintenanceRoleDirty = resolved.maintenanceRole !== (coordinator.maintenanceRole ?? null);
+      if (isMaintenanceRoleDirty) {
+        await apiClient.post(
+          `/api/coordinators/${coordinator.id}/maintenance-role`,
+          { maintenanceRole: resolved.maintenanceRole },
+          accessToken,
+        );
+      }
+
       toast.success("Details updated.");
       await load();
     } catch (err) {
@@ -165,33 +204,6 @@ export default function CoordinatorDetailPage() {
     }
   }
 
-  /**
-   * MYARCH Maintenance functional hierarchy — designates or clears this
-   * Coordinator's maintenanceRole. Technical-Secretary-only (this whole
-   * page already is); a Maintenance Secretary cannot self-promote, create
-   * another Maintenance Secretary, or designate the Maintenance
-   * Coordinator — that authorization lives entirely server-side in
-   * SetCoordinatorMaintenanceRoleUseCase, this control is just its UI.
-   */
-  async function handleSaveMaintenanceRole() {
-    if (!coordinator || !accessToken) return;
-    setMaintenanceRoleError(null);
-    setIsSavingMaintenanceRole(true);
-    try {
-      await apiClient.post(
-        `/api/coordinators/${coordinator.id}/maintenance-role`,
-        { maintenanceRole: maintenanceRole || null },
-        accessToken,
-      );
-      toast.success("Maintenance functional role updated.");
-      await load();
-    } catch (err) {
-      setMaintenanceRoleError(err instanceof ApiError ? err.message : "Unable to update the maintenance functional role.");
-    } finally {
-      setIsSavingMaintenanceRole(false);
-    }
-  }
-
   async function handleResetPassword() {
     if (!coordinator || !accessToken) return;
     setIsResetting(true);
@@ -228,6 +240,13 @@ export default function CoordinatorDetailPage() {
   const assignableBatches = batches.filter((b) => !coordinator.batchIds.includes(b.id));
   const assignedBatches = batches.filter((b) => coordinator.batchIds.includes(b.id));
 
+  // See handleSaveDetails's own doc comment for why this compares against
+  // the derived-from-record baseline rather than the resolved target value.
+  const isNameDirty = fullName.trim() !== coordinator.fullName;
+  const isPositionDirty =
+    unifiedPosition !== deriveUnifiedPosition(coordinator) || customPositionText.trim() !== derivedCustomPositionText(coordinator);
+  const isDetailsFormDirty = isNameDirty || isPositionDirty;
+
   return (
     <div className="max-w-2xl space-y-6">
       <Link
@@ -262,23 +281,34 @@ export default function CoordinatorDetailPage() {
             <Label htmlFor="position">Position</Label>
             <Select
               id="position"
-              value={position}
-              onChange={(e) => setPosition(e.target.value as CoordinatorPosition | "")}
+              value={unifiedPosition}
+              onChange={(e) => setUnifiedPosition(e.target.value as UnifiedCoordinatorPosition)}
             >
-              <option value="">Unspecified</option>
-              {COORDINATOR_POSITION_OPTIONS.map((option) => (
+              {UNIFIED_COORDINATOR_POSITION_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}
             </Select>
+            <p className="mt-1 text-xs text-(--color-text-secondary)">
+              Maintenance Secretary/Coordinator: at most one active Coordinator may hold each, and both still count
+              toward the maximum of 2 active Coordinators.
+            </p>
           </div>
+          {unifiedPosition === "OTHER" && (
+            <div>
+              <Label htmlFor="custom-position">Specify role/position</Label>
+              <Input
+                id="custom-position"
+                required
+                placeholder="e.g. Cultural Coordinator"
+                value={customPositionText}
+                onChange={(e) => setCustomPositionText(e.target.value)}
+              />
+            </div>
+          )}
           <div className="border-t border-(--color-border) pt-4">
-            <Button
-              type="submit"
-              variant="secondary"
-              disabled={isSaving || (fullName.trim() === coordinator.fullName && position === (coordinator.position ?? ""))}
-            >
+            <Button type="submit" variant="secondary" disabled={isSaving || !isDetailsFormDirty}>
               {isSaving ? "Saving…" : "Save details"}
             </Button>
           </div>
@@ -367,38 +397,6 @@ export default function CoordinatorDetailPage() {
             {isSavingPermissions ? "Saving…" : "Save permissions"}
           </Button>
         </div>
-      </DashboardPanel>
-
-      <DashboardPanel title="Maintenance Functional Role" icon={Wrench}>
-        <p className="text-sm text-(--color-text-secondary)">
-          Places this Coordinator into the Maintenance hierarchy — Maintenance Secretary administers the Maintenance
-          domain and may delegate to the Maintenance Coordinator; Maintenance Coordinator receives delegated
-          Maintenance permissions only. At most one active Coordinator may hold each role. Neither role grants
-          access beyond Maintenance, and both still count toward the maximum of 2 active Coordinators.
-        </p>
-        <div className="mt-4 flex items-end gap-3">
-          <div className="min-w-56">
-            <Label htmlFor="maintenance-role">Functional role</Label>
-            <Select
-              id="maintenance-role"
-              value={maintenanceRole}
-              onChange={(e) => setMaintenanceRole(e.target.value as MaintenanceCoordinatorRole | "")}
-            >
-              <option value="">None (ordinary Coordinator)</option>
-              <option value="MAINTENANCE_SECRETARY">Maintenance Secretary</option>
-              <option value="MAINTENANCE_COORDINATOR">Maintenance Coordinator</option>
-            </Select>
-          </div>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleSaveMaintenanceRole}
-            disabled={isSavingMaintenanceRole || maintenanceRole === (coordinator.maintenanceRole ?? "")}
-          >
-            {isSavingMaintenanceRole ? "Saving…" : "Save"}
-          </Button>
-        </div>
-        {maintenanceRoleError && <p className="mt-2 text-sm text-(--color-danger)">{maintenanceRoleError}</p>}
       </DashboardPanel>
 
       <DashboardPanel title="Password" icon={KeyRound}>

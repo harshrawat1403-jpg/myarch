@@ -15,6 +15,7 @@ function record(overrides: Partial<CoordinatorRecord> = {}): CoordinatorRecord {
     fullName: "Alice Coordinator",
     isActive: true,
     position: null,
+    customPosition: null,
     batchIds: [],
     permissions: [],
     maintenanceRole: null,

@@ -66,12 +66,15 @@ export class IssueEmailVerificationTokenUseCase {
       { recipientName: input.recipientName, verifyUrl },
       input.email,
     );
-    await this.deps.sendEmail(rendered).catch(() => {
+    await this.deps.sendEmail(rendered).catch((err: unknown) => {
       // Best-effort — matching every other notification dispatch in this
       // codebase (e.g. AdminResetPasswordUseCase's notify().catch()): a
       // delivery failure must never block the signup/registration itself,
       // which has already succeeded by this point. ResendEmailVerification
-      // exists precisely so the applicant can recover from this.
+      // exists precisely so the applicant can recover from this. Logged
+      // (never the token/URL) so a misconfigured/failing provider is
+      // visible in server logs instead of silently vanishing.
+      console.error("[auth] failed to send email-verification email", err);
     });
   }
 }

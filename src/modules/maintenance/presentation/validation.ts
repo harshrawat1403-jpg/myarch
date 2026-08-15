@@ -28,6 +28,16 @@ export const ReportMaintenanceIssueRequestSchema = z.object({
   priority: z.enum(MAINTENANCE_PRIORITY_VALUES).optional(),
 });
 
+/** MYARCH public Maintenance reporting — the unauthenticated counterpart. name/email are required so the complainant is trackable/contactable (see ReportPublicMaintenanceIssueUseCase's own doc comment); a max length matches the same defensive cap every other free-text field in this schema uses. */
+export const ReportPublicMaintenanceIssueRequestSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  email: z.string().trim().email().max(320),
+  category: z.enum(MAINTENANCE_CATEGORY_VALUES),
+  location: z.string().trim().min(1).max(MAINTENANCE_LOCATION_MAX_LENGTH),
+  description: z.string().trim().min(1).max(MAINTENANCE_DESCRIPTION_MAX_LENGTH),
+  priority: z.enum(MAINTENANCE_PRIORITY_VALUES).optional(),
+});
+
 export const UpdateMaintenanceIssueRequestSchema = z
   .object({
     priority: z.enum(MAINTENANCE_PRIORITY_VALUES).optional(),

@@ -3,7 +3,7 @@ import { getEnv } from "@/config/env";
 import { PrismaAuditRecorder } from "@/lib/audit";
 import { PrismaBatchLookup } from "@/lib/batch-lookup";
 import { getAdminResetPasswordUseCase, revokeUserSessions } from "@/modules/auth";
-import { CreateCoordinatorUseCase } from "../application/use-cases/create-coordinator";
+import { CreateCoordinatorUseCase, type CreateCoordinatorTransactionContext } from "../application/use-cases/create-coordinator";
 import { UpdateCoordinatorUseCase } from "../application/use-cases/update-coordinator";
 import { SetCoordinatorActiveUseCase } from "../application/use-cases/set-coordinator-active";
 import { AssignBatchUseCase } from "../application/use-cases/assign-batch";
@@ -62,19 +62,46 @@ export const updateMaintenanceCoordinatorPermissionsUseCase = new UpdateMaintena
 });
 export const getMaintenanceCoordinatorUseCase = new GetMaintenanceCoordinatorUseCase({ coordinatorRepository });
 
-// Depends on getEnv() (bcrypt cost factor) — lazily constructed and cached,
-// same reasoning as students/infrastructure/container.ts.
-let cachedUserProvisioner: PrismaCoordinatorUserProvisioner | undefined;
-function getUserProvisioner(): PrismaCoordinatorUserProvisioner {
-  return (cachedUserProvisioner ??= new PrismaCoordinatorUserProvisioner(prisma, getEnv().BCRYPT_COST_FACTOR));
+/**
+ * Runs CreateCoordinatorUseCase's writes — provision the User, create the
+ * CoordinatorProfile, assign initial batches, optionally designate a
+ * Maintenance functional role, and record the COORDINATOR_CREATED audit
+ * entry — as one atomic Prisma transaction. Mirrors
+ * modules/registration/infrastructure/container.ts's runApproveTransaction
+ * exactly: builds transaction-scoped instances of the exact same classes
+ * every other Coordinator-management path uses (PrismaCoordinatorRepository,
+ * PrismaCoordinatorUserProvisioner, PrismaAuditRecorder,
+ * SetCoordinatorMaintenanceRoleUseCase) bound to `tx`, so a mid-sequence
+ * failure (duplicate email, a Maintenance-role cap violation) rolls
+ * everything back rather than leaving a User account with no
+ * CoordinatorProfile, or a CoordinatorProfile with no/wrong Maintenance
+ * designation.
+ */
+async function runCreateCoordinatorTransaction<T>(
+  fn: (ctx: CreateCoordinatorTransactionContext) => Promise<T>,
+): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    const txCoordinatorRepository = new PrismaCoordinatorRepository(tx);
+    const txAuditRecorder = new PrismaAuditRecorder(tx);
+    const txSetMaintenanceRoleUseCase = new SetCoordinatorMaintenanceRoleUseCase({
+      coordinatorRepository: txCoordinatorRepository,
+      auditRecorder: txAuditRecorder,
+    });
+
+    return fn({
+      coordinatorUserProvisioner: new PrismaCoordinatorUserProvisioner(tx, getEnv().BCRYPT_COST_FACTOR),
+      coordinatorRepository: txCoordinatorRepository,
+      auditRecorder: txAuditRecorder,
+      assignMaintenanceRole: (input) => txSetMaintenanceRoleUseCase.execute(input),
+    });
+  });
 }
 
 let cachedCreateCoordinatorUseCase: CreateCoordinatorUseCase | undefined;
 export function getCreateCoordinatorUseCase(): CreateCoordinatorUseCase {
   return (cachedCreateCoordinatorUseCase ??= new CreateCoordinatorUseCase({
     coordinatorRepository,
-    coordinatorUserProvisioner: getUserProvisioner(),
     batchLookup,
-    auditRecorder,
+    runCreateCoordinatorTransaction,
   }));
 }

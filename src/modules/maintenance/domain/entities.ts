@@ -58,7 +58,11 @@ export interface MaintenanceIssueRecord {
   readonly priority: MaintenancePriority;
   readonly status: MaintenanceIssueStatus;
 
-  readonly requesterId: string;
+  /** Null for an anonymously-reported issue (see publicReporterName/publicReporterEmail) — see this field's own doc comment on the Prisma model. */
+  readonly requesterId: string | null;
+  /** Meaningful only when requesterId is null. Never used for authorization — staff-visible contact info only. */
+  readonly publicReporterName: string | null;
+  readonly publicReporterEmail: string | null;
   readonly assigneeId: string | null;
 
   readonly deadline: Date | null;

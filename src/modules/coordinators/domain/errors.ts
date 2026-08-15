@@ -87,3 +87,11 @@ export class NoMaintenanceCoordinatorDesignatedError extends Error {
     this.name = "NoMaintenanceCoordinatorDesignatedError";
   }
 }
+
+/** MYARCH unified Coordinator Position — position "OTHER" requires a non-empty customPosition label. */
+export class InvalidCustomPositionError extends Error {
+  constructor() {
+    super("Specify a role/position when Position is Other Coordinator");
+    this.name = "InvalidCustomPositionError";
+  }
+}

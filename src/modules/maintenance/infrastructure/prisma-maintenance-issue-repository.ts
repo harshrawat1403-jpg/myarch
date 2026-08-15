@@ -27,6 +27,8 @@ export class PrismaMaintenanceIssueRepository implements MaintenanceIssueReposit
         description: data.description,
         priority: data.priority ?? "MEDIUM",
         requesterId: data.requesterId,
+        publicReporterName: data.publicReporterName,
+        publicReporterEmail: data.publicReporterEmail,
       },
     });
     return toDomain(row);
@@ -196,6 +198,8 @@ function toDomain(row: PrismaMaintenanceIssue): MaintenanceIssueRecord {
     priority: row.priority,
     status: row.status,
     requesterId: row.requesterId,
+    publicReporterName: row.publicReporterName,
+    publicReporterEmail: row.publicReporterEmail,
     assigneeId: row.assigneeId,
     deadline: row.deadline,
     taskId: row.taskId,

@@ -44,6 +44,8 @@ describe("Maintenance workflow — full lifecycle end to end", () => {
       priority: "URGENT",
       status: "SUBMITTED",
       requesterId: "stu-1",
+      publicReporterName: null,
+      publicReporterEmail: null,
       assigneeId: null,
       deadline: null,
       taskId: null,
@@ -63,7 +65,12 @@ describe("Maintenance workflow — full lifecycle end to end", () => {
     const acknowledge = new AcknowledgeMaintenanceIssueUseCase({ maintenanceIssueRepository: repo, auditRecorder });
     const assign = new AssignMaintenanceIssueUseCase({ maintenanceIssueRepository: repo, userRoleLookup, auditRecorder });
     const startProgress = new StartMaintenanceIssueProgressUseCase({ maintenanceIssueRepository: repo, auditRecorder });
-    const resolve = new ResolveMaintenanceIssueUseCase({ maintenanceIssueRepository: repo, notificationService, auditRecorder });
+    const resolve = new ResolveMaintenanceIssueUseCase({
+      maintenanceIssueRepository: repo,
+      notificationService,
+      auditRecorder,
+      sendPublicReporterEmail: vi.fn().mockResolvedValue(undefined),
+    });
     const confirm = new ConfirmMaintenanceResolutionUseCase({ maintenanceIssueRepository: repo, auditRecorder });
     const close = new CloseMaintenanceIssueUseCase({ maintenanceIssueRepository: repo, auditRecorder });
     const reopen = new ReopenMaintenanceIssueUseCase({ maintenanceIssueRepository: repo, auditRecorder });
@@ -109,6 +116,8 @@ describe("Maintenance workflow — full lifecycle end to end", () => {
       priority: "MEDIUM",
       status: "IN_PROGRESS",
       requesterId: "stu-1",
+      publicReporterName: null,
+      publicReporterEmail: null,
       assigneeId: "coord-1",
       deadline: null,
       taskId: "task-2",
@@ -131,6 +140,8 @@ describe("Maintenance workflow — full lifecycle end to end", () => {
       priority: "MEDIUM",
       status: "RESOLVED",
       requesterId: "stu-1",
+      publicReporterName: null,
+      publicReporterEmail: null,
       assigneeId: "coord-1",
       deadline: null,
       taskId: "task-3",

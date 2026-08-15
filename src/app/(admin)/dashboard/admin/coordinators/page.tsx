@@ -8,7 +8,13 @@ import { apiClient, ApiError } from "@/lib/api-client";
 import { useRowSelection } from "@/lib/use-row-selection";
 import type { CoordinatorPosition, CoordinatorRecord } from "@/modules/coordinators";
 import type { Batch } from "@/modules/batches";
-import { COORDINATOR_POSITION_OPTIONS, coordinatorPositionLabel } from "@/lib/coordinator-position";
+import {
+  COORDINATOR_POSITION_OPTIONS,
+  UNIFIED_COORDINATOR_POSITION_OPTIONS,
+  resolveUnifiedPosition,
+  unifiedCoordinatorPositionLabel,
+  type UnifiedCoordinatorPosition,
+} from "@/lib/coordinator-position";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
@@ -219,7 +225,7 @@ export default function CoordinatorsPage() {
                       </Link>
                     </TableCell>
                     <TableCell>{coordinator.email}</TableCell>
-                    <TableCell>{coordinatorPositionLabel(coordinator.position)}</TableCell>
+                    <TableCell>{unifiedCoordinatorPositionLabel(coordinator)}</TableCell>
                     <TableCell>
                       {coordinator.batchIds.length === 0 ? (
                         <span className="text-(--color-text-secondary)">None</span>
@@ -271,7 +277,7 @@ export default function CoordinatorsPage() {
                   </Badge>
                 </div>
                 <p className="mt-2 text-xs text-(--color-text-secondary)">{coordinator.email}</p>
-                <p className="mt-1 text-xs text-(--color-text-secondary)">{coordinatorPositionLabel(coordinator.position)}</p>
+                <p className="mt-1 text-xs text-(--color-text-secondary)">{unifiedCoordinatorPositionLabel(coordinator)}</p>
                 {coordinator.batchIds.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {coordinator.batchIds.map((batchId) => (
@@ -340,7 +346,8 @@ interface CreateCoordinatorModalProps {
 function CreateCoordinatorModal({ isOpen, onClose, batches, accessToken, onCreated }: CreateCoordinatorModalProps) {
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
-  const [position, setPosition] = useState<CoordinatorPosition | "">("");
+  const [unifiedPosition, setUnifiedPosition] = useState<UnifiedCoordinatorPosition>("TECHNICAL");
+  const [customPositionText, setCustomPositionText] = useState("");
   const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -349,7 +356,8 @@ function CreateCoordinatorModal({ isOpen, onClose, batches, accessToken, onCreat
   function reset() {
     setEmail("");
     setFullName("");
-    setPosition("");
+    setUnifiedPosition("TECHNICAL");
+    setCustomPositionText("");
     setSelectedBatchIds([]);
     setError(null);
     setTempPassword(null);
@@ -365,9 +373,22 @@ function CreateCoordinatorModal({ isOpen, onClose, batches, accessToken, onCreat
     setError(null);
     setIsSubmitting(true);
     try {
+      const resolved = resolveUnifiedPosition(unifiedPosition, customPositionText);
+      // One logical create call — position, customPosition, and the
+      // Maintenance functional role (if any) are all applied atomically by
+      // CreateCoordinatorUseCase's own transaction, so a Maintenance-role
+      // cap violation rolls the whole creation back rather than leaving a
+      // Coordinator account behind with no/wrong designation.
       const result = await apiClient.post<{ tempPassword: string }>(
         "/api/coordinators",
-        { email, fullName, position: position || undefined, batchIds: selectedBatchIds },
+        {
+          email,
+          fullName,
+          position: resolved.position,
+          customPosition: resolved.customPosition ?? undefined,
+          batchIds: selectedBatchIds,
+          maintenanceRole: resolved.maintenanceRole,
+        },
         accessToken ?? undefined,
       );
       setTempPassword(result.tempPassword);
@@ -406,17 +427,32 @@ function CreateCoordinatorModal({ isOpen, onClose, batches, accessToken, onCreat
           <Label htmlFor="create-position">Position</Label>
           <Select
             id="create-position"
-            value={position}
-            onChange={(e) => setPosition(e.target.value as CoordinatorPosition | "")}
+            value={unifiedPosition}
+            onChange={(e) => setUnifiedPosition(e.target.value as UnifiedCoordinatorPosition)}
           >
-            <option value="">Unspecified</option>
-            {COORDINATOR_POSITION_OPTIONS.map((option) => (
+            {UNIFIED_COORDINATOR_POSITION_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
           </Select>
+          <p className="mt-1 text-xs text-(--color-text-secondary)">
+            Maintenance Secretary/Coordinator: at most one active Coordinator may hold each; can also be changed
+            later from this coordinator&apos;s own page.
+          </p>
         </div>
+        {unifiedPosition === "OTHER" && (
+          <div>
+            <Label htmlFor="create-custom-position">Specify role/position</Label>
+            <Input
+              id="create-custom-position"
+              required
+              placeholder="e.g. Cultural Coordinator"
+              value={customPositionText}
+              onChange={(e) => setCustomPositionText(e.target.value)}
+            />
+          </div>
+        )}
         {batches.length > 0 && (
           <div>
             <Label htmlFor="create-batches">Assigned batches</Label>

@@ -14,6 +14,17 @@ export class InMemoryCoordinatorRepository implements CoordinatorRepository {
     this.byId.set(record.id, record);
   }
 
+  /** Test-only — used by fake transaction runners (e.g. CreateCoordinatorUseCase's) to simulate real Prisma $transaction rollback: snapshot before the callback, restore() if it throws. */
+  snapshot(): CoordinatorRecord[] {
+    return [...this.byId.values()];
+  }
+
+  /** Test-only — see snapshot(). */
+  restore(records: readonly CoordinatorRecord[]): void {
+    this.byId.clear();
+    for (const record of records) this.byId.set(record.id, record);
+  }
+
   async create(data: CreateCoordinatorData): Promise<CoordinatorRecord> {
     const record: CoordinatorRecord = {
       id: crypto.randomUUID(),
@@ -22,6 +33,7 @@ export class InMemoryCoordinatorRepository implements CoordinatorRepository {
       fullName: data.fullName,
       isActive: true,
       position: data.position ?? null,
+      customPosition: data.customPosition ?? null,
       batchIds: [],
       permissions: [],
       maintenanceRole: null,
@@ -49,6 +61,7 @@ export class InMemoryCoordinatorRepository implements CoordinatorRepository {
       ...existing,
       fullName: data.fullName ?? existing.fullName,
       position: data.position !== undefined ? data.position : existing.position,
+      customPosition: data.customPosition !== undefined ? data.customPosition : existing.customPosition,
     };
     this.byId.set(id, updated);
     return updated;

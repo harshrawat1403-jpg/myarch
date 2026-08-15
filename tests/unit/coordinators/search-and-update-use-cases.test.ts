@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { SearchCoordinatorsUseCase } from "../../../src/modules/coordinators/application/use-cases/search-coordinators";
 import { UpdateCoordinatorUseCase } from "../../../src/modules/coordinators/application/use-cases/update-coordinator";
 import { GetCoordinatorUseCase } from "../../../src/modules/coordinators/application/use-cases/get-coordinator";
-import { CoordinatorNotFoundError } from "../../../src/modules/coordinators/domain/errors";
+import { CoordinatorNotFoundError, InvalidCustomPositionError } from "../../../src/modules/coordinators/domain/errors";
 import { NotAuthorizedError } from "../../../src/lib/errors";
 import { InMemoryCoordinatorRepository } from "../../support/fakes/in-memory-coordinator-repository";
 import { FakeAuditRecorder } from "../../support/fakes/fake-audit-recorder";
@@ -20,6 +20,7 @@ function record(overrides: Partial<CoordinatorRecord> = {}): CoordinatorRecord {
     fullName: overrides.fullName ?? "Alice Coordinator",
     isActive: overrides.isActive ?? true,
     position: overrides.position ?? null,
+    customPosition: overrides.customPosition ?? null,
     batchIds: overrides.batchIds ?? [],
     permissions: overrides.permissions ?? [],
     maintenanceRole: overrides.maintenanceRole ?? null,
@@ -113,5 +114,47 @@ describe("UpdateCoordinatorUseCase", () => {
     await useCase.execute({ actor: SECRETARY, coordinatorId: "coord-record-1", position: "T_AND_P" });
     const result = await useCase.execute({ actor: SECRETARY, coordinatorId: "coord-record-1", position: null });
     expect(result.position).toBeNull();
+  });
+
+  it("sets position OTHER with a customPosition label", async () => {
+    const result = await useCase.execute({
+      actor: SECRETARY,
+      coordinatorId: "coord-record-1",
+      position: "OTHER",
+      customPosition: "Cultural Coordinator",
+    });
+    expect(result.position).toBe("OTHER");
+    expect(result.customPosition).toBe("Cultural Coordinator");
+  });
+
+  it("rejects position OTHER with no customPosition text", async () => {
+    await expect(
+      useCase.execute({ actor: SECRETARY, coordinatorId: "coord-record-1", position: "OTHER" }),
+    ).rejects.toBeInstanceOf(InvalidCustomPositionError);
+  });
+
+  it("clears customPosition when switching away from OTHER to another position", async () => {
+    await useCase.execute({
+      actor: SECRETARY,
+      coordinatorId: "coord-record-1",
+      position: "OTHER",
+      customPosition: "Cultural Coordinator",
+    });
+    const result = await useCase.execute({ actor: SECRETARY, coordinatorId: "coord-record-1", position: "TECHNICAL" });
+    expect(result.position).toBe("TECHNICAL");
+    expect(result.customPosition).toBeNull();
+  });
+
+  it("leaves position/customPosition untouched when neither is provided (name-only update)", async () => {
+    await useCase.execute({
+      actor: SECRETARY,
+      coordinatorId: "coord-record-1",
+      position: "OTHER",
+      customPosition: "Cultural Coordinator",
+    });
+    const result = await useCase.execute({ actor: SECRETARY, coordinatorId: "coord-record-1", fullName: "Renamed" });
+    expect(result.fullName).toBe("Renamed");
+    expect(result.position).toBe("OTHER");
+    expect(result.customPosition).toBe("Cultural Coordinator");
   });
 });

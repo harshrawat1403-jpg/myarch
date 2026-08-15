@@ -28,6 +28,7 @@ function record(overrides: Partial<CoordinatorRecord> = {}): CoordinatorRecord {
     fullName: overrides.fullName ?? "Maintenance Coordinator",
     isActive: overrides.isActive ?? true,
     position: overrides.position ?? null,
+    customPosition: overrides.customPosition ?? null,
     batchIds: overrides.batchIds ?? [],
     permissions: overrides.permissions ?? [],
     maintenanceRole: overrides.maintenanceRole ?? "MAINTENANCE_COORDINATOR",

@@ -9,11 +9,13 @@ export interface CreateCoordinatorData {
   userId: string;
   fullName: string;
   position?: CoordinatorPosition | null;
+  customPosition?: string | null;
 }
 
 export interface UpdateCoordinatorData {
   fullName?: string;
   position?: CoordinatorPosition | null;
+  customPosition?: string | null;
 }
 
 export interface CoordinatorRepository {

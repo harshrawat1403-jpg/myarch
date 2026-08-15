@@ -31,6 +31,7 @@ function record(): CoordinatorRecord {
     fullName: "Maintenance Coordinator",
     isActive: true,
     position: null,
+    customPosition: null,
     batchIds: [],
     permissions: ["maintenance.view"],
     maintenanceRole: "MAINTENANCE_COORDINATOR",

@@ -27,6 +27,7 @@ export {
 export type { DashboardStats as MaintenanceDashboardStats } from "./application/ports/maintenance-issue-repository";
 
 export { reportMaintenanceIssueRouteHandler } from "./presentation/route-handlers/report";
+export { reportPublicMaintenanceIssueRouteHandler } from "./presentation/route-handlers/report-public";
 export { getMaintenanceIssueRouteHandler } from "./presentation/route-handlers/get";
 export { updateMaintenanceIssueRouteHandler } from "./presentation/route-handlers/update";
 export { acknowledgeMaintenanceIssueRouteHandler } from "./presentation/route-handlers/acknowledge";

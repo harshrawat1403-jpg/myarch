@@ -3,6 +3,8 @@ import { NotAuthorizedError } from "@/lib/errors";
 import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import type { AuditRecorder } from "@/lib/audit";
 import type { NotificationService } from "@/modules/notifications";
+import { renderEmailTemplate } from "@/modules/notifications/application/templates/render";
+import type { RenderedEmailMessage } from "@/modules/notifications/application/ports/email-provider";
 import type { MaintenanceIssueRecord } from "../../domain/entities";
 import { canResolveMaintenanceIssue } from "../../domain/permissions";
 import { isValidMaintenanceIssueTransition } from "../../domain/lifecycle";
@@ -23,6 +25,16 @@ export class ResolveMaintenanceIssueUseCase {
       maintenanceIssueRepository: MaintenanceIssueRepository;
       notificationService: NotificationService;
       auditRecorder: AuditRecorder;
+      /**
+       * Only used when the issue was reported anonymously (requesterId
+       * null) — there is no User account to notify through the normal
+       * userId-keyed NotificationService path, so this reuses the same
+       * direct-send bypass sendDirectEmail already provides for
+       * accounts-less recipients (see notifications/infrastructure/
+       * container.ts's own doc comment on that function). Best-effort,
+       * matching every other direct-send call site.
+       */
+      sendPublicReporterEmail: (message: RenderedEmailMessage) => Promise<void>;
     },
   ) {}
 
@@ -48,11 +60,22 @@ export class ResolveMaintenanceIssueUseCase {
       targetEntityId: updated.id,
     });
 
-    await this.deps.notificationService.notify({
-      recipientUserId: updated.requesterId,
-      template: "MAINTENANCE_ISSUE_RESOLVED",
-      context: { issueId: updated.id, location: updated.location },
-    });
+    if (updated.requesterId) {
+      await this.deps.notificationService.notify({
+        recipientUserId: updated.requesterId,
+        template: "MAINTENANCE_ISSUE_RESOLVED",
+        context: { issueId: updated.id, location: updated.location },
+      });
+    } else if (updated.publicReporterEmail) {
+      const rendered = renderEmailTemplate(
+        "MAINTENANCE_ISSUE_RESOLVED",
+        { issueId: updated.id, location: updated.location },
+        updated.publicReporterEmail,
+      );
+      await this.deps.sendPublicReporterEmail(rendered).catch((err: unknown) => {
+        console.error("[maintenance] failed to notify public reporter of resolution", err);
+      });
+    }
 
     return updated;
   }

@@ -7,11 +7,15 @@
  */
 
 /**
- * T&P vs Alumni — display/reporting label only (V4.0 A1). Both positions
- * have byte-for-byte identical permissions; no permission function ever
- * reads this field.
+ * Unified Coordinator Position — display/reporting label only (V4.0 A1,
+ * extended by the MYARCH unified position amendment). No permission function
+ * ever reads this field; Maintenance authorization is driven entirely by the
+ * separate `maintenanceRole` field below, never by this one. T_AND_P/ALUMNI
+ * are legacy values kept for existing data and no longer offered to new
+ * Coordinators; TECHNICAL is the ordinary-Coordinator default; OTHER pairs
+ * with `customPosition` on CoordinatorRecord (its free-text label).
  */
-export type CoordinatorPosition = "T_AND_P" | "ALUMNI";
+export type CoordinatorPosition = "T_AND_P" | "ALUMNI" | "TECHNICAL" | "OTHER";
 
 /**
  * MYARCH Maintenance functional hierarchy — mirrors the auth module's own
@@ -32,6 +36,8 @@ export interface CoordinatorRecord {
   readonly fullName: string;
   readonly isActive: boolean;
   readonly position: CoordinatorPosition | null;
+  /** Free-text label, meaningful only when position === "OTHER" — see CoordinatorPosition's own doc comment. Always null otherwise. */
+  readonly customPosition: string | null;
   readonly batchIds: readonly string[];
   /** MYARCH Phase 1 — granular capabilities delegated by the Technical Secretary. See domain/permissions.ts. */
   readonly permissions: readonly string[];
@@ -60,4 +66,26 @@ export interface CoordinatorSearchFilters {
   readonly email?: string;
   readonly includeInactive?: boolean;
   readonly position?: CoordinatorPosition;
+}
+
+/**
+ * The one place position + customPosition are validated together — shared by
+ * CreateCoordinatorUseCase and UpdateCoordinatorUseCase so the invariant
+ * ("customPosition is required and trimmed when position is OTHER, and is
+ * always cleared to null otherwise") can never drift between the two call
+ * sites. Throws InvalidCustomPositionError (domain/errors.ts) rather than
+ * importing it here to avoid a hard dependency in this framework-free file —
+ * callers pass their own error class in.
+ */
+export function normalizeCoordinatorPosition(
+  position: CoordinatorPosition | null | undefined,
+  customPosition: string | null | undefined,
+  onMissingCustomPosition: () => never,
+): { position: CoordinatorPosition | null; customPosition: string | null } {
+  if (position !== "OTHER") {
+    return { position: position ?? null, customPosition: null };
+  }
+  const trimmed = customPosition?.trim();
+  if (!trimmed) onMissingCustomPosition();
+  return { position: "OTHER", customPosition: trimmed! };
 }

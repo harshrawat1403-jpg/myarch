@@ -22,6 +22,7 @@ export {
   MaxActiveMaintenanceRoleError,
   InactiveCoordinatorError,
   NoMaintenanceCoordinatorDesignatedError,
+  InvalidCustomPositionError,
 } from "./domain/errors";
 export { COORDINATOR_PERMISSION_KEYS, hasCoordinatorPermission, type CoordinatorPermissionKey } from "./domain/permissions";
 
