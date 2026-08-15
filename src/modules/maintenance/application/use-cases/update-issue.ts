@@ -3,7 +3,7 @@ import { NotAuthorizedError } from "@/lib/errors";
 import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import type { AuditRecorder } from "@/lib/audit";
 import type { MaintenanceIssueRecord, MaintenancePriority } from "../../domain/entities";
-import { canManageMaintenanceIssue } from "../../domain/permissions";
+import { canUpdateMaintenanceIssue } from "../../domain/permissions";
 import { MaintenanceIssueNotFoundError } from "../../domain/errors";
 import type { MaintenanceIssueRepository } from "../ports/maintenance-issue-repository";
 import { updateLinkedTaskDeadline } from "../task-engine-bridge";
@@ -25,7 +25,7 @@ export class UpdateMaintenanceIssueUseCase {
   async execute(input: UpdateMaintenanceIssueInput): Promise<MaintenanceIssueRecord> {
     const existing = await this.deps.maintenanceIssueRepository.findById(input.issueId);
     if (!existing) throw new MaintenanceIssueNotFoundError();
-    if (!canManageMaintenanceIssue(input.actor, existing)) {
+    if (!canUpdateMaintenanceIssue(input.actor, existing)) {
       throw new NotAuthorizedError("Not authorized to update this issue");
     }
 

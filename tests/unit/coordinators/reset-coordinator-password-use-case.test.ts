@@ -17,6 +17,7 @@ function record(overrides: Partial<CoordinatorRecord> = {}): CoordinatorRecord {
     position: null,
     batchIds: [],
     permissions: [],
+    maintenanceRole: null,
     createdAt: new Date(),
     ...overrides,
   };

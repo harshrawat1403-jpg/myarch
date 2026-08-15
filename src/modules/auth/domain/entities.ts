@@ -7,6 +7,20 @@
 export type Role = "SECRETARY" | "COORDINATOR" | "STUDENT" | "RECRUITER" | "ALUMNI";
 
 /**
+ * MYARCH Maintenance functional hierarchy — deliberately NOT a Role. A
+ * Coordinator carrying this is still, in every other respect, an ordinary
+ * Coordinator (peer-only, no account-management power over other
+ * Coordinators, no cross-domain access beyond what any Coordinator already
+ * has). See src/modules/maintenance/domain/permissions.ts for the only
+ * place MAINTENANCE_SECRETARY is treated as unconditional access, and
+ * src/modules/coordinators's SetCoordinatorMaintenanceRoleUseCase/
+ * UpdateMaintenanceCoordinatorPermissionsUseCase for the two narrow
+ * capabilities this unlocks. Never checked by any permission function
+ * outside those two modules.
+ */
+export type MaintenanceCoordinatorRole = "MAINTENANCE_SECRETARY" | "MAINTENANCE_COORDINATOR";
+
+/**
  * The authenticated caller, resolved from a verified access token, carrying
  * exactly the scope information authorization checks need. Coordinators
  * always carry their assigned batch IDs explicitly (never inferred) per
@@ -28,6 +42,14 @@ export interface AuthenticatedActor {
    * every capability regardless.
    */
   readonly permissions?: readonly string[];
+  /**
+   * MYARCH Maintenance functional hierarchy — populated only for a
+   * COORDINATOR explicitly designated MAINTENANCE_SECRETARY or
+   * MAINTENANCE_COORDINATOR (see MaintenanceCoordinatorRole's own doc
+   * comment). Undefined for every other Coordinator, and for every other
+   * role.
+   */
+  readonly maintenanceRole?: MaintenanceCoordinatorRole;
   /** Populated only for STUDENT; used for "own data" checks. */
   readonly studentProfileId?: string;
   /**

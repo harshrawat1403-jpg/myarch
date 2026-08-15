@@ -13,6 +13,9 @@ import { GetCoordinatorUseCase } from "../application/use-cases/get-coordinator"
 import { BulkSetCoordinatorsActiveUseCase } from "../application/use-cases/bulk-set-coordinators-active";
 import { ResetCoordinatorPasswordUseCase } from "../application/use-cases/reset-password";
 import { UpdateCoordinatorPermissionsUseCase } from "../application/use-cases/update-coordinator-permissions";
+import { SetCoordinatorMaintenanceRoleUseCase } from "../application/use-cases/set-coordinator-maintenance-role";
+import { UpdateMaintenanceCoordinatorPermissionsUseCase } from "../application/use-cases/update-maintenance-coordinator-permissions";
+import { GetMaintenanceCoordinatorUseCase } from "../application/use-cases/get-maintenance-coordinator";
 import { PrismaCoordinatorRepository } from "./prisma-coordinator-repository";
 import { PrismaCoordinatorUserProvisioner } from "./prisma-coordinator-user-provisioner";
 
@@ -49,6 +52,15 @@ export const updateCoordinatorPermissionsUseCase = new UpdateCoordinatorPermissi
   coordinatorRepository,
   auditRecorder,
 });
+export const setCoordinatorMaintenanceRoleUseCase = new SetCoordinatorMaintenanceRoleUseCase({
+  coordinatorRepository,
+  auditRecorder,
+});
+export const updateMaintenanceCoordinatorPermissionsUseCase = new UpdateMaintenanceCoordinatorPermissionsUseCase({
+  coordinatorRepository,
+  auditRecorder,
+});
+export const getMaintenanceCoordinatorUseCase = new GetMaintenanceCoordinatorUseCase({ coordinatorRepository });
 
 // Depends on getEnv() (bcrypt cost factor) — lazily constructed and cached,
 // same reasoning as students/infrastructure/container.ts.

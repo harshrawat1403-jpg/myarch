@@ -17,7 +17,7 @@ export class PrismaUserRepository implements UserRepository {
 
   async loadActorScope(
     user: AuthUserRecord,
-  ): Promise<Pick<AuthenticatedActor, "batchScope" | "permissions" | "studentProfileId">> {
+  ): Promise<Pick<AuthenticatedActor, "batchScope" | "permissions" | "maintenanceRole" | "studentProfileId">> {
     if (user.role === "COORDINATOR") {
       const coordinatorProfile = await this.prisma.coordinatorProfile.findUnique({
         where: { userId: user.id },
@@ -26,6 +26,7 @@ export class PrismaUserRepository implements UserRepository {
       return {
         batchScope: coordinatorProfile?.batchScopes.map((scope) => scope.batchId) ?? [],
         permissions: coordinatorProfile?.permissions ?? [],
+        maintenanceRole: coordinatorProfile?.maintenanceRole ?? undefined,
       };
     }
 

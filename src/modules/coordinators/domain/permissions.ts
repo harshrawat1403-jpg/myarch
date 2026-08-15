@@ -21,6 +21,20 @@ export const COORDINATOR_PERMISSION_KEYS = [
   "maintenance.assign",
   "maintenance.manage",
 
+  // MYARCH Maintenance functional hierarchy amendment — finer-grained
+  // delegation alongside the four keys above. `maintenance.manage` remains
+  // the backward-compatible umbrella: canManageMaintenanceIssue/
+  // canAssignMaintenanceIssue (src/modules/maintenance/domain/permissions.ts)
+  // still treat it as implying every one of these narrower capabilities, so
+  // no Coordinator who already holds `maintenance.manage` loses anything —
+  // these five keys exist so a Maintenance Secretary can delegate a
+  // *subset* to the Maintenance Coordinator, not to shrink an existing grant.
+  "maintenance.update",
+  "maintenance.resolve",
+  "maintenance.reassign",
+  "maintenance.tasks",
+  "maintenance.reports",
+
   // MYARCH Phase 2 (§3.7) — Generic Request System, added now that a real
   // phase needs it (not speculative — see this file's own doc comment).
   "requests.view",

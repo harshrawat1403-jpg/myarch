@@ -1,23 +1,18 @@
 import type { AuthenticatedActor } from "@/modules/auth";
-import { hasCoordinatorPermission } from "@/modules/coordinators";
 import { NotAuthorizedError } from "@/lib/errors";
+import { canViewMaintenanceReports } from "../../domain/permissions";
 import type { DashboardStats, MaintenanceIssueRepository } from "../ports/maintenance-issue-repository";
 
 export interface GetMaintenanceDashboardStatsInput {
   actor: AuthenticatedActor;
 }
 
-/** §3.9 — staff-only (Secretary, or a Coordinator delegated view/manage visibility). */
+/** §3.9 — staff-only (Secretary, Maintenance Secretary, or a Coordinator delegated view/reports/manage visibility). */
 export class GetMaintenanceDashboardStatsUseCase {
   constructor(private readonly deps: { maintenanceIssueRepository: MaintenanceIssueRepository }) {}
 
   async execute(input: GetMaintenanceDashboardStatsInput): Promise<DashboardStats> {
-    const authorized =
-      input.actor.role === "SECRETARY" ||
-      (input.actor.role === "COORDINATOR" &&
-        (hasCoordinatorPermission(input.actor, "maintenance.view") ||
-          hasCoordinatorPermission(input.actor, "maintenance.manage")));
-    if (!authorized) {
+    if (!canViewMaintenanceReports(input.actor)) {
       throw new NotAuthorizedError("Not authorized to view the maintenance dashboard");
     }
 

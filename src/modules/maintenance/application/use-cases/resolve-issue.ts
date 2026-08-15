@@ -4,7 +4,7 @@ import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import type { AuditRecorder } from "@/lib/audit";
 import type { NotificationService } from "@/modules/notifications";
 import type { MaintenanceIssueRecord } from "../../domain/entities";
-import { canManageMaintenanceIssue } from "../../domain/permissions";
+import { canResolveMaintenanceIssue } from "../../domain/permissions";
 import { isValidMaintenanceIssueTransition } from "../../domain/lifecycle";
 import { InvalidMaintenanceIssueTransitionError, MaintenanceIssueNotFoundError } from "../../domain/errors";
 import type { MaintenanceIssueRepository } from "../ports/maintenance-issue-repository";
@@ -29,7 +29,7 @@ export class ResolveMaintenanceIssueUseCase {
   async execute(input: ResolveMaintenanceIssueInput): Promise<MaintenanceIssueRecord> {
     const existing = await this.deps.maintenanceIssueRepository.findById(input.issueId);
     if (!existing) throw new MaintenanceIssueNotFoundError();
-    if (!canManageMaintenanceIssue(input.actor, existing)) {
+    if (!canResolveMaintenanceIssue(input.actor, existing)) {
       throw new NotAuthorizedError("Not authorized to resolve this issue");
     }
     if (!isValidMaintenanceIssueTransition(existing.status, "RESOLVED")) {

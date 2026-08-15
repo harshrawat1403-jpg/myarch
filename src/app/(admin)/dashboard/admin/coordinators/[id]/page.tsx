@@ -3,11 +3,16 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, History, KeyRound, Layers, Plus, ShieldCheck, X } from "lucide-react";
+import { ChevronLeft, History, KeyRound, Layers, Plus, ShieldCheck, Wrench, X } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { formatAuditAction } from "@/lib/format-audit-action";
-import type { CoordinatorPermissionKey, CoordinatorPosition, CoordinatorRecord } from "@/modules/coordinators";
+import type {
+  CoordinatorPermissionKey,
+  CoordinatorPosition,
+  CoordinatorRecord,
+  MaintenanceCoordinatorRole,
+} from "@/modules/coordinators";
 import type { Batch } from "@/modules/batches";
 import type { AuditLogEntry } from "@/lib/audit";
 import { COORDINATOR_POSITION_OPTIONS } from "@/lib/coordinator-position";
@@ -55,6 +60,9 @@ export default function CoordinatorDetailPage() {
   const [isResetting, setIsResetting] = useState(false);
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
+  const [maintenanceRole, setMaintenanceRole] = useState<MaintenanceCoordinatorRole | "">("");
+  const [maintenanceRoleError, setMaintenanceRoleError] = useState<string | null>(null);
+  const [isSavingMaintenanceRole, setIsSavingMaintenanceRole] = useState(false);
 
   const load = useCallback(async () => {
     if (!accessToken || !id) return;
@@ -68,6 +76,7 @@ export default function CoordinatorDetailPage() {
       setFullName(record.fullName);
       setPosition(record.position ?? "");
       setSelectedPermissions([...record.permissions]);
+      setMaintenanceRole(record.maintenanceRole ?? "");
       setBatches(batchList);
       setActivity(activityEntries);
     } catch (err) {
@@ -153,6 +162,33 @@ export default function CoordinatorDetailPage() {
       toast.error(err instanceof ApiError ? err.message : "Unable to update permissions.");
     } finally {
       setIsSavingPermissions(false);
+    }
+  }
+
+  /**
+   * MYARCH Maintenance functional hierarchy — designates or clears this
+   * Coordinator's maintenanceRole. Technical-Secretary-only (this whole
+   * page already is); a Maintenance Secretary cannot self-promote, create
+   * another Maintenance Secretary, or designate the Maintenance
+   * Coordinator — that authorization lives entirely server-side in
+   * SetCoordinatorMaintenanceRoleUseCase, this control is just its UI.
+   */
+  async function handleSaveMaintenanceRole() {
+    if (!coordinator || !accessToken) return;
+    setMaintenanceRoleError(null);
+    setIsSavingMaintenanceRole(true);
+    try {
+      await apiClient.post(
+        `/api/coordinators/${coordinator.id}/maintenance-role`,
+        { maintenanceRole: maintenanceRole || null },
+        accessToken,
+      );
+      toast.success("Maintenance functional role updated.");
+      await load();
+    } catch (err) {
+      setMaintenanceRoleError(err instanceof ApiError ? err.message : "Unable to update the maintenance functional role.");
+    } finally {
+      setIsSavingMaintenanceRole(false);
     }
   }
 
@@ -331,6 +367,38 @@ export default function CoordinatorDetailPage() {
             {isSavingPermissions ? "Saving…" : "Save permissions"}
           </Button>
         </div>
+      </DashboardPanel>
+
+      <DashboardPanel title="Maintenance Functional Role" icon={Wrench}>
+        <p className="text-sm text-(--color-text-secondary)">
+          Places this Coordinator into the Maintenance hierarchy — Maintenance Secretary administers the Maintenance
+          domain and may delegate to the Maintenance Coordinator; Maintenance Coordinator receives delegated
+          Maintenance permissions only. At most one active Coordinator may hold each role. Neither role grants
+          access beyond Maintenance, and both still count toward the maximum of 2 active Coordinators.
+        </p>
+        <div className="mt-4 flex items-end gap-3">
+          <div className="min-w-56">
+            <Label htmlFor="maintenance-role">Functional role</Label>
+            <Select
+              id="maintenance-role"
+              value={maintenanceRole}
+              onChange={(e) => setMaintenanceRole(e.target.value as MaintenanceCoordinatorRole | "")}
+            >
+              <option value="">None (ordinary Coordinator)</option>
+              <option value="MAINTENANCE_SECRETARY">Maintenance Secretary</option>
+              <option value="MAINTENANCE_COORDINATOR">Maintenance Coordinator</option>
+            </Select>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleSaveMaintenanceRole}
+            disabled={isSavingMaintenanceRole || maintenanceRole === (coordinator.maintenanceRole ?? "")}
+          >
+            {isSavingMaintenanceRole ? "Saving…" : "Save"}
+          </Button>
+        </div>
+        {maintenanceRoleError && <p className="mt-2 text-sm text-(--color-danger)">{maintenanceRoleError}</p>}
       </DashboardPanel>
 
       <DashboardPanel title="Password" icon={KeyRound}>

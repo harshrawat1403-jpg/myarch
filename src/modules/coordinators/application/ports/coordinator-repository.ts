@@ -1,4 +1,9 @@
-import type { CoordinatorPosition, CoordinatorRecord, CoordinatorSearchFilters } from "../../domain/entities";
+import type {
+  CoordinatorPosition,
+  CoordinatorRecord,
+  CoordinatorSearchFilters,
+  MaintenanceCoordinatorRole,
+} from "../../domain/entities";
 
 export interface CreateCoordinatorData {
   userId: string;
@@ -25,6 +30,15 @@ export interface CoordinatorRepository {
 
   /** MYARCH Phase 1 — replaces the full delegated-permission set (Technical-Secretary-only, via UpdateCoordinatorPermissionsUseCase). */
   setPermissions(id: string, permissions: readonly string[]): Promise<CoordinatorRecord>;
+
+  /** MYARCH Maintenance functional hierarchy — sets or clears (null) this Coordinator's designation. */
+  setMaintenanceRole(id: string, maintenanceRole: MaintenanceCoordinatorRole | null): Promise<CoordinatorRecord>;
+
+  /** Counted excluding a given coordinatorId (so re-saving the same designation on the same Coordinator never trips the at-most-one check) — checked before designating a new one. */
+  countActiveByMaintenanceRole(role: MaintenanceCoordinatorRole, excludingId?: string): Promise<number>;
+
+  /** The one active Coordinator currently holding this designation, if any — used to resolve "the" Maintenance Coordinator without trusting a client-supplied id. */
+  findActiveByMaintenanceRole(role: MaintenanceCoordinatorRole): Promise<CoordinatorRecord | null>;
 
   search(filters: CoordinatorSearchFilters): Promise<CoordinatorRecord[]>;
 

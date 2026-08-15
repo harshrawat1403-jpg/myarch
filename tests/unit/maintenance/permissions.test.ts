@@ -3,9 +3,14 @@ import {
   canAssignMaintenanceIssue,
   canConfirmMaintenanceResolution,
   canManageMaintenanceIssue,
+  canReassignMaintenanceIssue,
   canReopenMaintenanceIssue,
   canReportMaintenanceIssue,
+  canResolveMaintenanceIssue,
+  canUpdateMaintenanceIssue,
   canViewMaintenanceIssue,
+  canViewMaintenanceReports,
+  canViewMaintenanceTasks,
 } from "../../../src/modules/maintenance/domain/permissions";
 import type { AuthenticatedActor } from "../../../src/modules/auth";
 
@@ -32,7 +37,54 @@ const VIEW_COORDINATOR: AuthenticatedActor = {
 const STUDENT: AuthenticatedActor = { userId: "stu-1", role: "STUDENT", studentProfileId: "sp-1" };
 const OTHER_STUDENT: AuthenticatedActor = { userId: "stu-2", role: "STUDENT", studentProfileId: "sp-2" };
 
+// MYARCH Maintenance functional hierarchy.
+const MAINTENANCE_SECRETARY: AuthenticatedActor = {
+  userId: "coord-mtsec",
+  role: "COORDINATOR",
+  batchScope: [],
+  permissions: [],
+  maintenanceRole: "MAINTENANCE_SECRETARY",
+};
+const MAINTENANCE_COORDINATOR_NO_GRANT: AuthenticatedActor = {
+  userId: "coord-mtco",
+  role: "COORDINATOR",
+  batchScope: [],
+  permissions: [],
+  maintenanceRole: "MAINTENANCE_COORDINATOR",
+};
+const UPDATE_ONLY_COORDINATOR: AuthenticatedActor = {
+  userId: "coord-5",
+  role: "COORDINATOR",
+  batchScope: [],
+  permissions: ["maintenance.update"],
+};
+const RESOLVE_ONLY_COORDINATOR: AuthenticatedActor = {
+  userId: "coord-6",
+  role: "COORDINATOR",
+  batchScope: [],
+  permissions: ["maintenance.resolve"],
+};
+const REASSIGN_ONLY_COORDINATOR: AuthenticatedActor = {
+  userId: "coord-7",
+  role: "COORDINATOR",
+  batchScope: [],
+  permissions: ["maintenance.reassign"],
+};
+const TASKS_ONLY_COORDINATOR: AuthenticatedActor = {
+  userId: "coord-8",
+  role: "COORDINATOR",
+  batchScope: [],
+  permissions: ["maintenance.tasks"],
+};
+const REPORTS_ONLY_COORDINATOR: AuthenticatedActor = {
+  userId: "coord-9",
+  role: "COORDINATOR",
+  batchScope: [],
+  permissions: ["maintenance.reports"],
+};
+
 const ISSUE = { requesterId: "stu-1", assigneeId: "coord-2" };
+const UNASSIGNED_ISSUE = { requesterId: "stu-1", assigneeId: null };
 
 describe("canReportMaintenanceIssue", () => {
   it("allows Secretary, Coordinator, Student — denies Recruiter/Alumni", () => {
@@ -113,5 +165,104 @@ describe("canReopenMaintenanceIssue — available to management AND the complain
   it("denies an unrelated Student or unprivileged Coordinator", () => {
     expect(canReopenMaintenanceIssue(OTHER_STUDENT, ISSUE)).toBe(false);
     expect(canReopenMaintenanceIssue(UNPRIVILEGED_COORDINATOR, ISSUE)).toBe(false);
+  });
+});
+
+describe("MYARCH Maintenance functional hierarchy — Maintenance Secretary full access", () => {
+  it("has unconditional access wherever Secretary does, without being Secretary", () => {
+    expect(MAINTENANCE_SECRETARY.role).toBe("COORDINATOR");
+    expect(canViewMaintenanceIssue(MAINTENANCE_SECRETARY, ISSUE)).toBe(true);
+    expect(canManageMaintenanceIssue(MAINTENANCE_SECRETARY, ISSUE)).toBe(true);
+    expect(canAssignMaintenanceIssue(MAINTENANCE_SECRETARY)).toBe(true);
+    expect(canReassignMaintenanceIssue(MAINTENANCE_SECRETARY)).toBe(true);
+    expect(canUpdateMaintenanceIssue(MAINTENANCE_SECRETARY, ISSUE)).toBe(true);
+    expect(canResolveMaintenanceIssue(MAINTENANCE_SECRETARY, ISSUE)).toBe(true);
+    expect(canConfirmMaintenanceResolution(MAINTENANCE_SECRETARY, ISSUE)).toBe(true);
+    expect(canReopenMaintenanceIssue(MAINTENANCE_SECRETARY, ISSUE)).toBe(true);
+    expect(canViewMaintenanceTasks(MAINTENANCE_SECRETARY)).toBe(true);
+    expect(canViewMaintenanceReports(MAINTENANCE_SECRETARY)).toBe(true);
+  });
+
+  it("a Coordinator merely designated MAINTENANCE_COORDINATOR (with no permissions delegated) gets none of this for free", () => {
+    expect(canManageMaintenanceIssue(MAINTENANCE_COORDINATOR_NO_GRANT, ISSUE)).toBe(false);
+    expect(canViewMaintenanceTasks(MAINTENANCE_COORDINATOR_NO_GRANT)).toBe(false);
+    expect(canViewMaintenanceReports(MAINTENANCE_COORDINATOR_NO_GRANT)).toBe(false);
+  });
+});
+
+describe("canUpdateMaintenanceIssue — backward-compatible split", () => {
+  it("maintenance.manage still implies update (no capability silently removed)", () => {
+    expect(canUpdateMaintenanceIssue(MANAGE_COORDINATOR, ISSUE)).toBe(true);
+  });
+
+  it("a Coordinator granted only maintenance.update can update but is not a general manager", () => {
+    expect(canUpdateMaintenanceIssue(UPDATE_ONLY_COORDINATOR, ISSUE)).toBe(true);
+    expect(canManageMaintenanceIssue(UPDATE_ONLY_COORDINATOR, ISSUE)).toBe(false);
+  });
+
+  it("denies an unrelated, unprivileged Coordinator", () => {
+    expect(canUpdateMaintenanceIssue(UNPRIVILEGED_COORDINATOR, ISSUE)).toBe(false);
+  });
+});
+
+describe("canResolveMaintenanceIssue — backward-compatible split", () => {
+  it("maintenance.manage still implies resolve", () => {
+    expect(canResolveMaintenanceIssue(MANAGE_COORDINATOR, ISSUE)).toBe(true);
+  });
+
+  it("a Coordinator granted only maintenance.resolve can resolve but is not a general manager", () => {
+    expect(canResolveMaintenanceIssue(RESOLVE_ONLY_COORDINATOR, ISSUE)).toBe(true);
+    expect(canManageMaintenanceIssue(RESOLVE_ONLY_COORDINATOR, ISSUE)).toBe(false);
+  });
+});
+
+describe("canReassignMaintenanceIssue — backward-compatible split", () => {
+  it("maintenance.assign and maintenance.manage still imply reassign", () => {
+    expect(canReassignMaintenanceIssue(ASSIGN_COORDINATOR)).toBe(true);
+    expect(canReassignMaintenanceIssue(MANAGE_COORDINATOR)).toBe(true);
+  });
+
+  it("a Coordinator granted only maintenance.reassign can reassign but not perform the initial assignment via a distinct broader grant", () => {
+    expect(canReassignMaintenanceIssue(REASSIGN_ONLY_COORDINATOR)).toBe(true);
+  });
+
+  it("denies an unprivileged Coordinator", () => {
+    expect(canReassignMaintenanceIssue(UNPRIVILEGED_COORDINATOR)).toBe(false);
+  });
+});
+
+describe("canViewMaintenanceTasks", () => {
+  it("Secretary, Maintenance Secretary, maintenance.manage, and maintenance.tasks all pass", () => {
+    expect(canViewMaintenanceTasks(SECRETARY)).toBe(true);
+    expect(canViewMaintenanceTasks(MAINTENANCE_SECRETARY)).toBe(true);
+    expect(canViewMaintenanceTasks(MANAGE_COORDINATOR)).toBe(true);
+    expect(canViewMaintenanceTasks(TASKS_ONLY_COORDINATOR)).toBe(true);
+  });
+
+  it("denies an unprivileged Coordinator or a Student", () => {
+    expect(canViewMaintenanceTasks(UNPRIVILEGED_COORDINATOR)).toBe(false);
+    expect(canViewMaintenanceTasks(STUDENT)).toBe(false);
+  });
+});
+
+describe("canViewMaintenanceReports", () => {
+  it("Secretary, Maintenance Secretary, maintenance.view (pre-existing behavior), maintenance.reports, and maintenance.manage all pass", () => {
+    expect(canViewMaintenanceReports(SECRETARY)).toBe(true);
+    expect(canViewMaintenanceReports(MAINTENANCE_SECRETARY)).toBe(true);
+    expect(canViewMaintenanceReports(VIEW_COORDINATOR)).toBe(true);
+    expect(canViewMaintenanceReports(REPORTS_ONLY_COORDINATOR)).toBe(true);
+    expect(canViewMaintenanceReports(MANAGE_COORDINATOR)).toBe(true);
+  });
+
+  it("denies an unprivileged Coordinator or a Student", () => {
+    expect(canViewMaintenanceReports(UNPRIVILEGED_COORDINATOR)).toBe(false);
+    expect(canViewMaintenanceReports(STUDENT)).toBe(false);
+  });
+});
+
+describe("assignee-based access still works when an issue has no assignee yet", () => {
+  it("does not throw and correctly denies a non-privileged actor", () => {
+    expect(canManageMaintenanceIssue(UNPRIVILEGED_COORDINATOR, UNASSIGNED_ISSUE)).toBe(false);
+    expect(canManageMaintenanceIssue(MAINTENANCE_SECRETARY, UNASSIGNED_ISSUE)).toBe(true);
   });
 });

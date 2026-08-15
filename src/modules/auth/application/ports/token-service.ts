@@ -1,4 +1,4 @@
-import type { Role } from "../../domain/entities";
+import type { MaintenanceCoordinatorRole, Role } from "../../domain/entities";
 
 /** Claims embedded in the short-lived access token JWT. */
 export interface AccessTokenClaims {
@@ -8,6 +8,8 @@ export interface AccessTokenClaims {
   readonly batchScope?: readonly string[];
   /** See AuthenticatedActor.permissions's doc comment (domain/entities.ts). */
   readonly permissions?: readonly string[];
+  /** See AuthenticatedActor.maintenanceRole's doc comment (domain/entities.ts). */
+  readonly maintenanceRole?: MaintenanceCoordinatorRole;
   readonly studentProfileId?: string;
   readonly mustChangePassword?: boolean;
 }

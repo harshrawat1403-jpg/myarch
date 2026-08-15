@@ -26,6 +26,7 @@ export class JwtTokenService implements TokenService {
         role: claims.role,
         batchScope: claims.batchScope,
         permissions: claims.permissions,
+        maintenanceRole: claims.maintenanceRole,
         studentProfileId: claims.studentProfileId,
         mustChangePassword: claims.mustChangePassword,
       },
@@ -58,6 +59,7 @@ export class JwtTokenService implements TokenService {
       role: decoded["role"],
       batchScope: decoded["batchScope"] as readonly string[] | undefined,
       permissions: decoded["permissions"] as readonly string[] | undefined,
+      maintenanceRole: decoded["maintenanceRole"] as AccessTokenClaims["maintenanceRole"],
       studentProfileId: decoded["studentProfileId"] as string | undefined,
       mustChangePassword: decoded["mustChangePassword"] as boolean | undefined,
     };

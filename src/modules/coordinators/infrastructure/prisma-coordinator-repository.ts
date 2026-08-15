@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
-import type { CoordinatorRecord, CoordinatorSearchFilters } from "../domain/entities";
+import type { CoordinatorRecord, CoordinatorSearchFilters, MaintenanceCoordinatorRole } from "../domain/entities";
 import type {
   CoordinatorRepository,
   CreateCoordinatorData,
@@ -76,6 +76,29 @@ export class PrismaCoordinatorRepository implements CoordinatorRepository {
     return toDomain(row);
   }
 
+  async setMaintenanceRole(id: string, maintenanceRole: MaintenanceCoordinatorRole | null): Promise<CoordinatorRecord> {
+    const row = await this.prisma.coordinatorProfile.update({
+      where: { id },
+      data: { maintenanceRole },
+      include: { user: true, batchScopes: true },
+    });
+    return toDomain(row);
+  }
+
+  async countActiveByMaintenanceRole(role: MaintenanceCoordinatorRole, excludingId?: string): Promise<number> {
+    return this.prisma.coordinatorProfile.count({
+      where: { maintenanceRole: role, isActive: true, id: excludingId ? { not: excludingId } : undefined },
+    });
+  }
+
+  async findActiveByMaintenanceRole(role: MaintenanceCoordinatorRole): Promise<CoordinatorRecord | null> {
+    const row = await this.prisma.coordinatorProfile.findFirst({
+      where: { maintenanceRole: role, isActive: true },
+      include: { user: true, batchScopes: true },
+    });
+    return row ? toDomain(row) : null;
+  }
+
   async search(filters: CoordinatorSearchFilters): Promise<CoordinatorRecord[]> {
     const where: Prisma.CoordinatorProfileWhereInput = {
       isActive: filters.includeInactive ? undefined : true,
@@ -118,6 +141,7 @@ function toDomain(row: CoordinatorProfileWithUser): CoordinatorRecord {
     position: row.position,
     batchIds: row.batchScopes.map((scope) => scope.batchId),
     permissions: row.permissions,
+    maintenanceRole: row.maintenanceRole,
     createdAt: row.user.createdAt,
   };
 }

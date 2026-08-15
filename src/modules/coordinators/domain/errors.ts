@@ -62,3 +62,28 @@ export class InvalidCoordinatorPermissionError extends Error {
     this.name = "InvalidCoordinatorPermissionError";
   }
 }
+
+/** MYARCH Maintenance functional hierarchy — at most one active Coordinator may hold each MaintenanceCoordinatorRole value at a time. */
+export class MaxActiveMaintenanceRoleError extends Error {
+  constructor(role: "MAINTENANCE_SECRETARY" | "MAINTENANCE_COORDINATOR") {
+    const label = role === "MAINTENANCE_SECRETARY" ? "Maintenance Secretary" : "Maintenance Coordinator";
+    super(`MYARCH allows only one active ${label} at a time`);
+    this.name = "MaxActiveMaintenanceRoleError";
+  }
+}
+
+/** SetCoordinatorMaintenanceRoleUseCase — the target must be an active Coordinator to hold a Maintenance functional role. */
+export class InactiveCoordinatorError extends Error {
+  constructor() {
+    super("Only an active Coordinator can be assigned a Maintenance functional role");
+    this.name = "InactiveCoordinatorError";
+  }
+}
+
+/** UpdateMaintenanceCoordinatorPermissionsUseCase — no Coordinator is currently designated MAINTENANCE_COORDINATOR. */
+export class NoMaintenanceCoordinatorDesignatedError extends Error {
+  constructor() {
+    super("No Maintenance Coordinator is currently designated");
+    this.name = "NoMaintenanceCoordinatorDesignatedError";
+  }
+}

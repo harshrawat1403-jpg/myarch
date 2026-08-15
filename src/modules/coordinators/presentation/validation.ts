@@ -38,3 +38,13 @@ export const BulkSetActiveRequestSchema = z.object({
 export const UpdateCoordinatorPermissionsRequestSchema = z.object({
   permissions: z.array(z.string().trim().min(1)),
 });
+
+/** MYARCH Maintenance functional hierarchy — null clears the designation. */
+export const SetCoordinatorMaintenanceRoleRequestSchema = z.object({
+  maintenanceRole: z.enum(["MAINTENANCE_SECRETARY", "MAINTENANCE_COORDINATOR"]).nullable(),
+});
+
+/** Same "format here, catalog membership in the use case" split as UpdateCoordinatorPermissionsRequestSchema. */
+export const UpdateMaintenanceCoordinatorPermissionsRequestSchema = z.object({
+  permissions: z.array(z.string().trim().min(1)),
+});

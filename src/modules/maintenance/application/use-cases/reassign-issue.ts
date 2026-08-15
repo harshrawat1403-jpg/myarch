@@ -3,7 +3,7 @@ import { NotAuthorizedError } from "@/lib/errors";
 import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import type { AuditRecorder } from "@/lib/audit";
 import type { MaintenanceIssueRecord } from "../../domain/entities";
-import { canAssignMaintenanceIssue } from "../../domain/permissions";
+import { canReassignMaintenanceIssue } from "../../domain/permissions";
 import { InvalidMaintenanceAssigneeError, MaintenanceIssueNotFoundError } from "../../domain/errors";
 import type { MaintenanceIssueRepository } from "../ports/maintenance-issue-repository";
 import type { UserRoleLookup } from "../ports/user-role-lookup";
@@ -28,7 +28,7 @@ export class ReassignMaintenanceIssueUseCase {
   async execute(input: ReassignMaintenanceIssueInput): Promise<MaintenanceIssueRecord> {
     const existing = await this.deps.maintenanceIssueRepository.findById(input.issueId);
     if (!existing) throw new MaintenanceIssueNotFoundError();
-    if (!canAssignMaintenanceIssue(input.actor)) {
+    if (!canReassignMaintenanceIssue(input.actor)) {
       throw new NotAuthorizedError("Not authorized to reassign maintenance issues");
     }
     if (!existing.taskId || (existing.status !== "ASSIGNED" && existing.status !== "IN_PROGRESS")) {

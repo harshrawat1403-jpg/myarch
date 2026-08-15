@@ -38,6 +38,7 @@ export async function issueSessionTokens(
     role: actor.role,
     batchScope: actor.batchScope,
     permissions: actor.permissions,
+    maintenanceRole: actor.maintenanceRole,
     studentProfileId: actor.studentProfileId,
     mustChangePassword: actor.mustChangePassword,
   });

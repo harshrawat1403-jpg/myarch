@@ -22,6 +22,10 @@ export interface AuthContextValue {
   studentProfileId: string | null;
   /** Only present for COORDINATOR actors — the batch IDs this session's server-side authorization checks are scoped to. Display-only here (e.g. the shell's scope sub-label); every real scope check still happens server-side. */
   batchScope: readonly string[] | null;
+  /** Only present for COORDINATOR actors — the granular capability keys delegated to this session. Display/nav-gating only (e.g. the Maintenance workspace showing only delegated tabs to a Maintenance Coordinator); every real permission check still happens server-side. */
+  permissions: readonly string[] | null;
+  /** Only present for a COORDINATOR explicitly designated within the Maintenance functional hierarchy — see AuthenticatedActor.maintenanceRole's own doc comment. Display/nav-gating only. */
+  maintenanceRole: "MAINTENANCE_SECRETARY" | "MAINTENANCE_COORDINATOR" | null;
   /** True when this session must change its password before doing anything else — see with-auth.ts's `allowMustChangePassword` gate, which is the real enforcement; this is what drives the frontend's forced-redirect. */
   mustChangePassword: boolean;
   isLoading: boolean;
@@ -50,6 +54,8 @@ interface DecodedClaims {
   role?: string;
   studentProfileId?: string;
   batchScope?: readonly string[];
+  permissions?: readonly string[];
+  maintenanceRole?: "MAINTENANCE_SECRETARY" | "MAINTENANCE_COORDINATOR";
   mustChangePassword?: boolean;
 }
 
@@ -75,6 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [studentProfileId, setStudentProfileId] = useState<string | null>(null);
   const [batchScope, setBatchScope] = useState<readonly string[] | null>(null);
+  const [permissions, setPermissions] = useState<readonly string[] | null>(null);
+  const [maintenanceRole, setMaintenanceRole] = useState<AuthContextValue["maintenanceRole"]>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -86,6 +94,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserId(claims.sub ?? null);
     setStudentProfileId(claims.studentProfileId ?? null);
     setBatchScope(claims.batchScope ?? null);
+    setPermissions(claims.permissions ?? null);
+    setMaintenanceRole(claims.maintenanceRole ?? null);
     setMustChangePassword(claims.mustChangePassword ?? false);
     return decodedRole;
   }, []);
@@ -96,6 +106,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserId(null);
     setStudentProfileId(null);
     setBatchScope(null);
+    setPermissions(null);
+    setMaintenanceRole(null);
     setMustChangePassword(false);
   }, []);
 
@@ -161,6 +173,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userId,
         studentProfileId,
         batchScope,
+        permissions,
+        maintenanceRole,
         mustChangePassword,
         isLoading,
         isAuthenticated: accessToken !== null,

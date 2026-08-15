@@ -15,6 +15,12 @@ export const COORDINATOR_PERMISSION_KEYS: readonly CoordinatorPermissionKey[] = 
   "maintenance.assign",
   "maintenance.manage",
 
+  "maintenance.update",
+  "maintenance.resolve",
+  "maintenance.reassign",
+  "maintenance.tasks",
+  "maintenance.reports",
+
   "requests.view",
   "requests.manage",
 

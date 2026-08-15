@@ -222,6 +222,25 @@ enum CoordinatorPosition {
   ALUMNI
 }
 
+// MYARCH — Maintenance functional hierarchy (architecture amendment, not a
+// new Role). A Coordinator flagged MAINTENANCE_SECRETARY administers the
+// Maintenance domain (full maintenance.* access, plus the narrow power to
+// edit the designated MAINTENANCE_COORDINATOR's own maintenance.* subset);
+// MAINTENANCE_COORDINATOR is the operational role beneath them, receiving
+// only delegated maintenance.* permissions like any other Coordinator.
+// Both remain Role = COORDINATOR and both count toward the existing
+// max-2-active-Coordinators cap — see MAX_ACTIVE_MAINTENANCE_SECRETARIES/
+// MAX_ACTIVE_MAINTENANCE_COORDINATORS in coordinators/domain/entities.ts
+// for the (application-layer-enforced, mirroring MAX_ACTIVE_COORDINATORS's
+// own pattern) at-most-one-of-each invariant. Never read by any
+// permission function outside src/modules/coordinators and
+// src/modules/maintenance — this is deliberately NOT a Super Admin and
+// must never be treated as unconditional access elsewhere.
+enum MaintenanceCoordinatorRole {
+  MAINTENANCE_SECRETARY
+  MAINTENANCE_COORDINATOR
+}
+
 enum BulkRunStatus {
   PENDING
   RUNNING
@@ -421,6 +440,13 @@ model CoordinatorProfile {
   isActive Boolean              @default(true)
   // V4.0 (A1): T&P vs Alumni — display/reporting label only, see enum doc comment.
   position CoordinatorPosition?
+
+  // MYARCH — Maintenance functional hierarchy (see MaintenanceCoordinatorRole's
+  // own doc comment). Null for every ordinary Coordinator (the overwhelming
+  // majority) — only set via SetCoordinatorMaintenanceRoleUseCase
+  // (Technical-Secretary-only, same gate as every other Coordinator-account
+  // management action), never directly.
+  maintenanceRole MaintenanceCoordinatorRole?
 
   // MYARCH Phase 1: granular capabilities the Technical Secretary has
   // delegated to this Coordinator (roadmap §2.3 — e.g. "maintenance.view",

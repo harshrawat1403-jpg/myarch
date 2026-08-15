@@ -26,7 +26,7 @@ export interface UserRepository {
    */
   loadActorScope(
     user: AuthUserRecord,
-  ): Promise<Pick<AuthenticatedActor, "batchScope" | "permissions" | "studentProfileId">>;
+  ): Promise<Pick<AuthenticatedActor, "batchScope" | "permissions" | "maintenanceRole" | "studentProfileId">>;
 
   /** Stamps the moment a login succeeds — V3.0 Administration Platform's "Last Login" column. */
   recordSuccessfulLogin(userId: string, at: Date): Promise<void>;

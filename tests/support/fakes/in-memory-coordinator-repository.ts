@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { CoordinatorRecord, CoordinatorSearchFilters } from "../../../src/modules/coordinators";
+import type { CoordinatorRecord, CoordinatorSearchFilters, MaintenanceCoordinatorRole } from "../../../src/modules/coordinators";
 import type {
   CoordinatorRepository,
   CreateCoordinatorData,
@@ -24,6 +24,7 @@ export class InMemoryCoordinatorRepository implements CoordinatorRepository {
       position: data.position ?? null,
       batchIds: [],
       permissions: [],
+      maintenanceRole: null,
       createdAt: new Date(),
     };
     this.byId.set(record.id, record);
@@ -71,6 +72,24 @@ export class InMemoryCoordinatorRepository implements CoordinatorRepository {
     const updated = { ...existing, permissions };
     this.byId.set(id, updated);
     return updated;
+  }
+
+  async setMaintenanceRole(id: string, maintenanceRole: MaintenanceCoordinatorRole | null): Promise<CoordinatorRecord> {
+    const existing = this.byId.get(id);
+    if (!existing) throw new Error("not found");
+    const updated = { ...existing, maintenanceRole };
+    this.byId.set(id, updated);
+    return updated;
+  }
+
+  async countActiveByMaintenanceRole(role: MaintenanceCoordinatorRole, excludingId?: string): Promise<number> {
+    return [...this.byId.values()].filter(
+      (record) => record.maintenanceRole === role && record.isActive && record.id !== excludingId,
+    ).length;
+  }
+
+  async findActiveByMaintenanceRole(role: MaintenanceCoordinatorRole): Promise<CoordinatorRecord | null> {
+    return [...this.byId.values()].find((record) => record.maintenanceRole === role && record.isActive) ?? null;
   }
 
   async search(filters: CoordinatorSearchFilters): Promise<CoordinatorRecord[]> {
