@@ -22,6 +22,8 @@ export const COORDINATOR_PERMISSION_KEYS: readonly CoordinatorPermissionKey[] = 
   "events.create",
   "events.manage",
 
+  "meetings.manage",
+
   "applications.view",
   "applications.review",
   "applications.shortlist",

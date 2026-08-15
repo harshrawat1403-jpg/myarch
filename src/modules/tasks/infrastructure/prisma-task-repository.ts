@@ -97,6 +97,9 @@ export class PrismaTaskRepository implements TaskRepository {
       ...(filters.overdueOnly
         ? { deadline: { lt: now }, status: { notIn: ["DONE", "CANCELLED"] } }
         : {}),
+      ...(filters.deadlineFrom || filters.deadlineTo
+        ? { deadline: { gte: filters.deadlineFrom, lte: filters.deadlineTo } }
+        : {}),
     };
 
     const orderBy: Prisma.TaskOrderByWithRelationInput =

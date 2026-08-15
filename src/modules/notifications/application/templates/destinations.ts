@@ -104,5 +104,11 @@ export function resolveNotificationDestination(
       const requestId = context.requestId;
       return typeof requestId === "string" && requestId.length > 0 ? `/requests/${requestId}` : null;
     }
+
+    // MYARCH Phase 3 (§4.5) — Announcements.
+    case "ANNOUNCEMENT_PUBLISHED": {
+      const announcementId = context.announcementId;
+      return typeof announcementId === "string" && announcementId.length > 0 ? `/announcements/${announcementId}` : null;
+    }
   }
 }

@@ -100,6 +100,41 @@ enum RequestDecision {
   REJECTED
 }
 
+// MYARCH Phase 3 (§4.2/§4.4/§4.5) — Events, Meetings, Announcements.
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  COMPLETED
+  CANCELLED
+}
+
+enum EventParticipantRole {
+  ORGANIZER
+  COORDINATOR
+  VOLUNTEER
+}
+
+enum EventAttachmentKind {
+  DOCUMENT
+  MEDIA
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum AnnouncementAudienceType {
+  EVERYONE
+  YEAR
+  PROGRAM
+  COMMITTEE
+  COUNCIL
+  COORDINATORS
+  SELECTED_GROUP
+}
+
 enum BatchStatus {
   ACTIVE
   GRADUATED
@@ -283,6 +318,15 @@ model User {
   maintenanceIssuesAssigned MaintenanceIssue[] @relation("MaintenanceIssueAssignee")
   requestsSubmitted         Request[]          @relation("RequestRequester")
   requestsOwned             Request[]          @relation("RequestOwner")
+
+  // MYARCH Phase 3 (§4.1–§4.5) — Calendar, Events & Meetings.
+  eventsOrganized      Event[]              @relation("EventOrganizer")
+  eventParticipations  EventParticipant[]   @relation("EventParticipantUser")
+  eventRegistrations   EventRegistration[]  @relation("EventRegistrationUser")
+  meetingsOrganized    Meeting[]            @relation("MeetingOrganizer")
+  meetingParticipations MeetingParticipant[] @relation("MeetingParticipantUser")
+  announcementsAuthored Announcement[]           @relation("AnnouncementAuthor")
+  announcementRecipient AnnouncementRecipient[]  @relation("AnnouncementRecipientUser")
 
   @@map("users")
 }
@@ -709,6 +753,8 @@ model FileAsset {
   usedAsPublicationExportOf PublicationExport?          @relation("PublicationExportFile")
   usedAsMaintenanceAttachmentOf MaintenanceAttachment[] @relation("MaintenanceAttachmentFile")
   usedAsRequestAttachmentOf     RequestAttachment[]     @relation("RequestAttachmentFile")
+  usedAsEventAttachmentOf        EventAttachment[]        @relation("EventAttachmentFile")
+  usedAsAnnouncementAttachmentOf AnnouncementAttachment[] @relation("AnnouncementAttachmentFile")
 
   @@index([ownerUserId])
   @@map("file_assets")
@@ -1181,6 +1227,219 @@ model RequestAttachment {
 
   @@index([requestId])
   @@map("request_attachments")
+}
+
+// ---------------------------------------------------------------------------
+// MYARCH Phase 3 (§4.1–§4.5) — Calendar, Events & Meetings.
+//
+// There is deliberately no `CalendarEvent`/`CalendarEntry` table: the
+// Central Activity Calendar (§4.1) is a pure read-time AGGREGATION over
+// each owning domain's own dated rows (Event.startAt, Meeting.startAt, ...)
+// — see src/modules/calendar's own module doc comment for the full
+// reasoning (mirrors how Task/Follow-up Engine is the one reusable
+// "work item" primitive; Calendar is the one reusable "occurrence in time"
+// query surface, not a duplicated data store).
+//
+// Event/Meeting "tasks" and "action items" are Task Engine rows
+// (relatedEntityType "Event"/"Meeting") — no separate task table here
+// either, per §4.3's/§4.4's own explicit instruction to reuse the shared
+// task/follow-up system.
+// ---------------------------------------------------------------------------
+
+model Event {
+  id          String      @id @default(uuid()) @db.Uuid
+  title       String
+  description String?
+  startAt     DateTime
+  endAt       DateTime?
+  venue       String?
+  status      EventStatus @default(DRAFT)
+
+  organizerId String @db.Uuid
+  organizer   User   @relation("EventOrganizer", fields: [organizerId], references: [id])
+
+  budgetAmount Decimal? @db.Decimal(10, 2)
+  budgetNotes  String?
+
+  postEventReport String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants  EventParticipant[]
+  checklist     EventChecklistItem[]
+  attachments   EventAttachment[]
+  registrations EventRegistration[]
+
+  @@index([status])
+  @@index([startAt])
+  @@index([organizerId])
+  @@map("events")
+}
+
+model EventParticipant {
+  id      String               @id @default(uuid()) @db.Uuid
+  eventId String               @db.Uuid
+  event   Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId  String               @db.Uuid
+  user    User                 @relation("EventParticipantUser", fields: [userId], references: [id])
+  role    EventParticipantRole
+
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, userId])
+  @@index([userId])
+  @@map("event_participants")
+}
+
+// The "checklist" bullet in §4.2, deliberately distinct from "tasks"
+// (Task Engine rows): a lightweight, unowned, undated todo item — no
+// assignment/deadline/priority machinery, just a label and a done flag.
+model EventChecklistItem {
+  id      String  @id @default(uuid()) @db.Uuid
+  eventId String  @db.Uuid
+  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  label   String
+  isDone  Boolean @default(false)
+  sortOrder Int   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([eventId])
+  @@map("event_checklist_items")
+}
+
+// Covers both §4.2's "documents" and "media" bullets — one table, a `kind`
+// discriminator, mirroring Maintenance/Request's own established
+// attachment-join-table shape (FileAsset, classification PUBLIC).
+model EventAttachment {
+  id      String              @id @default(uuid()) @db.Uuid
+  eventId String              @db.Uuid
+  event   Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  fileId  String              @db.Uuid
+  file    FileAsset           @relation("EventAttachmentFile", fields: [fileId], references: [id])
+  kind    EventAttachmentKind @default(DOCUMENT)
+
+  createdAt DateTime @default(now())
+
+  @@index([eventId])
+  @@map("event_attachments")
+}
+
+// Covers both §4.2's "registration" and "attendance" bullets in one row —
+// attendance is only ever marked for someone already registered.
+model EventRegistration {
+  id           String    @id @default(uuid()) @db.Uuid
+  eventId      String    @db.Uuid
+  event        Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId       String    @db.Uuid
+  user         User      @relation("EventRegistrationUser", fields: [userId], references: [id])
+  registeredAt DateTime  @default(now())
+  attendedAt   DateTime?
+
+  @@unique([eventId, userId])
+  @@index([userId])
+  @@map("event_registrations")
+}
+
+model Meeting {
+  id          String        @id @default(uuid()) @db.Uuid
+  title       String
+  agenda      String?
+  startAt     DateTime
+  venueOrLink String?
+  status      MeetingStatus @default(SCHEDULED)
+
+  organizerId String @db.Uuid
+  organizer   User   @relation("MeetingOrganizer", fields: [organizerId], references: [id])
+
+  // Post-meeting record — filled in once the meeting has happened.
+  notes     String?
+  decisions String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants MeetingParticipant[]
+
+  @@index([status])
+  @@index([startAt])
+  @@index([organizerId])
+  @@map("meetings")
+}
+
+model MeetingParticipant {
+  id        String  @id @default(uuid()) @db.Uuid
+  meetingId String  @db.Uuid
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId    String  @db.Uuid
+  user      User    @relation("MeetingParticipantUser", fields: [userId], references: [id])
+  attended  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([meetingId, userId])
+  @@index([userId])
+  @@map("meeting_participants")
+}
+
+model Announcement {
+  id           String                   @id @default(uuid()) @db.Uuid
+  title        String
+  content      String
+  priority     TaskPriority             @default(MEDIUM)
+  audienceType AnnouncementAudienceType @default(EVERYONE)
+  // Interpretation per audienceType: YEAR -> a batch id (as text); PROGRAM
+  // -> a program/department name; COMMITTEE/COUNCIL -> reserved for Phase 4
+  // (§5), free text for now since no Committee/Council table exists yet;
+  // EVERYONE/COORDINATORS/SELECTED_GROUP -> unused (null) — SELECTED_GROUP's
+  // actual membership lives in AnnouncementRecipient below, not here.
+  audienceValue String?
+  publishAt     DateTime                 @default(now())
+  expiresAt     DateTime?
+
+  authorId String @db.Uuid
+  author   User   @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attachments AnnouncementAttachment[]
+  recipients  AnnouncementRecipient[]
+
+  @@index([publishAt])
+  @@index([audienceType])
+  @@map("announcements")
+}
+
+model AnnouncementAttachment {
+  id             String       @id @default(uuid()) @db.Uuid
+  announcementId String       @db.Uuid
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  fileId         String       @db.Uuid
+  file           FileAsset    @relation("AnnouncementAttachmentFile", fields: [fileId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([announcementId])
+  @@map("announcement_attachments")
+}
+
+// Only populated when audienceType = SELECTED_GROUP — an explicit,
+// arbitrary set of recipients chosen by the author, distinct from every
+// other audienceType (which is resolved dynamically at send-time from
+// audienceValue/role, not stored as rows).
+model AnnouncementRecipient {
+  id             String       @id @default(uuid()) @db.Uuid
+  announcementId String       @db.Uuid
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String       @db.Uuid
+  user           User         @relation("AnnouncementRecipientUser", fields: [userId], references: [id])
+
+  @@unique([announcementId, userId])
+  @@index([userId])
+  @@map("announcement_recipients")
 }
 
 // ---------------------------------------------------------------------------

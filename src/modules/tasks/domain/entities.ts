@@ -58,6 +58,9 @@ export interface TaskFilters {
   /** deadline < now AND status not in (DONE, CANCELLED). */
   readonly overdueOnly?: boolean;
   readonly search?: string;
+  /** Inclusive deadline range — added for the Calendar module (§4.1) to query "tasks with a deadline falling in this window" without a separate repository method. A null deadline never matches either bound. */
+  readonly deadlineFrom?: Date;
+  readonly deadlineTo?: Date;
 }
 
 export type TaskSortField = "createdAt" | "deadline" | "priority" | "updatedAt";

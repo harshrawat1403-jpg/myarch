@@ -43,7 +43,14 @@ export type NotificationTemplateId =
   | "MAINTENANCE_ISSUE_SUBMITTED"
   | "MAINTENANCE_ISSUE_RESOLVED"
   | "REQUEST_SUBMITTED"
-  | "REQUEST_DECIDED";
+  | "REQUEST_DECIDED"
+  // MYARCH Phase 3 (§4.5) — Announcements. The ANNOUNCEMENT_POSTED id named
+  // (but never added) back in V4.0 E1/E2 is superseded by this one — Phase 3
+  // is the real, roadmap-authorized Announcement feature that id's own
+  // deferral note anticipated ("building this would be exactly the kind of
+  // speculative, PRD-unauthorized feature this project's standing
+  // instructions rule out" — no longer true now that §4.5 exists).
+  | "ANNOUNCEMENT_PUBLISHED";
 
 /**
  * The one thing a business use case knows about a notification: who should

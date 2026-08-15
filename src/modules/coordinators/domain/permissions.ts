@@ -30,6 +30,12 @@ export const COORDINATOR_PERMISSION_KEYS = [
   "events.create",
   "events.manage",
 
+  // MYARCH Phase 3 (§4.4) — Meeting Management, added now that a real phase
+  // needs it (not speculative — see this file's own doc comment). No
+  // granular split requested for meetings, mirroring announcements.manage's
+  // own single-key shape.
+  "meetings.manage",
+
   "applications.view",
   "applications.review",
   "applications.shortlist",

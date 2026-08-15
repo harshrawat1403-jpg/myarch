@@ -46,6 +46,7 @@ import {
 } from "./definitions/maintenance-issue-resolved";
 import { requestSubmittedTemplate, requestSubmittedInAppTemplate } from "./definitions/request-submitted";
 import { requestDecidedTemplate, requestDecidedInAppTemplate } from "./definitions/request-decided";
+import { announcementPublishedTemplate, announcementPublishedInAppTemplate } from "./definitions/announcement-published";
 
 /**
  * Every known template, keyed by the id business use cases pass to
@@ -65,12 +66,11 @@ import { requestDecidedTemplate, requestDecidedInAppTemplate } from "./definitio
  *   - PUBLICATION_PUBLISHED has no real call site yet — Publication Studio
  *     (E3-E5) hasn't been built. Wiring happens there, when
  *     PublishPublicationUseCase exists.
- *   - ANNOUNCEMENT_POSTED has no backing entity or use case anywhere in the
- *     approved V4.0 schema (§5) — it appears only in this one template
- *     list, nowhere else in the PRD. Building a real "Announcement" feature
- *     to give this template something to fire from would be exactly the
- *     kind of speculative, PRD-unauthorized feature this project's
- *     standing instructions rule out.
+ *
+ * MYARCH Phase 3 (§4.5) update: the ANNOUNCEMENT_POSTED deferral above no
+ * longer applies — Announcements is now a real, roadmap-authorized feature.
+ * See ANNOUNCEMENT_PUBLISHED below, wired from
+ * announcements/application/use-cases/create-announcement.ts.
  */
 export const EMAIL_TEMPLATE_REGISTRY: Record<NotificationTemplateId, EmailTemplateDefinition> = {
   PROFILE_APPROVED: profileApprovedTemplate,
@@ -98,6 +98,7 @@ export const EMAIL_TEMPLATE_REGISTRY: Record<NotificationTemplateId, EmailTempla
   MAINTENANCE_ISSUE_RESOLVED: maintenanceIssueResolvedTemplate,
   REQUEST_SUBMITTED: requestSubmittedTemplate,
   REQUEST_DECIDED: requestDecidedTemplate,
+  ANNOUNCEMENT_PUBLISHED: announcementPublishedTemplate,
 };
 
 /** V4.0 E1 — the IN_APP counterpart to EMAIL_TEMPLATE_REGISTRY. */
@@ -127,6 +128,7 @@ export const IN_APP_TEMPLATE_REGISTRY: Record<NotificationTemplateId, InAppTempl
   MAINTENANCE_ISSUE_RESOLVED: maintenanceIssueResolvedInAppTemplate,
   REQUEST_SUBMITTED: requestSubmittedInAppTemplate,
   REQUEST_DECIDED: requestDecidedInAppTemplate,
+  ANNOUNCEMENT_PUBLISHED: announcementPublishedInAppTemplate,
 };
 
 /**
@@ -182,4 +184,8 @@ export const NOTIFICATION_CHANNELS: Record<NotificationTemplateId, readonly Noti
   MAINTENANCE_ISSUE_RESOLVED: ["EMAIL", "IN_APP"],
   REQUEST_SUBMITTED: ["IN_APP"],
   REQUEST_DECIDED: ["EMAIL", "IN_APP"],
+  // MYARCH Phase 3 (§4.5) — an announcement is department-wide news, worth
+  // an email (potentially high fan-out, but infrequent — nothing like
+  // TASK_ASSIGNED's per-task volume).
+  ANNOUNCEMENT_PUBLISHED: ["EMAIL", "IN_APP"],
 };

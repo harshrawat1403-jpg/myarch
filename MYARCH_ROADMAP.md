@@ -26,15 +26,15 @@
 
 
 
-CURRENT\_PHASE: 3
+CURRENT\_PHASE: 4
 
 STATUS: NOT\_STARTED
 
-LAST\_COMPLETED\_PHASE: 2
+LAST\_COMPLETED\_PHASE: 3
 
 BLOCKED: FALSE
 
-BLOCK\_REASON: none. Phase 2 (\# 3, "MAINTENANCE & REQUESTS") is now COMPLETE — \#3.8 (Task/Follow-up Engine) was built first as reusable infrastructure, then \#3.1–\#3.7 (Maintenance lifecycle, complainant tracking, assignment, SLA/escalation, Generic Request System) and \#3.9 (Maintenance Dashboard) were built on top of it, reusing the existing auth/authorization/notification/job/audit/storage systems throughout — no second task, scheduler, reminder, notification, or escalation system was created. See the Phase Report under "\# 3. PHASE 2 — MAINTENANCE & REQUESTS" below. Phase 3 (\# 4, CALENDAR, EVENTS \& MEETINGS) has NOT been started — per instruction, it was not begun automatically after Phase 2 completed.
+BLOCK\_REASON: none. Phase 3 (\# 4, "CALENDAR, EVENTS \& MEETINGS") is now COMPLETE — \#4.1 (Central Activity Calendar, built first per explicit instruction as a pure read-time aggregation registry, mirroring the existing Background Job Processing System's \`JobRegistry\` pattern) then \#4.2/\#4.3 (Event Planner \+ Event Tasks), \#4.4 (Meeting Management), and \#4.5 (Announcements), each reusing the existing auth/authorization/notification/audit/file-storage systems and, for Event Tasks/Meeting action items, the EXISTING Task/Follow-up Engine directly (no bridge, no new task table). See the Phase Report under "\# 4. PHASE 3 — CALENDAR, EVENTS \& MEETINGS" below. Phase 4 (\# 5, COUNCIL \& COMMITTEES) has NOT been started — per instruction, it was not begun automatically after Phase 3 completed.
 
 
 
@@ -2332,7 +2332,7 @@ NEXT: \# 4 — PHASE 3 (CALENDAR, EVENTS \& MEETINGS). Not started, per explicit
 
 
 
-STATUS: NOT\_STARTED
+STATUS: COMPLETE
 
 
 
@@ -2557,6 +2557,126 @@ Audience can include:
 \- Coordinators
 
 \- selected groups
+
+
+
+\---
+
+
+
+\## §4.1–§4.5 PHASE REPORT (2026-08-15)
+
+
+
+STATUS: COMPLETE
+
+
+
+IMPLEMENTED:
+
+\- Four new modules: \`src/modules/calendar\` (§4.1), \`src/modules/events\` (§4.2/§4.3), \`src/modules/meetings\` (§4.4), \`src/modules/announcements\` (§4.5), built in that sequence per explicit instruction.
+
+\- §4.1 Central Activity Calendar: month/week/day/agenda views, filters for activity type/owner/status (academic year/committee accepted but honestly deferred — see KNOWN ISSUES), aggregating every registered \`CalendarSource\` (Task Engine deadlines, Events, Meetings, Announcements) into one normalized, read-only \`CalendarEntry\` stream — no \`CalendarEvent\`/\`CalendarEntry\` table exists; a source is a pure query-time adapter over its own domain's existing dated rows.
+
+\- §4.2/§4.3 Event Planner: title/description/date-time/venue/organizer (\`Event\`), Coordinators/volunteers (\`EventParticipant\`), checklist (\`EventChecklistItem\`), budget (amount \+ notes), documents/media (\`EventAttachment\`, one table with a \`kind\` discriminator), registration \+ attendance (\`EventRegistration\`, one row for both), post-event report, and the full DRAFT → PUBLISHED → COMPLETED/CANCELLED lifecycle. Event Tasks (§4.3) are plain Task Engine rows (\`relatedEntityType: "Event"\`) — created/queried directly against Task Engine's own existing \`/api/tasks\` endpoints, zero new backend code.
+
+\- §4.4 Meeting Management: title/date-time/venue-or-link/participants/agenda/attendance/notes/decisions, SCHEDULED → COMPLETED/CANCELLED. Action items are, per the roadmap's own explicit instruction, plain Task Engine rows (\`relatedEntityType: "Meeting"\`) — same direct-reuse shape as Event Tasks, no bridge.
+
+\- §4.5 Announcements: title/content/priority (reuses \`TaskPriority\`)/audience/publish date/expiry/attachments/author. Audience: EVERYONE, YEAR (batch-matched), COORDINATORS, and SELECTED\_GROUP are fully resolved (both for visibility and for notification fan-out); PROGRAM/COMMITTEE/COUNCIL are accepted as valid values but always resolve to nobody — no backing entity exists yet (see KNOWN ISSUES). A new \`ANNOUNCEMENT\_PUBLISHED\` template fires once, synchronously, at creation time, but only for an immediately-active (\`publishAt <= now\`) announcement.
+
+
+
+ARCHITECTURE — the Calendar is a registry, not a table: \`CalendarSourceRegistry\` mirrors the Background Job Processing System's own \`JobRegistry\` exactly (a consuming module calls \`calendarSourceRegistry.register(new XCalendarSource(...))\` from its own composition root; \`GetCalendarEntriesUseCase\` fans out via \`Promise.allSettled\` — one broken source never fails the whole calendar — merges, and re-applies activityType/owner/status filters defensively even if a source ignores them). \`TaskCalendarSource\` is the one exception living outside its own domain (in \`calendar/infrastructure\`, not \`tasks/\`) since Task Engine predates Calendar and has no calendar-awareness of its own; this required one small, additive extension to Task Engine itself — \`TaskFilters.deadlineFrom/deadlineTo\` — rather than an inefficient in-memory-filter workaround. A second, deliberate architectural departure from Phase 2's precedent: Event Tasks/Meeting action items do NOT use a \`task-engine-bridge.ts\` elevation file. That pattern existed in Maintenance/Requests because exactly ONE system-driven, status-synced Task exists per issue/request, created automatically on assignment. An event or meeting can have MANY ad-hoc, human-created tasks — exactly the reuse case Task Engine's own \`tasks/index.ts\` doc comment already anticipated ("a future domain module... creates one via \`createTaskUseCase.execute({..., relatedEntityType: "Event", ...})\`") — so the existing \`/api/tasks\` endpoints are used directly, with zero new Events/Meetings backend code for this feature.
+
+
+
+FILES CHANGED (full list intentionally not duplicated — see \`git diff\`): \`prisma/schema.prisma\` (5 enums, 10 tables — \`events\`, \`event\_participants\`, \`event\_checklist\_items\`, \`event\_attachments\`, \`event\_registrations\`, \`meetings\`, \`meeting\_participants\`, \`announcements\`, \`announcement\_attachments\`, \`announcement\_recipients\` — fully additive); \`src/modules/calendar/\*\*\`, \`src/modules/events/\*\*\`, \`src/modules/meetings/\*\*\`, \`src/modules/announcements/\*\*\` (four new modules: domain, application, infrastructure, presentation); \`src/modules/tasks/domain/entities.ts\` \+ \`src/modules/tasks/infrastructure/prisma-task-repository.ts\` (additive \`TaskFilters.deadlineFrom/deadlineTo\`, used only by \`TaskCalendarSource\`); \`src/lib/audit-actions.ts\` (new \`EVENT\_\*\`/\`MEETING\_\*\`/\`ANNOUNCEMENT\_\*\` actions); \`src/modules/coordinators/domain/permissions.ts\` \+ \`src/lib/coordinator-permissions.ts\` (added \`meetings.manage\`; \`events.\*\`/\`announcements.manage\` already existed, forward-declared in Phase 1); \`src/modules/notifications/\*\` (new \`ANNOUNCEMENT\_PUBLISHED\` template — the \`ANNOUNCEMENT\_POSTED\` id deferred back in V4.0 E1/E2 as "PRD-unauthorized" is superseded by this one, now that §4.5 is real); \`src/app/(calendar)/\*\*\`, \`src/app/(events)/\*\*\`, \`src/app/(meetings)/\*\*\`, \`src/app/(announcements)/\*\*\`, \`src/app/api/calendar/\*\*\`, \`src/app/api/events/\*\*\`, \`src/app/api/meetings/\*\*\`, \`src/app/api/announcements/\*\*\` (new UI + API routes).
+
+
+
+DATABASE: Migration \`20260815021931\_add\_myarch\_phase3\_calendar\_events\_meetings\_announcements\` — 5 enums, 10 tables, 17 indexes, 16 foreign keys (all to \`users\`/\`file\_assets\`/each domain's own attachment or announcement table — none to \`tasks\`, matching the FK-less polymorphic-pointer convention). Fully additive, zero drops/alters against existing data. Rehearsed against local Docker Postgres first (21 migrations applied cleanly, \`migrate status\` clean, re-diff showed only the same known, pre-existing \`searchVector\` noise), then applied to production Neon after explicit user confirmation — 21/21, zero errors, \`migrate status\` clean.
+
+
+
+APIS: \`/api/calendar\` (the one aggregated read endpoint — \`from\`/\`to\`/\`activityType\`/\`ownerId\`/\`status\`); \`/api/events\` (search, create) plus \`/[id]\`, \`/[id]/publish\`, \`/[id]/complete\`, \`/[id]/cancel\`, \`/[id]/participants(/[userId])\`, \`/[id]/checklist(/[itemId])\`, \`/[id]/attachments\`, \`/attachments/[attachmentId]\` (public file serve), \`/[id]/register\`, \`/[id]/attendance\`; \`/api/meetings\` (search, create) plus \`/[id]\`, \`/[id]/complete\`, \`/[id]/cancel\`, \`/[id]/participants(/[userId])\`, \`/[id]/attendance\`; \`/api/announcements\` (search, create) plus \`/[id]\` (GET/PATCH/DELETE), \`/[id]/attachments\`, \`/attachments/[attachmentId]\`. Every route: Route → withAuth (Authentication) → domain permission function (Authorization) → Zod schema (Validation) → use case (Service) → Prisma repository (Database) → NextResponse (Response) — no business logic in a route handler.
+
+
+
+PERMISSIONS (server-side only, never trusted from the frontend):
+
+\- Technical Secretary: unconditional full administration across all four modules.
+
+\- Coordinator: \`canManageEvent\`/\`canManageMeeting\`/\`canManageAnnouncement\` restrict full management to a delegated permission (\`events.manage\`/\`meetings.manage\`/\`announcements.manage\`) or being the organizer/author; \`canCreateEvent\` additionally recognizes the narrower \`events.create\` delegation.
+
+\- Visibility differs by module on purpose: an Event becomes visible to EVERYONE once PUBLISHED (registration is student/alumni self-service); a Meeting has NO public state at all — only management or being a listed participant grants access, ever; an Announcement is visible only while active (\`publishAt <= now\`, not yet expired) AND the viewer matches its resolved audience.
+
+\- Student/Alumni self-registration for Events (\`canRegisterForEvent\`) is separate from staff-side attendance marking — a Student can never mark their own attendance.
+
+
+
+TESTS: 15 new test files (\`tests/unit/calendar\`, \`tests/unit/events\`, \`tests/unit/meetings\`, \`tests/unit/announcements\`), 67 new tests — domain (lifecycle state machines, permission matrices for every role/delegation combination, the \`isAnnouncementActive\`/\`isActorInAudience\` pure-logic truth table), the Calendar aggregation use case (multi-source merge/sort, a rejecting source dropped without failing the whole call, defensive filtering), and key use cases per domain (create/publish/register for Events, create/complete for Meetings, create with notification-fan-out verification for Announcements) against in-memory fakes. Full repo suite: 238 test files / 1748 tests passing (the pre-existing 1681 plus these 67; a batch of 20 pre-existing, unrelated UI tests were observed to intermittently time out at the default 5000ms only under full-suite parallel load — confirmed flaky, not a regression, by passing individually and by the full suite passing clean at a 15000ms timeout).
+
+
+
+BUILD: \`npx tsc --noEmit\` clean; \`npx eslint .\` clean (project-wide, including all new modules/tests); \`npx next build\` (Turbopack) clean — \`/calendar\`, \`/events\`, \`/events/[id]\`, \`/meetings\`, \`/meetings/[id]\`, \`/announcements\`, \`/announcements/[id]\` and every corresponding \`/api/\*\` route present in the route manifest.
+
+
+
+UI: \`(calendar)\`/\`(events)\`/\`(meetings)\`/\`(announcements)\` route groups (own thin shells, matching \`(tasks)\`/\`(maintenance)\`'s precedent). The Calendar page implements all four required views (month grid, week columns, day list, rolling 30-day agenda) client-side from one server-fetched, already-sorted entry list. Event/Meeting detail pages embed their linked Task Engine rows read-only with a link out to \`/tasks\` to create one. Loading/empty/error states present throughout; mobile responsiveness inherits the same Tailwind responsive patterns used across the rest of the app, not separately verified at a mobile viewport (same honest caveat as the Phase 2 report).
+
+
+
+SECURITY: every write use case re-derives authorization from the loaded record, never trusts a client-supplied role/ownership claim. Every state-changing action is audited. Attachments are validated by MIME type and size before touching disk (10MB cap for Events/Announcements' PDF/Word/JPEG/PNG documents and media). The Calendar's per-source authorization is real, not cosmetic: \`EventCalendarSource\`/\`MeetingCalendarSource\`/\`AnnouncementCalendarSource\` each reuse their own domain's real scoping logic (\`canViewEvent\`, \`SearchMeetingsUseCase\`'s own involvingUserId scoping, \`SearchAnnouncementsUseCase\`'s own audienceScopeFor SQL translation) rather than returning an unfiltered feed and trusting the client.
+
+
+
+KNOWN ISSUES / DEFERRED (by design, stated honestly rather than silently omitted):
+
+\- Calendar sources are limited to Task Engine, Events, Meetings, and Announcements. Retrofitting existing modules to register as calendar sources — Placements' \`PlacementDrive.applicationDeadline\`, Applications' \`Application.interviewScheduledAt\`, Maintenance's issue deadlines — was explicitly scoped OUT of this phase, matching the same "don't touch what isn't yours" discipline Phase 2 applied. Elections/workshops/competitions/reviews/submissions/council activities/technical activities/project milestones named in §4.1 have no backing entity anywhere in the codebase yet; the \`CalendarActivityType\` is deliberately an open string (mirroring \`JobType\`) so a future phase can add a source for any of these without touching this module.
+
+\- The Calendar's "academic year" and "committee" filters are accepted by the query schema but not backed by real matching logic on Events/Meetings (no Batch/Committee linkage exists on either) — only Announcements' YEAR audience genuinely resolves against \`Batch\`. Committee/Council as an Announcement audience type resolves to zero recipients for the same reason — no Committee/Council table exists until Phase 4 (§5).
+
+\- A future-dated Announcement (\`publishAt\` in the future) is created and stored but does not notify anyone until a later phase adds a real scheduled-dispatch subsystem — the same class of deferral \`TASK\_DEADLINE\_APPROACHING\`'s own scheduled-check machinery represents for Task Engine, not a one-line addition to this use case.
+
+\- \`/calendar\`, \`/events\`, \`/meetings\`, \`/announcements\` are not yet linked from the (admin)/(student) sidebar navigation, for the same reason \`/tasks\`/\`/maintenance\`/\`/requests\` weren't in earlier phase reports — reachable today by direct URL or a notification's destination link.
+
+\- Announcement editing does not re-notify on update, and re-publishing after an edit is not a distinct action — \`ANNOUNCEMENT\_PUBLISHED\` fires exactly once, at creation, for an immediately-active announcement.
+
+
+
+ACCEPTANCE (reasonable criteria for this phase, since the roadmap defines none explicitly for \# 4 — verified): the calendar aggregates every registered source into one view with month/week/day/agenda — yes (tested, built). Events can be planned end-to-end (create, staff/volunteers, checklist, budget, documents/media, registration, attendance, post-event report) — yes (tested, built). Event tasks use the shared Task Engine, not a parallel system — yes (zero new task code). Meetings can be scheduled, run, and recorded (participants, agenda, attendance, notes, decisions) — yes (tested, built). Meeting action items use the shared Task Engine — yes, per the roadmap's own explicit instruction. Announcements can be authored, targeted to a real audience, and notify that audience — yes (tested, built) for EVERYONE/YEAR/COORDINATORS/SELECTED\_GROUP; honestly not yet for PROGRAM/COMMITTEE/COUNCIL (see KNOWN ISSUES). Authorization works — yes (dedicated permission tests for every role/delegation/audience combination). Audit works — yes (\`AUDIT\_ACTIONS.EVENT\_\*\`/\`MEETING\_\*\`/\`ANNOUNCEMENT\_\*\`). Mobile workflow works — inherited, not independently verified (see UI note above).
+
+
+
+NEXT: \# 5 — PHASE 4 (COUNCIL \& COMMITTEES). Not started, per explicit instruction not to begin it automatically in this session.
+
+
+
+\---
+
+
+
+\## ACCEPTANCE
+
+
+
+\- calendar aggregates every source into month/week/day/agenda views
+
+\- events can be planned end-to-end (staff, checklist, budget, documents/media, registration, attendance, report)
+
+\- event tasks use the shared Task/Follow-up system
+
+\- meetings can be scheduled, run, and recorded
+
+\- meeting action items use the shared Task/Follow-up system
+
+\- announcements can be authored, targeted, and notify their audience
+
+\- authorization works
+
+\- audit works
+
+\- mobile workflow works
 
 
 
