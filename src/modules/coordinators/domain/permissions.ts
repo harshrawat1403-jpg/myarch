@@ -67,6 +67,12 @@ export const COORDINATOR_PERMISSION_KEYS = [
   "inventory.manage",
 
   "announcements.manage",
+
+  // MYARCH Phase 4 (§5) — Council & Committees, added now that a real phase
+  // needs it (not speculative — see this file's own doc comment). No
+  // granular split requested, mirroring announcements.manage's own
+  // single-key shape.
+  "committees.manage",
 ] as const;
 
 export type CoordinatorPermissionKey = (typeof COORDINATOR_PERMISSION_KEYS)[number];
