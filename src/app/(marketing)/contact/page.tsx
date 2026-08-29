@@ -10,6 +10,10 @@ import { ImagePlaceholder } from "@/components/public/image-placeholder";
 import { SectionIntro } from "@/components/public/section-intro";
 import { FaqAccordion } from "@/components/public/faq-accordion";
 import { ContactForm } from "@/components/public/contact-form";
+import { PageOverridesProvider } from "@/components/edit-mode/page-overrides-context";
+import { EditableText } from "@/components/edit-mode/editable-text";
+import { EditableImage } from "@/components/edit-mode/editable-image";
+import { getPageContentOverridesUseCase } from "@/modules/content-overrides";
 import { DEPARTMENT_EMAIL } from "@/lib/public-content";
 import {
   CONTACT_HERO,
@@ -25,7 +29,13 @@ import {
   TPO_EMAIL,
 } from "@/lib/contact-content";
 
+// MYARCH Edit Mode: read live content overrides on every request — see
+// /about's own doc comment for why (otherwise a Publish never reaches
+// visitors until the next deploy).
+export const dynamic = "force-dynamic";
+
 const ROUTE_ICONS: LucideIcon[] = [HelpCircle, Building2, GraduationCap];
+const PAGE = "contact";
 
 /**
  * `/contact` (Version 2.0 editorial pass) — a Server Component apart from
@@ -42,16 +52,34 @@ const ROUTE_ICONS: LucideIcon[] = [HelpCircle, Building2, GraduationCap];
  * the second-to-last thing a visitor scrolls to. The "map integration
  * pending" honesty note (no fabricated embed) is preserved verbatim, now
  * as a large `ImagePlaceholder` rather than a small bordered box.
+ *
+ * MYARCH Edit Mode — an async Server Component, same pattern as the other
+ * content pages. Editable: hero, the office location image, and the
+ * closing message. Contact panels, the form, enquiry routes, and the FAQ
+ * are left as static this pass (same reasoning as the other pages).
  */
-export default function ContactPage() {
+export default async function ContactPage() {
+  const overrides = await getPageContentOverridesUseCase.execute(PAGE);
+
   return (
-    <>
+    <PageOverridesProvider page={PAGE} overrides={overrides}>
       {/* 1 — Hero: centered, no image — calm by design. */}
       <section className="bg-(--color-surface)">
         <PageContainer className="py-20 text-center lg:py-28">
-          <DataLabel className="text-center text-(--color-accent)">{CONTACT_HERO.eyebrow}</DataLabel>
-          <PageTitle className="mx-auto mt-5 max-w-2xl text-balance text-4xl leading-[1.05] lg:text-5xl">{CONTACT_HERO.title}</PageTitle>
-          <p className="mx-auto mt-6 max-w-xl text-base text-(--color-text-secondary) lg:text-lg">{CONTACT_HERO.subhead}</p>
+          <EditableText contentKey="hero.eyebrow" defaultValue={CONTACT_HERO.eyebrow} as="label" className="text-center text-(--color-accent)" />
+          <EditableText
+            contentKey="hero.title"
+            defaultValue={CONTACT_HERO.title}
+            as="h1"
+            className="mx-auto mt-5 block max-w-2xl text-balance text-4xl leading-[1.05] lg:text-5xl"
+          />
+          <EditableText
+            contentKey="hero.subhead"
+            defaultValue={CONTACT_HERO.subhead}
+            as="p"
+            multiline
+            className="mx-auto mt-6 block max-w-xl text-base text-(--color-text-secondary) lg:text-lg"
+          />
         </PageContainer>
       </section>
 
@@ -103,7 +131,7 @@ export default function ContactPage() {
       <Section className="border-t border-(--color-border) bg-(--color-surface-muted)">
         <SectionIntro title="Office Location & Hours" />
         <div className="grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16">
-          <ImagePlaceholder label={LOCATION_IMAGE_LABEL} aspect="square" tone="cool" />
+          <EditableImage contentKey="location.image" fallback={<ImagePlaceholder label={LOCATION_IMAGE_LABEL} aspect="square" tone="cool" />} />
           <div>
             <DataLabel>Address</DataLabel>
             <address className="mt-2 text-sm not-italic text-(--color-text-secondary)">
@@ -135,8 +163,8 @@ export default function ContactPage() {
           ends the same way it started. */}
       <section className="border-t border-(--color-border) bg-(--color-surface-muted)">
         <PageContainer className="py-20 text-center lg:py-28">
-          <SectionHeading className="mx-auto max-w-xl text-2xl lg:text-3xl">{CONTACT_CTA.title}</SectionHeading>
-          <p className="mx-auto mt-4 max-w-md text-(--color-text-secondary)">{CONTACT_CTA.description}</p>
+          <EditableText contentKey="cta.title" defaultValue={CONTACT_CTA.title} as="h2" className="mx-auto max-w-xl text-2xl lg:text-3xl" />
+          <EditableText contentKey="cta.description" defaultValue={CONTACT_CTA.description} as="p" multiline className="mx-auto mt-4 block max-w-md text-(--color-text-secondary)" />
           <div className="mt-8 flex flex-wrap items-center justify-center gap-6">
             <Link href={`mailto:${TPO_EMAIL}`} className={buttonClassName("primary", "px-8 py-3 text-base")}>
               Email the Placement Cell
@@ -150,6 +178,6 @@ export default function ContactPage() {
           </div>
         </PageContainer>
       </section>
-    </>
+    </PageOverridesProvider>
   );
 }

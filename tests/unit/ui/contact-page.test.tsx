@@ -1,21 +1,25 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
+import { ToastProvider } from "../../../src/components/ui/toast";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+vi.mock("@/modules/auth/client", () => ({ useAuth: () => ({ role: null, accessToken: null }) }));
+vi.mock("@/modules/content-overrides", () => ({ getPageContentOverridesUseCase: { execute: vi.fn().mockResolvedValue({}) } }));
+
 import ContactPage from "../../../src/app/(marketing)/contact/page";
 
 describe("Contact page (/contact)", () => {
-  it("renders exactly one h1", () => {
-    render(<ContactPage />);
+  it("renders exactly one h1", async () => {
+    render(<ToastProvider>{await ContactPage()}</ToastProvider>);
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
-  it("renders every required section as an h2", () => {
-    render(<ContactPage />);
+  it("renders every required section as an h2", async () => {
+    render(<ToastProvider>{await ContactPage()}</ToastProvider>);
 
     const h2Labels = [
       "Contact Information",
@@ -30,26 +34,26 @@ describe("Contact page (/contact)", () => {
     }
   });
 
-  it("renders both contact panels with correct mailto links", () => {
-    render(<ContactPage />);
+  it("renders both contact panels with correct mailto links", async () => {
+    render(<ToastProvider>{await ContactPage()}</ToastProvider>);
     expect(screen.getByRole("link", { name: "contact@tnparch.in" })).toHaveAttribute("href", "mailto:contact@tnparch.in");
     expect(screen.getByRole("link", { name: "placements@tnparch.in" })).toHaveAttribute("href", "mailto:placements@tnparch.in");
   });
 
-  it("renders all three enquiry routing cards", () => {
-    render(<ContactPage />);
+  it("renders all three enquiry routing cards", async () => {
+    render(<ToastProvider>{await ContactPage()}</ToastProvider>);
     for (const title of ["General Enquiries", "Recruiter Enquiries", "Student Support"]) {
       expect(screen.getByRole("heading", { level: 3, name: title })).toBeInTheDocument();
     }
   });
 
-  it("renders the contact form", () => {
-    render(<ContactPage />);
+  it("renders the contact form", async () => {
+    render(<ToastProvider>{await ContactPage()}</ToastProvider>);
     expect(screen.getByRole("button", { name: /send message/i })).toBeInTheDocument();
   });
 
-  it("does not fabricate a map embed or a phone number", () => {
-    render(<ContactPage />);
+  it("does not fabricate a map embed or a phone number", async () => {
+    render(<ToastProvider>{await ContactPage()}</ToastProvider>);
     // The map slot is a placeholder (ImagePlaceholder renders no visible
     // caption — see that component's own doc comment); the honest "not
     // real yet" disclosure survives as its accessible name, not as painted
@@ -59,8 +63,8 @@ describe("Contact page (/contact)", () => {
     expect(screen.getByText(/phone contact details are being finalised/i)).toBeInTheDocument();
   });
 
-  it("the closing CTA links to the Placement Cell and to Placements", () => {
-    render(<ContactPage />);
+  it("the closing CTA links to the Placement Cell and to Placements", async () => {
+    render(<ToastProvider>{await ContactPage()}</ToastProvider>);
     expect(screen.getByRole("link", { name: /email the placement cell/i })).toHaveAttribute(
       "href",
       "mailto:placements@tnparch.in",

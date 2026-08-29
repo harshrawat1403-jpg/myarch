@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { PublicNav } from "@/components/public/public-nav";
 import { Footer } from "@/components/public/footer";
+import { EditModeProvider } from "@/components/edit-mode/edit-mode-context";
+import { EditModeToolbar } from "@/components/edit-mode/edit-mode-toolbar";
 
 /**
  * The public marketing site's shared shell — Milestone 1 of V1.1
@@ -27,21 +29,31 @@ import { Footer } from "@/components/public/footer";
  * this milestone's report for the full reasoning; flag if animated
  * transitions were actually intended, since that would be a deviation from
  * the approved spec this file does not make silently.
+ *
+ * MYARCH Edit Mode — `EditModeProvider` wraps the whole shell (not just
+ * `children`) so `EditModeToolbar` and every page's content share one
+ * `isActive`/Preview/pending-count state. Reached the same way a Secretary
+ * already reaches the public site today (`SheetLayout`'s "visit public
+ * website" link) — no new dashboard route, no page-builder, no CMS. See
+ * `src/components/edit-mode/edit-mode-context.tsx`.
  */
 export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-(--color-background) text-(--color-text-primary)">
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-(--color-accent) focus:px-4 focus:py-2 focus:text-(--color-background)"
-      >
-        Skip to main content
-      </a>
-      <PublicNav />
-      <main id="main-content" className="flex-1">
-        {children}
-      </main>
-      <Footer />
-    </div>
+    <EditModeProvider>
+      <div className="flex min-h-screen flex-col bg-(--color-background) text-(--color-text-primary)">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-(--color-accent) focus:px-4 focus:py-2 focus:text-(--color-background)"
+        >
+          Skip to main content
+        </a>
+        <PublicNav />
+        <main id="main-content" className="flex-1">
+          {children}
+        </main>
+        <Footer />
+        <EditModeToolbar />
+      </div>
+    </EditModeProvider>
   );
 }

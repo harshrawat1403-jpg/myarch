@@ -358,6 +358,9 @@ model User {
   announcementsAuthored Announcement[]           @relation("AnnouncementAuthor")
   announcementRecipient AnnouncementRecipient[]  @relation("AnnouncementRecipientUser")
 
+  // MYARCH Edit Mode — inline content overrides for existing public pages.
+  updatedContentOverrides ContentOverride[] @relation("ContentOverrideUpdatedBy")
+
   @@map("users")
 }
 
@@ -798,6 +801,8 @@ model FileAsset {
   usedAsRequestAttachmentOf     RequestAttachment[]     @relation("RequestAttachmentFile")
   usedAsEventAttachmentOf        EventAttachment[]        @relation("EventAttachmentFile")
   usedAsAnnouncementAttachmentOf AnnouncementAttachment[] @relation("AnnouncementAttachmentFile")
+  usedAsContentOverrideOf      ContentOverride[] @relation("ContentOverrideFile")
+  usedAsContentOverrideDraftOf ContentOverride[] @relation("ContentOverrideDraftFile")
 
   @@index([ownerUserId])
   @@map("file_assets")
@@ -1733,4 +1738,59 @@ model PublicationExport {
 
   @@index([publicationId])
   @@map("publication_exports")
+}
+
+// ---------------------------------------------------------------------------
+// MYARCH Edit Mode (SECRETARY-only inline content editing) — corrected
+// architecture plan. The public site stays 100% developer-built React
+// pages/layouts/components; this is NOT a page-builder or CMS. A single
+// flat key-value table holds only the fields a Secretary has actually
+// overridden — `page` + `contentKey` identify one existing piece of
+// developer-authored text/image (e.g. page "about", contentKey
+// "hero.title"); when no row exists, the page's own hardcoded default
+// value renders, so the site is fully functional even if this table is
+// empty or unreachable. No draft/publish/version distinction — a save is
+// immediately live, matching "the public site simply displays the latest
+// saved content." Removing an override deletes the row (reverting to the
+// code-defined default) rather than storing an empty value.
+// ---------------------------------------------------------------------------
+
+enum ContentOverrideType {
+  TEXT
+  IMAGE
+}
+
+model ContentOverride {
+  id         String              @id @default(uuid()) @db.Uuid
+  page       String
+  contentKey String
+  type       ContentOverrideType
+
+  // Published (live) — what every public visitor, and every non-previewing
+  // Secretary, sees. Untouched by a field-level Save; only Publish writes
+  // here. Exactly one of textValue/fileId is set, matching `type`.
+  textValue String?
+  fileId    String?    @db.Uuid
+  file      FileAsset? @relation("ContentOverrideFile", fields: [fileId], references: [id])
+
+  // Draft (pending, unpublished) — added on top of the same row rather
+  // than a second table/version history (MYARCH Edit Mode draft/preview/
+  // publish pass). Only ever read by the SECRETARY-only preview/summary
+  // endpoints. hasDraftChange distinguishes "no pending edit" from "a
+  // pending edit whose value is empty" (a staged Reset — draftTextValue/
+  // draftFileId both null, but still a real pending state, not "no draft").
+  hasDraftChange Boolean    @default(false)
+  draftTextValue String?
+  draftFileId    String?    @db.Uuid
+  draftFile      FileAsset? @relation("ContentOverrideDraftFile", fields: [draftFileId], references: [id])
+
+  updatedByUserId String   @db.Uuid
+  updatedBy       User     @relation("ContentOverrideUpdatedBy", fields: [updatedByUserId], references: [id])
+  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now())
+
+  @@unique([page, contentKey])
+  @@index([page])
+  @@index([hasDraftChange])
+  @@map("content_overrides")
 }

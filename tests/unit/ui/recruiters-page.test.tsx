@@ -1,16 +1,21 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { ToastProvider } from "../../../src/components/ui/toast";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/modules/auth/client", () => ({ useAuth: () => ({ role: null, accessToken: null }) }));
+vi.mock("@/modules/content-overrides", () => ({ getPageContentOverridesUseCase: { execute: vi.fn().mockResolvedValue({}) } }));
+
 import RecruitersPage from "../../../src/app/(marketing)/recruiters/page";
 
 describe("Recruiters page (/recruiters)", () => {
-  it("renders exactly one h1", () => {
-    render(<RecruitersPage />);
+  it("renders exactly one h1", async () => {
+    render(<ToastProvider>{await RecruitersPage()}</ToastProvider>);
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
-  it("renders every required section as an h2", () => {
-    render(<RecruitersPage />);
+  it("renders every required section as an h2", async () => {
+    render(<ToastProvider>{await RecruitersPage()}</ToastProvider>);
 
     const h2Labels = [
       "Why Recruit From VNIT Architecture",
@@ -28,15 +33,15 @@ describe("Recruiters page (/recruiters)", () => {
     }
   });
 
-  it("reuses the exact 'Why Recruit' content from Home, not a rewritten copy", () => {
-    render(<RecruitersPage />);
+  it("reuses the exact 'Why Recruit' content from Home, not a rewritten copy", async () => {
+    render(<ToastProvider>{await RecruitersPage()}</ToastProvider>);
     for (const title of ["Rigorous Design Training", "Software Fluency", "Studio Culture", "Design Thinking"]) {
       expect(screen.getByRole("heading", { level: 3, name: title })).toBeInTheDocument();
     }
   });
 
-  it("reuses the same skill matrix and software ecosystem content as Students", () => {
-    render(<RecruitersPage />);
+  it("reuses the same skill matrix and software ecosystem content as Students", async () => {
+    render(<ToastProvider>{await RecruitersPage()}</ToastProvider>);
     expect(screen.getByText("Design & Drafting")).toBeInTheDocument();
     expect(screen.getByText("Architectural drawing")).toBeInTheDocument();
     for (const tool of ["AutoCAD", "Revit", "SketchUp", "Rhino / Grasshopper"]) {
@@ -44,8 +49,8 @@ describe("Recruiters page (/recruiters)", () => {
     }
   });
 
-  it("reuses the recruiter engagement workflow steps from Placements, in order", () => {
-    render(<RecruitersPage />);
+  it("reuses the recruiter engagement workflow steps from Placements, in order", async () => {
+    render(<ToastProvider>{await RecruitersPage()}</ToastProvider>);
     const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
     const steps = ["Request Access", "Schedule a Drive", "Review & Shortlist", "Interview & Offer"];
     const indices = steps.map((s) => headings.indexOf(s));
@@ -53,8 +58,8 @@ describe("Recruiters page (/recruiters)", () => {
     expect(indices).toEqual([...indices].sort((a, b) => a - b));
   });
 
-  it("renders all 4 hiring models with commitment and duration details", () => {
-    render(<RecruitersPage />);
+  it("renders all 4 hiring models with commitment and duration details", async () => {
+    render(<ToastProvider>{await RecruitersPage()}</ToastProvider>);
     for (const title of ["Full-Time Placement", "Pre-Placement Internship", "Internship Only", "Sponsored Studio Project"]) {
       expect(screen.getByRole("heading", { level: 3, name: title })).toBeInTheDocument();
     }
@@ -62,15 +67,15 @@ describe("Recruiters page (/recruiters)", () => {
     expect(screen.getAllByText("Duration").length).toBe(4);
   });
 
-  it("renders 6 FAQ items, reusing 4 from Placements and adding 2 new ones", () => {
-    render(<RecruitersPage />);
+  it("renders 6 FAQ items, reusing 4 from Placements and adding 2 new ones", async () => {
+    render(<ToastProvider>{await RecruitersPage()}</ToastProvider>);
     expect(document.querySelectorAll("details").length).toBe(6);
     expect(screen.getByText("Who can access the student directory?")).toBeInTheDocument();
     expect(screen.getByText("How do we schedule a pre-placement talk?")).toBeInTheDocument();
   });
 
-  it("the closing CTA links to Contact and Placements", () => {
-    render(<RecruitersPage />);
+  it("the closing CTA links to Contact and Placements", async () => {
+    render(<ToastProvider>{await RecruitersPage()}</ToastProvider>);
     expect(screen.getByRole("link", { name: /request recruiter access/i })).toHaveAttribute("href", "/contact");
     expect(screen.getByRole("link", { name: /see placement outcomes/i })).toHaveAttribute("href", "/placements");
   });

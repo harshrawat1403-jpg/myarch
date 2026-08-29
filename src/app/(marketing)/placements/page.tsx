@@ -8,6 +8,10 @@ import { ImagePlaceholder } from "@/components/public/image-placeholder";
 import { SectionIntro } from "@/components/public/section-intro";
 import { ProcessSteps } from "@/components/public/process-steps";
 import { FaqAccordion } from "@/components/public/faq-accordion";
+import { PageOverridesProvider } from "@/components/edit-mode/page-overrides-context";
+import { EditableText } from "@/components/edit-mode/editable-text";
+import { EditableImage } from "@/components/edit-mode/editable-image";
+import { getPageContentOverridesUseCase } from "@/modules/content-overrides";
 import { PLACEMENT_STATS, RECRUITING_CATEGORIES } from "@/lib/public-content";
 import {
   PLACEMENTS_HERO,
@@ -22,56 +26,67 @@ import {
   PLACEMENTS_CTA,
 } from "@/lib/placements-content";
 
+// MYARCH Edit Mode: read live content overrides on every request — see
+// /about's own doc comment for why (otherwise a Publish never reaches
+// visitors until the next deploy).
+export const dynamic = "force-dynamic";
+
 const STATS_CAPTION = "Illustrative figures — verified department statistics to follow.";
 const IMAGE_TONES = ["violet", "amber", "cool"] as const;
 const STAT_ICONS: LucideIcon[] = [Award, Users2, Wallet];
+const PAGE = "placements";
 
 /**
- * `/placements` (Version 2.0 editorial pass) — a pure Server Component,
- * same rationale as About: nothing here depends on auth state.
- *
- * Inherits Home/About's language: the same asymmetric hero, the same
- * plain typographic stats band as Home's (identical `PLACEMENT_STATS`
- * data — same treatment, not a second invented layout for the same
- * numbers), the same full-bleed closing band instead of `CtaPanel`.
- * Specific to this page's trust-building purpose: an honest "Success
- * Stories" panel row (editable placeholders, never fabricated names or
- * quotes) and an editable recruiter-logo grid — both explicitly asked
- * for and absent from the page before this pass. Student Preparation and
- * Recruiter Engagement — two parallel step sequences — are placed side by
- * side as a comparison layout instead of two consecutive identical
- * timelines, which is also why they use a compact vertical list rather
- * than `ProcessSteps`; the page's main Placement Process keeps the
- * horizontal `ProcessSteps` timeline as its one prominent flow diagram.
+ * `/placements` (Version 2.0 editorial pass) — an async Server Component
+ * (MYARCH Edit Mode), same one-fetch-then-thread pattern as `/about`. Not
+ * every element on this page is wrapped: `ProcessSteps`/`FaqAccordion` render
+ * their own internal structure from a `steps`/`items` array prop — making
+ * those editable would mean reworking the shared components themselves
+ * (used by Students too), out of scope for this pass. Everything else —
+ * hero, stats, success stories, internship spread, recruiter logos, the two
+ * comparison step lists, and the closing band — is editable.
  */
-export default function PlacementsPage() {
+export default async function PlacementsPage() {
+  const overrides = await getPageContentOverridesUseCase.execute(PAGE);
+
   return (
-    <>
+    <PageOverridesProvider page={PAGE} overrides={overrides}>
       {/* 1 — Hero: same asymmetric shape as Home/About. */}
       <section className="relative overflow-hidden bg-(--color-surface)">
         <div className="grid lg:grid-cols-2 lg:items-stretch">
           <div className="flex flex-col justify-center px-4 py-16 sm:px-8 lg:px-16 lg:py-24">
-            <DataLabel className="text-(--color-accent)">{PLACEMENTS_HERO.eyebrow}</DataLabel>
-            <PageTitle className="mt-6 text-4xl font-bold leading-[1.05] tracking-tight lg:text-6xl">
-              {PLACEMENTS_HERO.title}
-            </PageTitle>
-            <p className="mt-6 max-w-md text-base text-(--color-text-secondary) lg:text-lg">{PLACEMENTS_HERO.subhead}</p>
+            <EditableText contentKey="hero.eyebrow" defaultValue={PLACEMENTS_HERO.eyebrow} as="label" className="text-(--color-accent)" />
+            <EditableText
+              contentKey="hero.title"
+              defaultValue={PLACEMENTS_HERO.title}
+              as="h1"
+              className="mt-6 text-4xl font-bold leading-[1.05] tracking-tight lg:text-6xl"
+            />
+            <EditableText
+              contentKey="hero.subhead"
+              defaultValue={PLACEMENTS_HERO.subhead}
+              as="p"
+              multiline
+              className="mt-6 block max-w-md text-base text-(--color-text-secondary) lg:text-lg"
+            />
           </div>
           <div className="h-[20rem] sm:h-[26rem] lg:h-auto">
-            <ImagePlaceholder label={PLACEMENTS_HERO.imageLabel} aspect="auto" tone="bold" rounded={false} className="h-full w-full" />
+            <EditableImage
+              contentKey="hero.image"
+              className="h-full w-full"
+              fallback={<ImagePlaceholder label={PLACEMENTS_HERO.imageLabel} aspect="auto" tone="bold" rounded={false} className="h-full w-full" />}
+            />
           </div>
         </div>
       </section>
 
-      {/* 2 — Placement Process: the page's one prominent horizontal
-          timeline. */}
+      {/* 2 — Placement Process: the page's one prominent horizontal timeline. */}
       <Section className="border-t border-(--color-border)">
         <SectionIntro title="Placement Process" />
         <ProcessSteps steps={PLACEMENT_PROCESS_STEPS} />
       </Section>
 
-      {/* 3 — Placement Statistics: the same plain typographic band as
-          Home's — identical data, identical treatment. */}
+      {/* 3 — Placement Statistics: the same plain typographic band as Home's. */}
       <section className="border-y border-(--color-border) bg-(--color-surface-muted)">
         <PageContainer className="py-14 lg:py-20">
           <SectionHeading className="text-xs font-semibold uppercase tracking-[0.08em] text-(--color-text-secondary)">
@@ -83,10 +98,13 @@ export default function PlacementsPage() {
               return (
                 <div key={stat.label} className="sm:border-l sm:border-(--color-border) sm:pl-8 sm:first:border-l-0 sm:first:pl-0">
                   {StatIcon && <StatIcon aria-hidden="true" size={22} strokeWidth={1.75} className="text-(--color-accent)" />}
-                  <p className="mt-3 font-[family-name:var(--font-display)] text-6xl font-bold tracking-tight text-(--color-text-primary) lg:text-7xl">
-                    {stat.value}
-                  </p>
-                  <p className="mt-2 text-sm font-medium text-(--color-text-primary)">{stat.label}</p>
+                  <EditableText
+                    contentKey={`stats.${i}.value`}
+                    defaultValue={stat.value}
+                    as="p"
+                    className="mt-3 block font-[family-name:var(--font-display)] text-6xl font-bold tracking-tight text-(--color-text-primary) lg:text-7xl"
+                  />
+                  <EditableText contentKey={`stats.${i}.label`} defaultValue={stat.label} as="p" className="mt-2 block text-sm font-medium text-(--color-text-primary)" />
                   <p className="mt-1 text-xs text-(--color-text-secondary)">{stat.scope}</p>
                 </div>
               );
@@ -96,15 +114,17 @@ export default function PlacementsPage() {
         </PageContainer>
       </section>
 
-      {/* 4 — Success Stories: honest highlight panels — editable
-          placeholders, never fabricated testimonials. */}
+      {/* 4 — Success Stories: honest highlight panels — editable placeholders, never fabricated testimonials. */}
       <Section className="border-t border-(--color-border)">
         <SectionIntro title="Success Stories" description="Placement outcomes will appear here as they're confirmed." />
         <div className="grid gap-6 sm:grid-cols-3">
           {SUCCESS_STORIES.map((story, i) => (
             <div key={i} className="overflow-hidden rounded-[28px] border border-(--color-border) bg-(--color-surface) shadow-sm">
-              <ImagePlaceholder label={story.imageLabel} aspect="square" tone={IMAGE_TONES[i % IMAGE_TONES.length]} tag={false} rounded={false} />
-              <p className="p-6 text-center text-sm font-medium text-(--color-text-secondary)">{story.role}</p>
+              <EditableImage
+                contentKey={`successStories.${i}.image`}
+                fallback={<ImagePlaceholder label={story.imageLabel} aspect="square" tone={IMAGE_TONES[i % IMAGE_TONES.length]} tag={false} rounded={false} />}
+              />
+              <EditableText contentKey={`successStories.${i}.role`} defaultValue={story.role} as="p" className="block p-6 text-center text-sm font-medium text-(--color-text-secondary)" />
             </div>
           ))}
         </div>
@@ -113,38 +133,32 @@ export default function PlacementsPage() {
       {/* 5 — Internship Opportunities: an editorial image+text spread. */}
       <Section className="border-t border-(--color-border) bg-(--color-surface-muted)">
         <div className="grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16">
-          <ImagePlaceholder label={INTERNSHIP_IMAGE_LABEL} aspect="square" tone="cool" />
+          <EditableImage contentKey="internship.image" fallback={<ImagePlaceholder label={INTERNSHIP_IMAGE_LABEL} aspect="square" tone="cool" />} />
           <div>
             <SectionIntro title="Internship Opportunities" />
-            <p className="text-(--color-text-secondary)">{INTERNSHIP_OVERVIEW}</p>
+            <EditableText contentKey="internship.overview" defaultValue={INTERNSHIP_OVERVIEW} as="p" multiline className="block text-(--color-text-secondary)" />
           </div>
         </div>
       </Section>
 
-      {/* 6 — Recruiter Categories: a tag row plus an editable
-          recruiter-logo grid. */}
+      {/* 6 — Recruiter Categories: a tag row plus an editable recruiter-logo grid. */}
       <Section className="border-t border-(--color-border)">
         <SectionIntro title="Recruiter Categories" />
         <div className="flex flex-wrap gap-2">
           {RECRUITING_CATEGORIES.map((category) => (
-            <span
-              key={category}
-              className="rounded-full border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-xs text-(--color-text-secondary) shadow-sm"
-            >
+            <span key={category} className="rounded-full border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-xs text-(--color-text-secondary) shadow-sm">
               {category}
             </span>
           ))}
         </div>
         <div className="mt-10 grid grid-cols-3 gap-4 sm:grid-cols-6">
           {Array.from({ length: RECRUITER_LOGO_COUNT }).map((_, i) => (
-            <ImagePlaceholder key={i} label="Replace Logo" aspect="square" tag={false} tone={IMAGE_TONES[i % IMAGE_TONES.length]} />
+            <EditableImage key={i} contentKey={`recruiterLogos.${i}`} fallback={<ImagePlaceholder label="Replace Logo" aspect="square" tag={false} tone={IMAGE_TONES[i % IMAGE_TONES.length]} />} />
           ))}
         </div>
       </Section>
 
-      {/* 7 — Student Preparation Process + Recruiter Engagement
-          Workflow: a side-by-side comparison layout — two parallel
-          journeys, not two consecutive identical timelines. */}
+      {/* 7 — Student Preparation Process + Recruiter Engagement Workflow. */}
       <Section className="border-t border-(--color-border) bg-(--color-surface-muted)">
         <div className="grid gap-12 lg:grid-cols-2 lg:gap-16">
           <div>
@@ -156,8 +170,8 @@ export default function PlacementsPage() {
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <div>
-                    <CardTitle>{step.title}</CardTitle>
-                    <p className="mt-1 text-sm text-(--color-text-secondary)">{step.description}</p>
+                    <EditableText contentKey={`studentPrep.${i}.title`} defaultValue={step.title} as="h3" />
+                    <EditableText contentKey={`studentPrep.${i}.description`} defaultValue={step.description} as="p" multiline className="mt-1 block text-sm text-(--color-text-secondary)" />
                   </div>
                 </div>
               ))}
@@ -172,8 +186,8 @@ export default function PlacementsPage() {
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <div>
-                    <CardTitle>{step.title}</CardTitle>
-                    <p className="mt-1 text-sm text-(--color-text-secondary)">{step.description}</p>
+                    <EditableText contentKey={`recruiterEngagement.${i}.title`} defaultValue={step.title} as="h3" />
+                    <EditableText contentKey={`recruiterEngagement.${i}.description`} defaultValue={step.description} as="p" multiline className="mt-1 block text-sm text-(--color-text-secondary)" />
                   </div>
                 </div>
               ))}
@@ -182,7 +196,7 @@ export default function PlacementsPage() {
         </div>
       </Section>
 
-      {/* 8 — FAQ: a narrow, centered accordion. */}
+      {/* 8 — FAQ: a narrow, centered accordion (not editable this pass — see doc comment). */}
       <Section className="border-t border-(--color-border)">
         <SectionIntro title="Frequently Asked Questions" />
         <div className="mx-auto max-w-3xl">
@@ -192,21 +206,22 @@ export default function PlacementsPage() {
 
       {/* 9 — Closing: the same full-bleed color band as Home/About. */}
       <section className="relative overflow-hidden">
-        <ImagePlaceholder label={PLACEMENTS_CTA.imageLabel} aspect="auto" tone="bold" rounded={false} minimal className="h-[22rem] w-full lg:h-[26rem]" />
+        <EditableImage
+          contentKey="cta.image"
+          className="h-[22rem] w-full lg:h-[26rem]"
+          fallback={<ImagePlaceholder label={PLACEMENTS_CTA.imageLabel} aspect="auto" tone="bold" rounded={false} minimal className="h-[22rem] w-full lg:h-[26rem]" />}
+        />
         <div className="absolute inset-0 flex items-center">
           <PageContainer>
             <div className="max-w-xl">
-              <DataLabel className="text-white/80">{PLACEMENTS_CTA.eyebrow}</DataLabel>
-              <SectionHeading className="mt-3 text-3xl text-white lg:text-4xl">{PLACEMENTS_CTA.title}</SectionHeading>
-              <p className="mt-4 text-white/85">{PLACEMENTS_CTA.description}</p>
+              <EditableText contentKey="cta.eyebrow" defaultValue={PLACEMENTS_CTA.eyebrow} as="label" className="text-white/80" />
+              <EditableText contentKey="cta.title" defaultValue={PLACEMENTS_CTA.title} as="h2" className="mt-3 text-3xl text-white lg:text-4xl" />
+              <EditableText contentKey="cta.description" defaultValue={PLACEMENTS_CTA.description} as="p" multiline className="mt-4 block text-white/85" />
               <div className="mt-8 flex flex-wrap items-center gap-6">
                 <Link href="/contact" className={buttonClassName("secondary", "px-8 py-3 text-base")}>
                   Request Recruiter Access
                 </Link>
-                <Link
-                  href="/login"
-                  className="text-sm font-semibold text-white underline-offset-4 transition-opacity duration-150 hover:underline hover:opacity-90"
-                >
+                <Link href="/login" className="text-sm font-semibold text-white underline-offset-4 transition-opacity duration-150 hover:underline hover:opacity-90">
                   Student Sign In
                 </Link>
               </div>
@@ -214,6 +229,6 @@ export default function PlacementsPage() {
           </PageContainer>
         </div>
       </section>
-    </>
+    </PageOverridesProvider>
   );
 }
