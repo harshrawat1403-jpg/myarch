@@ -8,6 +8,7 @@ import { PrismaAnnouncementRepository } from "./prisma-announcement-repository";
 import { PrismaAnnouncementAttachmentRepository } from "./prisma-announcement-attachment-repository";
 import { PrismaAnnouncementRecipientRepository } from "./prisma-announcement-recipient-repository";
 import { PrismaStudentBatchLookup } from "./prisma-student-batch-lookup";
+import { PrismaCommitteeMembershipLookup } from "./prisma-committee-membership-lookup";
 import { PrismaAudienceRecipientResolver } from "./prisma-audience-recipient-resolver";
 import { AnnouncementCalendarSource } from "./announcement-calendar-source";
 import { CreateAnnouncementUseCase } from "../application/use-cases/create-announcement";
@@ -21,10 +22,13 @@ const announcementRepository = new PrismaAnnouncementRepository(prisma);
 export const announcementAttachmentRepository = new PrismaAnnouncementAttachmentRepository(prisma);
 const announcementRecipientRepository = new PrismaAnnouncementRecipientRepository(prisma);
 const studentBatchLookup = new PrismaStudentBatchLookup(prisma);
+const committeeMembershipLookup = new PrismaCommitteeMembershipLookup(prisma);
 const audienceRecipientResolver = new PrismaAudienceRecipientResolver(prisma);
 const auditRecorder = new PrismaAuditRecorder(prisma);
 
-calendarSourceRegistry.register(new AnnouncementCalendarSource({ announcementRepository, studentBatchLookup }));
+calendarSourceRegistry.register(
+  new AnnouncementCalendarSource({ announcementRepository, studentBatchLookup, committeeMembershipLookup }),
+);
 
 export const createAnnouncementUseCase = new CreateAnnouncementUseCase({
   announcementRepository,
@@ -44,8 +48,13 @@ export const getAnnouncementUseCase = new GetAnnouncementUseCase({
   announcementAttachmentRepository,
   announcementRecipientRepository,
   studentBatchLookup,
+  committeeMembershipLookup,
 });
-export const searchAnnouncementsUseCase = new SearchAnnouncementsUseCase({ announcementRepository, studentBatchLookup });
+export const searchAnnouncementsUseCase = new SearchAnnouncementsUseCase({
+  announcementRepository,
+  studentBatchLookup,
+  committeeMembershipLookup,
+});
 export const addAnnouncementAttachmentUseCase = new AddAnnouncementAttachmentUseCase({
   announcementRepository,
   announcementAttachmentRepository,

@@ -19,6 +19,7 @@ export class InMemoryMeetingRepository implements MeetingRepository {
       venueOrLink: data.venueOrLink ?? null,
       status: "SCHEDULED",
       organizerId: data.organizerId,
+      committeeId: data.committeeId ?? null,
       notes: null,
       decisions: null,
       createdAt: now,
@@ -65,6 +66,7 @@ export class InMemoryMeetingRepository implements MeetingRepository {
     let items = [...this.byId.values()].filter((meeting) => {
       if (filters.status && meeting.status !== filters.status) return false;
       if (filters.organizerId && meeting.organizerId !== filters.organizerId) return false;
+      if (filters.committeeId && meeting.committeeId !== filters.committeeId) return false;
       if (filters.involvingUserId && meeting.organizerId !== filters.involvingUserId) return false;
       return true;
     });

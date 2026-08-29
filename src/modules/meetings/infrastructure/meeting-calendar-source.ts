@@ -29,6 +29,9 @@ export class MeetingCalendarSource implements CalendarSource {
         startAtTo: range.to,
         organizerId: filters.ownerId,
         involvingUserId: isPrivileged ? undefined : actor.userId,
+        // MYARCH Phase 4 (§5) — the Calendar's "committee" filter, applied
+        // to meetings linked via Meeting.committeeId.
+        committeeId: filters.committee,
       },
       { field: "startAt", direction: "asc" },
       { page: 1, pageSize: 100 },

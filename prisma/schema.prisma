@@ -141,6 +141,29 @@ enum BatchStatus {
   ARCHIVED
 }
 
+// MYARCH Phase 4 (§5) — Council & Committees. One unified model covers every
+// named group (Student Council, Core Committee, Event/Technical committees,
+// project teams, temporary committees) — they all share the identical
+// attribute shape per the roadmap's own spec, mirroring how CoordinatorPosition
+// unifies T&P/Alumni/Technical/Other rather than one table per variant.
+enum CommitteeType {
+  STUDENT_COUNCIL
+  CORE_COMMITTEE
+  EVENT_COMMITTEE
+  TECHNICAL_COMMITTEE
+  PROJECT_TEAM
+  TEMPORARY_COMMITTEE
+}
+
+// ARCHIVED covers both a rotated-out Student Council/Core Committee and a
+// finished temporary/event committee — never deleted, mirroring Batch's own
+// never-delete/status-flip precedent (§5's "preserve historical membership /
+// do not destroy previous-year records").
+enum CommitteeStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 // Renamed from the original REJECTED per the Days 5-6 implementation
 // decision (approved by the Secretary): "Submitted" is a transient action,
 // not a stored state (DRAFT/CHANGES_REQUESTED -> PENDING_REVIEW), and the
@@ -350,13 +373,16 @@ model User {
   requestsOwned             Request[]          @relation("RequestOwner")
 
   // MYARCH Phase 3 (§4.1–§4.5) — Calendar, Events & Meetings.
-  eventsOrganized      Event[]              @relation("EventOrganizer")
-  eventParticipations  EventParticipant[]   @relation("EventParticipantUser")
-  eventRegistrations   EventRegistration[]  @relation("EventRegistrationUser")
-  meetingsOrganized    Meeting[]            @relation("MeetingOrganizer")
-  meetingParticipations MeetingParticipant[] @relation("MeetingParticipantUser")
-  announcementsAuthored Announcement[]           @relation("AnnouncementAuthor")
-  announcementRecipient AnnouncementRecipient[]  @relation("AnnouncementRecipientUser")
+  eventsOrganized       Event[]                 @relation("EventOrganizer")
+  eventParticipations   EventParticipant[]      @relation("EventParticipantUser")
+  eventRegistrations    EventRegistration[]     @relation("EventRegistrationUser")
+  meetingsOrganized     Meeting[]               @relation("MeetingOrganizer")
+  meetingParticipations MeetingParticipant[]    @relation("MeetingParticipantUser")
+  announcementsAuthored Announcement[]          @relation("AnnouncementAuthor")
+  announcementRecipient AnnouncementRecipient[] @relation("AnnouncementRecipientUser")
+
+  // MYARCH Phase 4 (§5) — Council & Committees.
+  committeeMemberships CommitteeMembership[] @relation("CommitteeMembershipUser")
 
   // MYARCH Edit Mode — inline content overrides for existing public pages.
   updatedContentOverrides ContentOverride[] @relation("ContentOverrideUpdatedBy")
@@ -790,19 +816,20 @@ model FileAsset {
   confidentialOfPrivateProfileId String?                @db.Uuid
   confidentialOfPrivateProfile   StudentPrivateProfile? @relation("ConfidentialDocumentsOf", fields: [confidentialOfPrivateProfileId], references: [id])
 
-  usedAsPublicResume        StudentPublicProfile[]      @relation("PublicResumeOf")
-  usedAsDraftResume         StudentPublicProfileDraft[] @relation("DraftResumeOf")
-  usedAsAvatarOf            User?                       @relation("UserAvatar")
-  usedAsLogoOf              Company?                    @relation("CompanyLogo")
-  usedAsCertificateOf       InternshipOutcome?          @relation("InternshipCertificate")
-  usedAsTemplateThumbnailOf PublicationTemplate?        @relation("PublicationTemplateThumbnail")
-  usedAsPublicationExportOf PublicationExport?          @relation("PublicationExportFile")
-  usedAsMaintenanceAttachmentOf MaintenanceAttachment[] @relation("MaintenanceAttachmentFile")
-  usedAsRequestAttachmentOf     RequestAttachment[]     @relation("RequestAttachmentFile")
-  usedAsEventAttachmentOf        EventAttachment[]        @relation("EventAttachmentFile")
-  usedAsAnnouncementAttachmentOf AnnouncementAttachment[] @relation("AnnouncementAttachmentFile")
-  usedAsContentOverrideOf      ContentOverride[] @relation("ContentOverrideFile")
-  usedAsContentOverrideDraftOf ContentOverride[] @relation("ContentOverrideDraftFile")
+  usedAsPublicResume             StudentPublicProfile[]      @relation("PublicResumeOf")
+  usedAsDraftResume              StudentPublicProfileDraft[] @relation("DraftResumeOf")
+  usedAsAvatarOf                 User?                       @relation("UserAvatar")
+  usedAsLogoOf                   Company?                    @relation("CompanyLogo")
+  usedAsCertificateOf            InternshipOutcome?          @relation("InternshipCertificate")
+  usedAsTemplateThumbnailOf      PublicationTemplate?        @relation("PublicationTemplateThumbnail")
+  usedAsPublicationExportOf      PublicationExport?          @relation("PublicationExportFile")
+  usedAsMaintenanceAttachmentOf  MaintenanceAttachment[]     @relation("MaintenanceAttachmentFile")
+  usedAsRequestAttachmentOf      RequestAttachment[]         @relation("RequestAttachmentFile")
+  usedAsEventAttachmentOf        EventAttachment[]           @relation("EventAttachmentFile")
+  usedAsAnnouncementAttachmentOf AnnouncementAttachment[]    @relation("AnnouncementAttachmentFile")
+  usedAsCommitteeAttachmentOf    CommitteeAttachment[]       @relation("CommitteeAttachmentFile")
+  usedAsContentOverrideOf        ContentOverride[]           @relation("ContentOverrideFile")
+  usedAsContentOverrideDraftOf   ContentOverride[]           @relation("ContentOverrideDraftFile")
 
   @@index([ownerUserId])
   @@map("file_assets")
@@ -1419,6 +1446,14 @@ model Meeting {
   notes     String?
   decisions String?
 
+  // MYARCH Phase 4 (§5) — Council & Committees. Nullable, additive: a meeting
+  // predates this column and most meetings still have no committee (ad hoc
+  // staff/student meetings). When set, this meeting shows on that committee's
+  // own "Meetings" tab (queried via Meeting.search's new committeeId filter)
+  // — no change to any existing meeting's behavior or to MeetingCalendarSource.
+  committeeId String?    @db.Uuid
+  committee   Committee? @relation(fields: [committeeId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1427,6 +1462,7 @@ model Meeting {
   @@index([status])
   @@index([startAt])
   @@index([organizerId])
+  @@index([committeeId])
   @@map("meetings")
 }
 
@@ -1501,6 +1537,92 @@ model AnnouncementRecipient {
   @@unique([announcementId, userId])
   @@index([userId])
   @@map("announcement_recipients")
+}
+
+// ---------------------------------------------------------------------------
+// MYARCH Phase 4 (§5) — Council & Committees. Explicitly out of scope here,
+// per the roadmap's own phase assignment: full Project management (Phase 7,
+// §8.1) and a generic versioned Resource/Document system (also Phase 7) —
+// Committee "documents" reuse the existing flat FileAsset+join-table pattern
+// (CommitteeAttachment below), not a new versioned document system.
+// ---------------------------------------------------------------------------
+
+model Committee {
+  id     String          @id @default(uuid()) @db.Uuid
+  name   String
+  type   CommitteeType
+  status CommitteeStatus @default(ACTIVE)
+
+  // Free text (e.g. "2025-2026") — no institution-wide AcademicYear model
+  // exists; Batch represents a graduating student cohort, not a yearly
+  // governance cycle, and doesn't fit a Student Council spanning all batches.
+  academicYear String?
+
+  // Free-text description of the group's mandate — the "responsibilities"
+  // attribute from §5's own spec, at the committee/group level.
+  responsibilities String?
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships CommitteeMembership[]
+  attachments CommitteeAttachment[]
+  meetings    Meeting[]
+
+  @@index([type])
+  @@index([status])
+  @@map("committees")
+}
+
+// Never deleted — "preserve historical membership... do not destroy
+// previous-year records" (§5) is implemented here exactly like Batch's own
+// never-delete/status-flip precedent: a membership that ends gets isActive
+// flipped false and endDate stamped, never removed.
+model CommitteeMembership {
+  id          String    @id @default(uuid()) @db.Uuid
+  committeeId String    @db.Uuid
+  committee   Committee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  userId      String    @db.Uuid
+  user        User      @relation("CommitteeMembershipUser", fields: [userId], references: [id])
+
+  // Free text (e.g. "President", "Secretary", "Member") — mirrors
+  // CoordinatorProfile.customPosition's own free-text precedent; committee
+  // positions are too open-ended across Council/Committee/project-team types
+  // for a closed enum.
+  position String?
+
+  // Structured management-rights flag — deliberately NOT derived from the
+  // free-text `position` string (matching "President" vs "Chairperson" vs
+  // "Convener" would be fragile). Mirrors Meeting.organizerId's single-owner-
+  // can-manage precedent, generalized to allow multiple co-leads.
+  isLead Boolean @default(false)
+
+  academicYear String?
+  isActive     Boolean   @default(true)
+  startDate    DateTime  @default(now())
+  endDate      DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([committeeId])
+  @@index([userId])
+  @@map("committee_memberships")
+}
+
+model CommitteeAttachment {
+  id          String    @id @default(uuid()) @db.Uuid
+  committeeId String    @db.Uuid
+  committee   Committee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  fileId      String    @db.Uuid
+  file        FileAsset @relation("CommitteeAttachmentFile", fields: [fileId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([committeeId])
+  @@map("committee_attachments")
 }
 
 // ---------------------------------------------------------------------------

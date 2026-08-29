@@ -13,6 +13,7 @@ export interface CreateMeetingData {
   startAt: Date;
   venueOrLink?: string | null;
   organizerId: string;
+  committeeId?: string | null;
 }
 
 export interface UpdateMeetingData {

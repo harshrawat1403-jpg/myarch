@@ -25,6 +25,7 @@ import {
   CalendarDays,
   CalendarRange,
   Megaphone,
+  Landmark,
 } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { useRequireRole } from "@/lib/use-require-role";
@@ -104,6 +105,10 @@ const BASE_NAV_ITEMS: NavItem[] = [
   { href: "/events", label: "Events", icon: CalendarRange, group: "Activities" },
   { href: "/meetings", label: "Meetings", icon: Users, group: "Activities" },
   { href: "/announcements", label: "Announcements", icon: Megaphone, group: "Activities" },
+  // MYARCH Phase 4 (§5) — same "existed, fully built and server-authorized;
+  // only the nav entry was missing" precedent as the six entries above,
+  // added at ship time this phase rather than deferred to a later cleanup.
+  { href: "/committees", label: "Committees", icon: Landmark, group: "Activities" },
   // Directory is visible to both roles (matches its own route handler's
   // { roles: ["SECRETARY", "COORDINATOR"] } gate) — placed in BASE_NAV_ITEMS,
   // not SECRETARY_ONLY_NAV_ITEMS, even though it shares the "Administration"

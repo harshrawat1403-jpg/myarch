@@ -51,6 +51,16 @@ export interface CalendarFilters {
   readonly activityType?: CalendarActivityType;
   readonly ownerId?: string;
   readonly status?: string;
+  /**
+   * MYARCH Phase 4 (§5) — a Committee id. Honored by TaskCalendarSource
+   * (matches Task.relatedEntityType "Committee" + relatedEntityId) and
+   * MeetingCalendarSource (matches Meeting.committeeId) — the two sources
+   * with a real committee linkage. Not applied by Event/Announcement
+   * sources, which have no committee concept of their own; entries from
+   * those sources are unaffected by this filter, the same honestly-partial
+   * shape Phase 3's own KNOWN ISSUES documented for this filter.
+   */
+  readonly committee?: string;
 }
 
 export const MAX_CALENDAR_RANGE_DAYS = 366;

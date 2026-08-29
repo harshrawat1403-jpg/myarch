@@ -45,6 +45,9 @@ export class TaskCalendarSource implements CalendarSource {
         deadlineTo: range.to,
         ownerId: filters.ownerId,
         status,
+        // MYARCH Phase 4 (§5) — the Calendar's "committee" filter, applied
+        // to Committee action items (Task.relatedEntityType "Committee").
+        ...(filters.committee ? { relatedEntityType: "Committee", relatedEntityId: filters.committee } : {}),
       },
       sort: { field: "deadline", direction: "asc" },
       pageSize: 100,

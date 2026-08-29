@@ -15,6 +15,7 @@ export const CreateMeetingRequestSchema = z.object({
   startAt: z.coerce.date(),
   venueOrLink: z.string().trim().max(MEETING_VENUE_OR_LINK_MAX_LENGTH).optional(),
   organizerId: z.string().uuid().optional(),
+  committeeId: z.string().uuid().optional(),
 });
 
 export const UpdateMeetingRequestSchema = z
@@ -31,6 +32,7 @@ export const UpdateMeetingRequestSchema = z
 export const SearchMeetingsQuerySchema = z.object({
   status: z.enum(MEETING_STATUS_VALUES).optional(),
   organizerId: z.string().uuid().optional(),
+  committeeId: z.string().uuid().optional(),
   search: z.string().trim().min(1).optional(),
   startAtFrom: z.coerce.date().optional(),
   startAtTo: z.coerce.date().optional(),

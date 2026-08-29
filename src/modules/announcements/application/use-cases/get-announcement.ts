@@ -7,6 +7,7 @@ import type { AnnouncementRepository } from "../ports/announcement-repository";
 import type { AnnouncementAttachmentRepository } from "../ports/announcement-attachment-repository";
 import type { AnnouncementRecipientRepository } from "../ports/announcement-recipient-repository";
 import type { StudentBatchLookup } from "../ports/student-batch-lookup";
+import type { CommitteeMembershipLookup } from "../ports/committee-membership-lookup";
 
 export interface GetAnnouncementInput {
   actor: AuthenticatedActor;
@@ -25,6 +26,7 @@ export class GetAnnouncementUseCase {
       announcementAttachmentRepository: AnnouncementAttachmentRepository;
       announcementRecipientRepository: AnnouncementRecipientRepository;
       studentBatchLookup: StudentBatchLookup;
+      committeeMembershipLookup: CommitteeMembershipLookup;
     },
   ) {}
 
@@ -32,12 +34,14 @@ export class GetAnnouncementUseCase {
     const announcement = await this.deps.announcementRepository.findById(input.announcementId);
     if (!announcement) throw new AnnouncementNotFoundError();
 
-    const [batchId, isSelectedRecipient] = await Promise.all([
+    const [batchId, isSelectedRecipient, committeeIds, isCouncilMember] = await Promise.all([
       this.deps.studentBatchLookup.findBatchIdByUserId(input.actor.userId),
       this.deps.announcementRecipientRepository.isRecipient(announcement.id, input.actor.userId),
+      this.deps.committeeMembershipLookup.listActiveCommitteeIds(input.actor.userId),
+      this.deps.committeeMembershipLookup.isActiveStudentCouncilMember(input.actor.userId),
     ]);
 
-    if (!canViewAnnouncement(input.actor, announcement, { batchId, isSelectedRecipient })) {
+    if (!canViewAnnouncement(input.actor, announcement, { batchId, isSelectedRecipient, committeeIds, isCouncilMember })) {
       throw new NotAuthorizedError("Not authorized to view this announcement");
     }
 

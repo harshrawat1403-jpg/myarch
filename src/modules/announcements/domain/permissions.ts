@@ -20,7 +20,12 @@ export function canManageAnnouncement(actor: AuthenticatedActor, announcement: P
 export function canViewAnnouncement(
   actor: AuthenticatedActor,
   announcement: Pick<AnnouncementRecord, "authorId" | "audienceType" | "audienceValue" | "publishAt" | "expiresAt">,
-  audienceContext: { batchId: string | null; isSelectedRecipient: boolean },
+  audienceContext: {
+    batchId: string | null;
+    isSelectedRecipient: boolean;
+    committeeIds: readonly string[];
+    isCouncilMember: boolean;
+  },
 ): boolean {
   if (canManageAnnouncement(actor, announcement)) return true;
   return isAnnouncementActive(announcement) && isActorInAudience(actor, announcement, audienceContext);

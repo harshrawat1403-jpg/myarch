@@ -26,7 +26,7 @@ describe("isAnnouncementActive", () => {
 });
 
 describe("isActorInAudience", () => {
-  const noContext = { batchId: null, isSelectedRecipient: false };
+  const noContext = { batchId: null, isSelectedRecipient: false, committeeIds: [], isCouncilMember: false };
 
   it("EVERYONE reaches everyone except Recruiter", () => {
     const announcement = { audienceType: "EVERYONE" as const, audienceValue: null };
@@ -44,20 +44,31 @@ describe("isActorInAudience", () => {
 
   it("YEAR reaches only a Student in the matching batch", () => {
     const announcement = { audienceType: "YEAR" as const, audienceValue: "batch-2026" };
-    expect(isActorInAudience({ userId: "u1", role: "STUDENT" }, announcement, { batchId: "batch-2026", isSelectedRecipient: false })).toBe(true);
-    expect(isActorInAudience({ userId: "u2", role: "STUDENT" }, announcement, { batchId: "batch-2025", isSelectedRecipient: false })).toBe(false);
-    expect(isActorInAudience({ userId: "u3", role: "COORDINATOR" }, announcement, { batchId: "batch-2026", isSelectedRecipient: false })).toBe(false);
+    expect(isActorInAudience({ userId: "u1", role: "STUDENT" }, announcement, { ...noContext, batchId: "batch-2026" })).toBe(true);
+    expect(isActorInAudience({ userId: "u2", role: "STUDENT" }, announcement, { ...noContext, batchId: "batch-2025" })).toBe(false);
+    expect(isActorInAudience({ userId: "u3", role: "COORDINATOR" }, announcement, { ...noContext, batchId: "batch-2026" })).toBe(false);
   });
 
   it("SELECTED_GROUP reaches only an explicit recipient", () => {
     const announcement = { audienceType: "SELECTED_GROUP" as const, audienceValue: null };
-    expect(isActorInAudience({ userId: "u1", role: "STUDENT" }, announcement, { batchId: null, isSelectedRecipient: true })).toBe(true);
+    expect(isActorInAudience({ userId: "u1", role: "STUDENT" }, announcement, { ...noContext, isSelectedRecipient: true })).toBe(true);
     expect(isActorInAudience({ userId: "u2", role: "STUDENT" }, announcement, noContext)).toBe(false);
   });
 
-  it("PROGRAM/COMMITTEE/COUNCIL never resolve — no backing entity yet", () => {
-    for (const audienceType of ["PROGRAM", "COMMITTEE", "COUNCIL"] as const) {
-      expect(isActorInAudience({ userId: "u1", role: "SECRETARY" }, { audienceType, audienceValue: null }, noContext)).toBe(false);
-    }
+  it("PROGRAM never resolves — no backing entity anywhere in the roadmap", () => {
+    expect(isActorInAudience({ userId: "u1", role: "SECRETARY" }, { audienceType: "PROGRAM", audienceValue: null }, noContext)).toBe(false);
+  });
+
+  it("COMMITTEE reaches only a member of that specific committee (MYARCH Phase 4)", () => {
+    const announcement = { audienceType: "COMMITTEE" as const, audienceValue: "committee-1" };
+    expect(isActorInAudience({ userId: "u1", role: "STUDENT" }, announcement, { ...noContext, committeeIds: ["committee-1"] })).toBe(true);
+    expect(isActorInAudience({ userId: "u2", role: "STUDENT" }, announcement, { ...noContext, committeeIds: ["committee-2"] })).toBe(false);
+    expect(isActorInAudience({ userId: "u3", role: "STUDENT" }, announcement, noContext)).toBe(false);
+  });
+
+  it("COUNCIL reaches only an active Student Council member (MYARCH Phase 4)", () => {
+    const announcement = { audienceType: "COUNCIL" as const, audienceValue: null };
+    expect(isActorInAudience({ userId: "u1", role: "STUDENT" }, announcement, { ...noContext, isCouncilMember: true })).toBe(true);
+    expect(isActorInAudience({ userId: "u2", role: "STUDENT" }, announcement, noContext)).toBe(false);
   });
 });

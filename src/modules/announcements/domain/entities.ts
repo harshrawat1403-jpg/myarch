@@ -55,6 +55,9 @@ export interface AnnouncementFilters {
     readonly userId: string;
     readonly role: string;
     readonly batchId: string | null;
+    /** MYARCH Phase 4 (§5) — active Committee memberships, for COMMITTEE/COUNCIL audience matching. */
+    readonly committeeIds: readonly string[];
+    readonly isCouncilMember: boolean;
   };
 }
 
@@ -93,17 +96,23 @@ export function isAnnouncementActive(
 }
 
 /**
- * Pure — no DB round trip. `context` carries the two facts that can only be
+ * Pure — no DB round trip. `context` carries the facts that can only be
  * resolved with a query (a Student's own batchId; whether this actor is an
- * explicit SELECTED_GROUP recipient) — everything else is decidable from
- * the actor's role alone. PROGRAM/COMMITTEE/COUNCIL always resolve false:
- * no backing entity exists yet to match against (see schema.prisma's
- * Announcement doc comment) — deferred, not a bug.
+ * explicit SELECTED_GROUP recipient; MYARCH Phase 4's own committeeIds/
+ * isCouncilMember for COMMITTEE/COUNCIL) — everything else is decidable from
+ * the actor's role alone. PROGRAM still always resolves false: no backing
+ * entity exists for it anywhere in the roadmap (unlike COMMITTEE/COUNCIL,
+ * which Phase 4 now backs with the real Committee table).
  */
 export function isActorInAudience(
   actor: { readonly userId: string; readonly role: string },
   announcement: Pick<AnnouncementRecord, "audienceType" | "audienceValue">,
-  context: { readonly batchId: string | null; readonly isSelectedRecipient: boolean },
+  context: {
+    readonly batchId: string | null;
+    readonly isSelectedRecipient: boolean;
+    readonly committeeIds: readonly string[];
+    readonly isCouncilMember: boolean;
+  },
 ): boolean {
   switch (announcement.audienceType) {
     case "EVERYONE":
@@ -114,9 +123,11 @@ export function isActorInAudience(
       return actor.role === "STUDENT" && context.batchId !== null && context.batchId === announcement.audienceValue;
     case "SELECTED_GROUP":
       return context.isSelectedRecipient;
-    case "PROGRAM":
     case "COMMITTEE":
+      return announcement.audienceValue !== null && context.committeeIds.includes(announcement.audienceValue);
     case "COUNCIL":
+      return context.isCouncilMember;
+    case "PROGRAM":
       return false;
   }
 }

@@ -13,6 +13,7 @@ export class PrismaMeetingRepository implements MeetingRepository {
         startAt: data.startAt,
         venueOrLink: data.venueOrLink ?? null,
         organizerId: data.organizerId,
+        committeeId: data.committeeId ?? null,
       },
     });
     return toDomain(row);
@@ -50,6 +51,7 @@ export class PrismaMeetingRepository implements MeetingRepository {
       title: filters.search ? { contains: filters.search, mode: "insensitive" } : undefined,
       startAt:
         filters.startAtFrom || filters.startAtTo ? { gte: filters.startAtFrom, lte: filters.startAtTo } : undefined,
+      committeeId: filters.committeeId,
       ...(filters.involvingUserId
         ? { OR: [{ organizerId: filters.involvingUserId }, { participants: { some: { userId: filters.involvingUserId } } }] }
         : {}),
@@ -78,6 +80,7 @@ function toDomain(row: PrismaMeeting): MeetingRecord {
     venueOrLink: row.venueOrLink,
     status: row.status,
     organizerId: row.organizerId,
+    committeeId: row.committeeId,
     notes: row.notes,
     decisions: row.decisions,
     createdAt: row.createdAt,

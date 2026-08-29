@@ -131,6 +131,17 @@ export const AUDIT_ACTIONS = {
   ANNOUNCEMENT_DELETED: "ANNOUNCEMENT_DELETED",
   ANNOUNCEMENT_ATTACHMENT_ADDED: "ANNOUNCEMENT_ATTACHMENT_ADDED",
 
+  // MYARCH Phase 4 (§5) — Council & Committees. Action items are plain Task
+  // Engine rows and use TASK_* actions above; meetings linked to a committee
+  // use MEETING_* actions above — neither gets its own action here.
+  COMMITTEE_CREATED: "COMMITTEE_CREATED",
+  COMMITTEE_UPDATED: "COMMITTEE_UPDATED",
+  COMMITTEE_ARCHIVED: "COMMITTEE_ARCHIVED",
+  COMMITTEE_MEMBER_ADDED: "COMMITTEE_MEMBER_ADDED",
+  COMMITTEE_MEMBER_UPDATED: "COMMITTEE_MEMBER_UPDATED",
+  COMMITTEE_MEMBERSHIP_ENDED: "COMMITTEE_MEMBERSHIP_ENDED",
+  COMMITTEE_ATTACHMENT_ADDED: "COMMITTEE_ATTACHMENT_ADDED",
+
   // MYARCH Edit Mode — inline content overrides on existing public pages
   // (text/images only, no page creation). CONTENT_OVERRIDE_UPDATED/REMOVED
   // are per-field draft stages; the *_PUBLISHED/DISCARDED pair below are

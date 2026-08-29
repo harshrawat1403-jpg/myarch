@@ -40,10 +40,26 @@ export class PrismaAudienceRecipientResolver implements AudienceRecipientResolve
         });
         return recipients.map((r) => r.userId);
       }
-      // PROGRAM/COMMITTEE/COUNCIL — no backing entity yet, see domain/entities.ts's isActorInAudience doc comment.
+      // MYARCH Phase 4 (§5) — COMMITTEE/COUNCIL now resolve real recipients
+      // via CommitteeMembership, mirroring isActorInAudience's own two cases.
+      case "COMMITTEE": {
+        if (!audienceValue) return [];
+        const memberships = await this.prisma.committeeMembership.findMany({
+          where: { committeeId: audienceValue, isActive: true },
+          select: { userId: true },
+        });
+        return memberships.map((m) => m.userId);
+      }
+      case "COUNCIL": {
+        const memberships = await this.prisma.committeeMembership.findMany({
+          where: { isActive: true, committee: { type: "STUDENT_COUNCIL" } },
+          select: { userId: true },
+        });
+        return memberships.map((m) => m.userId);
+      }
+      // PROGRAM — no backing entity anywhere in the roadmap, see
+      // domain/entities.ts's isActorInAudience doc comment.
       case "PROGRAM":
-      case "COMMITTEE":
-      case "COUNCIL":
         return [];
     }
   }

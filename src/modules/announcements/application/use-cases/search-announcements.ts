@@ -10,6 +10,7 @@ import {
 } from "../../domain/entities";
 import type { AnnouncementRepository } from "../ports/announcement-repository";
 import type { StudentBatchLookup } from "../ports/student-batch-lookup";
+import type { CommitteeMembershipLookup } from "../ports/committee-membership-lookup";
 
 export interface SearchAnnouncementsInput {
   actor: AuthenticatedActor;
@@ -29,7 +30,11 @@ export interface SearchAnnouncementsInput {
  */
 export class SearchAnnouncementsUseCase {
   constructor(
-    private readonly deps: { announcementRepository: AnnouncementRepository; studentBatchLookup: StudentBatchLookup },
+    private readonly deps: {
+      announcementRepository: AnnouncementRepository;
+      studentBatchLookup: StudentBatchLookup;
+      committeeMembershipLookup: CommitteeMembershipLookup;
+    },
   ) {}
 
   async execute(input: SearchAnnouncementsInput): Promise<PaginatedResult<AnnouncementRecord>> {
@@ -42,11 +47,15 @@ export class SearchAnnouncementsUseCase {
     if (isPrivileged) {
       filters = requested;
     } else {
-      const batchId = await this.deps.studentBatchLookup.findBatchIdByUserId(input.actor.userId);
+      const [batchId, committeeIds, isCouncilMember] = await Promise.all([
+        this.deps.studentBatchLookup.findBatchIdByUserId(input.actor.userId),
+        this.deps.committeeMembershipLookup.listActiveCommitteeIds(input.actor.userId),
+        this.deps.committeeMembershipLookup.isActiveStudentCouncilMember(input.actor.userId),
+      ]);
       filters = {
         ...requested,
         activeOnly: true,
-        audienceScopeFor: { userId: input.actor.userId, role: input.actor.role, batchId },
+        audienceScopeFor: { userId: input.actor.userId, role: input.actor.role, batchId, committeeIds, isCouncilMember },
       };
     }
 

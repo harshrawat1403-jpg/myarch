@@ -4,6 +4,7 @@ import type { CalendarSource } from "@/modules/calendar";
 import type { CalendarDateRange, CalendarEntry, CalendarFilters } from "@/modules/calendar";
 import type { AnnouncementRepository } from "../application/ports/announcement-repository";
 import type { StudentBatchLookup } from "../application/ports/student-batch-lookup";
+import type { CommitteeMembershipLookup } from "../application/ports/committee-membership-lookup";
 
 const ANNOUNCEMENT_ACTIVITY_TYPE = "ANNOUNCEMENT";
 
@@ -17,7 +18,13 @@ const ANNOUNCEMENT_ACTIVITY_TYPE = "ANNOUNCEMENT";
 export class AnnouncementCalendarSource implements CalendarSource {
   readonly sourceModule = "announcements";
 
-  constructor(private readonly deps: { announcementRepository: AnnouncementRepository; studentBatchLookup: StudentBatchLookup }) {}
+  constructor(
+    private readonly deps: {
+      announcementRepository: AnnouncementRepository;
+      studentBatchLookup: StudentBatchLookup;
+      committeeMembershipLookup: CommitteeMembershipLookup;
+    },
+  ) {}
 
   async findEntries(range: CalendarDateRange, filters: CalendarFilters, actor: AuthenticatedActor): Promise<CalendarEntry[]> {
     if (filters.activityType && filters.activityType !== ANNOUNCEMENT_ACTIVITY_TYPE) return [];
@@ -32,6 +39,8 @@ export class AnnouncementCalendarSource implements CalendarSource {
             userId: actor.userId,
             role: actor.role,
             batchId: await this.deps.studentBatchLookup.findBatchIdByUserId(actor.userId),
+            committeeIds: await this.deps.committeeMembershipLookup.listActiveCommitteeIds(actor.userId),
+            isCouncilMember: await this.deps.committeeMembershipLookup.isActiveStudentCouncilMember(actor.userId),
           },
         };
 

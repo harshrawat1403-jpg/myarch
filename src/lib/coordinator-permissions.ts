@@ -47,6 +47,8 @@ export const COORDINATOR_PERMISSION_KEYS: readonly CoordinatorPermissionKey[] = 
   "inventory.manage",
 
   "announcements.manage",
+
+  "committees.manage",
 ];
 
 export function coordinatorPermissionLabel(key: string): string {

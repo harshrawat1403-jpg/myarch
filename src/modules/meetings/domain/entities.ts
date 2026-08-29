@@ -20,6 +20,9 @@ export interface MeetingRecord {
 
   readonly organizerId: string;
 
+  /** MYARCH Phase 4 (§5) — nullable, additive. Links this meeting to a Committee, so it shows on that committee's own "Meetings" tab. Most meetings still have none. */
+  readonly committeeId: string | null;
+
   readonly notes: string | null;
   readonly decisions: string | null;
 
@@ -43,6 +46,8 @@ export interface MeetingFilters {
   readonly startAtTo?: Date;
   /** organizerId = X OR participants contains X — the visibility scoping SearchMeetingsUseCase forces for anyone without meetings.manage, mirroring tasks' own involvingUserId shape. */
   readonly involvingUserId?: string;
+  /** MYARCH Phase 4 (§5) — "this committee's meetings" (a Committee detail page's own Meetings tab, and the Calendar's own "committee" filter once wired). */
+  readonly committeeId?: string;
 }
 
 export type MeetingSortField = "startAt" | "createdAt";

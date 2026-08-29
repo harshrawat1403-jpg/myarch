@@ -46,14 +46,14 @@ describe("canManageAnnouncement", () => {
 
 describe("canViewAnnouncement", () => {
   it("whoever manages it can view it even before publishAt (still editing a future-dated draft)", () => {
-    expect(canViewAnnouncement(AUTHOR, DRAFT_FUTURE_ANNOUNCEMENT, { batchId: null, isSelectedRecipient: false })).toBe(true);
+    expect(canViewAnnouncement(AUTHOR, DRAFT_FUTURE_ANNOUNCEMENT, { batchId: null, isSelectedRecipient: false, committeeIds: [], isCouncilMember: false })).toBe(true);
   });
 
   it("a matched, active audience member can view it", () => {
-    expect(canViewAnnouncement(STUDENT, ACTIVE_ANNOUNCEMENT, { batchId: null, isSelectedRecipient: false })).toBe(true);
+    expect(canViewAnnouncement(STUDENT, ACTIVE_ANNOUNCEMENT, { batchId: null, isSelectedRecipient: false, committeeIds: [], isCouncilMember: false })).toBe(true);
   });
 
   it("denies viewing a future-dated announcement for a non-manager, even if they'd match the audience", () => {
-    expect(canViewAnnouncement(STUDENT, DRAFT_FUTURE_ANNOUNCEMENT, { batchId: null, isSelectedRecipient: false })).toBe(false);
+    expect(canViewAnnouncement(STUDENT, DRAFT_FUTURE_ANNOUNCEMENT, { batchId: null, isSelectedRecipient: false, committeeIds: [], isCouncilMember: false })).toBe(false);
   });
 });

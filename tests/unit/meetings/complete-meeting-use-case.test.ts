@@ -19,6 +19,7 @@ function record(overrides: Partial<MeetingRecord> = {}): MeetingRecord {
     venueOrLink: null,
     status: "SCHEDULED",
     organizerId: "organizer-1",
+    committeeId: null,
     notes: null,
     decisions: null,
     createdAt: now,

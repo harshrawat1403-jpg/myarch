@@ -110,5 +110,11 @@ export function resolveNotificationDestination(
       const announcementId = context.announcementId;
       return typeof announcementId === "string" && announcementId.length > 0 ? `/announcements/${announcementId}` : null;
     }
+
+    // MYARCH Phase 4 (§5) — Council & Committees.
+    case "COMMITTEE_MEMBER_ADDED": {
+      const committeeId = context.committeeId;
+      return typeof committeeId === "string" && committeeId.length > 0 ? `/committees/${committeeId}` : null;
+    }
   }
 }

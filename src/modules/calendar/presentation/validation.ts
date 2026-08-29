@@ -13,4 +13,5 @@ export const GetCalendarEntriesQuerySchema = z.object({
   activityType: z.string().trim().min(1).optional(),
   ownerId: z.string().uuid().optional(),
   status: z.string().trim().min(1).optional(),
+  committee: z.string().uuid().optional(),
 });

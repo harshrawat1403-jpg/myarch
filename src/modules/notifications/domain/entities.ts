@@ -50,7 +50,12 @@ export type NotificationTemplateId =
   // deferral note anticipated ("building this would be exactly the kind of
   // speculative, PRD-unauthorized feature this project's standing
   // instructions rule out" — no longer true now that §4.5 exists).
-  | "ANNOUNCEMENT_PUBLISHED";
+  | "ANNOUNCEMENT_PUBLISHED"
+  // MYARCH Phase 4 (§5) — Council & Committees. Action items are plain Task
+  // Engine rows and use the existing TASK_* templates; meetings linked to a
+  // committee are plain Meeting rows, which (like every meeting today) send
+  // no notification of their own — neither gets a new template here.
+  | "COMMITTEE_MEMBER_ADDED";
 
 /**
  * The one thing a business use case knows about a notification: who should

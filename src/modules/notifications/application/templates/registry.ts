@@ -47,6 +47,7 @@ import {
 import { requestSubmittedTemplate, requestSubmittedInAppTemplate } from "./definitions/request-submitted";
 import { requestDecidedTemplate, requestDecidedInAppTemplate } from "./definitions/request-decided";
 import { announcementPublishedTemplate, announcementPublishedInAppTemplate } from "./definitions/announcement-published";
+import { committeeMemberAddedTemplate, committeeMemberAddedInAppTemplate } from "./definitions/committee-member-added";
 
 /**
  * Every known template, keyed by the id business use cases pass to
@@ -99,6 +100,7 @@ export const EMAIL_TEMPLATE_REGISTRY: Record<NotificationTemplateId, EmailTempla
   REQUEST_SUBMITTED: requestSubmittedTemplate,
   REQUEST_DECIDED: requestDecidedTemplate,
   ANNOUNCEMENT_PUBLISHED: announcementPublishedTemplate,
+  COMMITTEE_MEMBER_ADDED: committeeMemberAddedTemplate,
 };
 
 /** V4.0 E1 — the IN_APP counterpart to EMAIL_TEMPLATE_REGISTRY. */
@@ -129,6 +131,7 @@ export const IN_APP_TEMPLATE_REGISTRY: Record<NotificationTemplateId, InAppTempl
   REQUEST_SUBMITTED: requestSubmittedInAppTemplate,
   REQUEST_DECIDED: requestDecidedInAppTemplate,
   ANNOUNCEMENT_PUBLISHED: announcementPublishedInAppTemplate,
+  COMMITTEE_MEMBER_ADDED: committeeMemberAddedInAppTemplate,
 };
 
 /**
@@ -188,4 +191,8 @@ export const NOTIFICATION_CHANNELS: Record<NotificationTemplateId, readonly Noti
   // an email (potentially high fan-out, but infrequent — nothing like
   // TASK_ASSIGNED's per-task volume).
   ANNOUNCEMENT_PUBLISHED: ["EMAIL", "IN_APP"],
+  // MYARCH Phase 4 (§5) — routine, per-person update; IN_APP-only, matching
+  // this file's own "routine staff-to-staff/individual updates stay
+  // IN_APP-only" rule (e.g. TASK_ASSIGNED, MAINTENANCE_ISSUE_SUBMITTED).
+  COMMITTEE_MEMBER_ADDED: ["IN_APP"],
 };

@@ -68,12 +68,15 @@ export class PrismaAnnouncementRepository implements AnnouncementRepository {
       andConditions.push({ OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] });
     }
     if (filters.audienceScopeFor) {
-      const { userId, role, batchId } = filters.audienceScopeFor;
+      const { userId, role, batchId, committeeIds, isCouncilMember } = filters.audienceScopeFor;
       const scopeOr: Prisma.AnnouncementWhereInput[] = [{ authorId: userId }];
       if (role !== "RECRUITER") scopeOr.push({ audienceType: "EVERYONE" });
       if (role === "COORDINATOR" || role === "SECRETARY") scopeOr.push({ audienceType: "COORDINATORS" });
       if (role === "STUDENT" && batchId) scopeOr.push({ audienceType: "YEAR", audienceValue: batchId });
       scopeOr.push({ audienceType: "SELECTED_GROUP", recipients: { some: { userId } } });
+      // MYARCH Phase 4 (§5) — mirrors isActorInAudience's own COMMITTEE/COUNCIL cases.
+      if (committeeIds.length > 0) scopeOr.push({ audienceType: "COMMITTEE", audienceValue: { in: [...committeeIds] } });
+      if (isCouncilMember) scopeOr.push({ audienceType: "COUNCIL" });
       andConditions.push({ OR: scopeOr });
     }
     if (andConditions.length > 0) where.AND = andConditions;

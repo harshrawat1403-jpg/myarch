@@ -13,6 +13,7 @@ export interface CreateMeetingInput {
   startAt: Date;
   venueOrLink?: string | null;
   organizerId?: string;
+  committeeId?: string | null;
 }
 
 export class CreateMeetingUseCase {
@@ -29,6 +30,7 @@ export class CreateMeetingUseCase {
       startAt: input.startAt,
       venueOrLink: input.venueOrLink?.trim() ?? null,
       organizerId: input.organizerId ?? input.actor.userId,
+      committeeId: input.committeeId ?? null,
     });
 
     await this.deps.auditRecorder.record({
