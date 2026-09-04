@@ -19,6 +19,7 @@ RUN apk add --no-cache openssl
 # ---------------------------------------------------------------------------
 FROM base AS deps
 COPY package.json package-lock.json ./
+COPY prisma/schema.prisma ./prisma/schema.prisma
 RUN npm ci
 
 # ---------------------------------------------------------------------------
@@ -37,6 +38,7 @@ RUN npm run build
 FROM base AS web
 ENV NODE_ENV=production
 RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
+RUN mkdir -p /app/storage/uploads && chown -R nextjs:nodejs /app/storage
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
@@ -57,6 +59,7 @@ CMD ["node", "server.js"]
 FROM base AS worker
 ENV NODE_ENV=production
 RUN addgroup -S nodejs && adduser -S worker -G nodejs
+RUN mkdir -p /app/storage/uploads && chown -R worker:nodejs /app/storage
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY package.json ./

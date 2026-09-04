@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  output: "standalone",
   images: {
     // Portfolio/resume assets are served from object storage via signed URLs
     // (see docs/architecture/06_Technology_Stack.md). Remote patterns are
