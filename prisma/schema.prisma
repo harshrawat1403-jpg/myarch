@@ -384,6 +384,16 @@ model User {
   // MYARCH Phase 4 (§5) — Council & Committees.
   committeeMemberships CommitteeMembership[] @relation("CommitteeMembershipUser")
 
+  // MYARCH Phase 5 — Generic forms and applications. These are deliberately
+  // separate from the placement-specific Application model below.
+  createdForms                         Form[]                         @relation("FormCreatedBy")
+  formSubmissions                      FormSubmission[]                @relation("FormSubmissionApplicant")
+  formApplicationReviewerAssignments   FormApplicationReviewer[]       @relation("FormApplicationReviewer")
+  formApplicationReviewAssignments     FormApplicationReviewer[]       @relation("FormApplicationReviewerAssignedBy")
+  formApplicationReviews               FormApplicationReview[]         @relation("FormApplicationReviewReviewer")
+  formApplicationStatusChanges         FormApplicationStatusEvent[]    @relation("FormApplicationStatusChangedBy")
+  formApplicationDecisions             FormApplication[]               @relation("FormApplicationDecidedBy")
+
   // MYARCH Edit Mode — inline content overrides for existing public pages.
   updatedContentOverrides ContentOverride[] @relation("ContentOverrideUpdatedBy")
 
@@ -657,6 +667,7 @@ model StudentProfile {
   recruiterStudentInteractions RecruiterStudentInteraction[]
   recruiterInterestRequests    RecruiterInterestRequest[]
   applications                 Application[]
+  formSubmissions              FormSubmission[] @relation("FormSubmissionStudent")
   alumniProfile                AlumniProfile?
 
   @@index([batchId])
@@ -1032,6 +1043,167 @@ model AlumniProfile {
 
   @@index([graduationYear])
   @@map("alumni_profiles")
+}
+
+// ---------------------------------------------------------------------------
+// Generic Forms and Applications (MYARCH Phase 5)
+// ---------------------------------------------------------------------------
+
+enum FormStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  ARCHIVED
+}
+
+enum FormFieldType {
+  TEXT
+  LONG_TEXT
+  NUMBER
+  EMAIL
+  DROPDOWN
+  RADIO
+  CHECKBOX
+  DATE
+}
+
+enum FormApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  SELECTED
+  REJECTED
+}
+
+model Form {
+  id          String     @id @default(uuid()) @db.Uuid
+  title       String
+  description String?
+  status      FormStatus @default(DRAFT)
+  deadline    DateTime?
+
+  committeeId String?    @db.Uuid
+  committee   Committee? @relation(fields: [committeeId], references: [id])
+
+  createdByUserId String @db.Uuid
+  createdBy       User   @relation("FormCreatedBy", fields: [createdByUserId], references: [id])
+
+  publishedAt DateTime?
+  closedAt    DateTime?
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  fields      FormField[]
+  submissions FormSubmission[]
+
+  @@index([status])
+  @@index([committeeId])
+  @@map("forms")
+}
+
+model FormField {
+  id          String        @id @default(uuid()) @db.Uuid
+  formId      String        @db.Uuid
+  form        Form          @relation(fields: [formId], references: [id], onDelete: Cascade)
+  key         String
+  label       String
+  type        FormFieldType
+  description String?
+  required    Boolean       @default(false)
+  options     Json?
+  validation  Json?
+  displayOrder Int
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([formId, key])
+  @@index([formId, displayOrder])
+  @@map("form_fields")
+}
+
+model FormSubmission {
+  id              String         @id @default(uuid()) @db.Uuid
+  formId          String         @db.Uuid
+  form            Form           @relation(fields: [formId], references: [id], onDelete: Cascade)
+  applicantUserId String         @db.Uuid
+  applicant       User           @relation("FormSubmissionApplicant", fields: [applicantUserId], references: [id])
+  studentProfileId String        @db.Uuid
+  studentProfile  StudentProfile @relation("FormSubmissionStudent", fields: [studentProfileId], references: [id])
+  answers         Json
+  submittedAt     DateTime       @default(now())
+  createdAt       DateTime       @default(now())
+
+  application FormApplication?
+
+  @@unique([formId, applicantUserId])
+  @@index([applicantUserId])
+  @@index([studentProfileId])
+  @@map("form_submissions")
+}
+
+model FormApplication {
+  id              String                @id @default(uuid()) @db.Uuid
+  submissionId    String                @unique @db.Uuid
+  submission      FormSubmission        @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  currentStatus   FormApplicationStatus @default(SUBMITTED)
+  decisionReason  String?
+  decidedByUserId String?               @db.Uuid
+  decidedBy       User?                 @relation("FormApplicationDecidedBy", fields: [decidedByUserId], references: [id])
+  decidedAt       DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  reviewers   FormApplicationReviewer[]
+  reviews     FormApplicationReview[]
+  statusEvents FormApplicationStatusEvent[]
+
+  @@index([currentStatus])
+  @@map("form_applications")
+}
+
+model FormApplicationReviewer {
+  id            String          @id @default(uuid()) @db.Uuid
+  applicationId String          @db.Uuid
+  application   FormApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reviewerUserId String         @db.Uuid
+  reviewer      User            @relation("FormApplicationReviewer", fields: [reviewerUserId], references: [id])
+  assignedByUserId String       @db.Uuid
+  assignedBy    User            @relation("FormApplicationReviewerAssignedBy", fields: [assignedByUserId], references: [id])
+  assignedAt    DateTime        @default(now())
+  unassignedAt  DateTime?
+
+  @@index([applicationId])
+  @@index([reviewerUserId, unassignedAt])
+  @@map("form_application_reviewers")
+}
+
+model FormApplicationReview {
+  id            String          @id @default(uuid()) @db.Uuid
+  applicationId String          @db.Uuid
+  application   FormApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reviewerUserId String         @db.Uuid
+  reviewer      User            @relation("FormApplicationReviewReviewer", fields: [reviewerUserId], references: [id])
+  notes         String
+  createdAt     DateTime        @default(now())
+
+  @@index([applicationId])
+  @@index([reviewerUserId])
+  @@map("form_application_reviews")
+}
+
+model FormApplicationStatusEvent {
+  id            String                 @id @default(uuid()) @db.Uuid
+  applicationId String                 @db.Uuid
+  application   FormApplication        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fromStatus    FormApplicationStatus?
+  toStatus      FormApplicationStatus
+  note          String?
+  changedByUserId String               @db.Uuid
+  changedBy     User                   @relation("FormApplicationStatusChangedBy", fields: [changedByUserId], references: [id])
+  occurredAt    DateTime               @default(now())
+
+  @@index([applicationId])
+  @@map("form_application_status_events")
 }
 
 // V4.0 D1 (§5.1, §11) — append-only audit trail of status changes, never
@@ -1570,6 +1742,7 @@ model Committee {
 
   memberships CommitteeMembership[]
   attachments CommitteeAttachment[]
+  forms       Form[]
   meetings    Meeting[]
 
   @@index([type])

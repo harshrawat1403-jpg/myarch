@@ -116,5 +116,13 @@ export function resolveNotificationDestination(
       const committeeId = context.committeeId;
       return typeof committeeId === "string" && committeeId.length > 0 ? `/committees/${committeeId}` : null;
     }
+
+    case "FORM_SUBMITTED":
+    case "FORM_APPLICATION_REVIEWER_ASSIGNED":
+      return "/dashboard/form-applications";
+
+    case "FORM_APPLICATION_UNDER_REVIEW":
+    case "FORM_APPLICATION_DECIDED":
+      return "/student/form-applications";
   }
 }

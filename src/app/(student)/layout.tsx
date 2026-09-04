@@ -12,6 +12,8 @@ import {
   Megaphone,
   UserCircle,
   Wrench,
+  FileText,
+  ClipboardList,
 } from "lucide-react";
 import { useRequireRole } from "@/lib/use-require-role";
 import { SheetLayout, type NavItem } from "@/components/sheet-layout";
@@ -25,6 +27,8 @@ import { LoadingScreen } from "@/components/loading-screen";
 const NAV_ITEMS: NavItem[] = [
   { href: "/student", label: "Overview", icon: LayoutDashboard },
   { href: "/student/applications", label: "Applications", icon: Briefcase },
+  { href: "/student/forms", label: "Forms", icon: FileText },
+  { href: "/student/form-applications", label: "Form Submissions", icon: ClipboardList },
   { href: "/student/interests", label: "Interests", icon: Mail },
   { href: "/student/reports", label: "My Reports", icon: BarChart3 },
   { href: "/student/profile", label: "My Profile", icon: UserCircle },

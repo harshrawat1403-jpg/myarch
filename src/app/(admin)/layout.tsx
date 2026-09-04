@@ -26,6 +26,8 @@ import {
   CalendarRange,
   Megaphone,
   Landmark,
+  FileText,
+  ClipboardPenLine,
 } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { useRequireRole } from "@/lib/use-require-role";
@@ -46,6 +48,8 @@ const BASE_NAV_ITEMS: NavItem[] = [
     icon: ClipboardList,
     group: "Workflow",
   },
+  { href: "/dashboard/forms", label: "Forms", icon: FileText, group: "Workflow" },
+  { href: "/dashboard/form-applications", label: "Form Applications", icon: ClipboardPenLine, group: "Workflow" },
   { href: "/dashboard/audit", label: "Audit", icon: History, group: "Workflow" },
   // V4.0 E7 (§2, §3, §16): rename/extend "Exports" → "Reports" — the route
   // itself moves from /dashboard/exports to /dashboard/reports (a

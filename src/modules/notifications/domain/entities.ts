@@ -55,7 +55,11 @@ export type NotificationTemplateId =
   // Engine rows and use the existing TASK_* templates; meetings linked to a
   // committee are plain Meeting rows, which (like every meeting today) send
   // no notification of their own — neither gets a new template here.
-  | "COMMITTEE_MEMBER_ADDED";
+  | "COMMITTEE_MEMBER_ADDED"
+  | "FORM_SUBMITTED"
+  | "FORM_APPLICATION_REVIEWER_ASSIGNED"
+  | "FORM_APPLICATION_UNDER_REVIEW"
+  | "FORM_APPLICATION_DECIDED";
 
 /**
  * The one thing a business use case knows about a notification: who should
