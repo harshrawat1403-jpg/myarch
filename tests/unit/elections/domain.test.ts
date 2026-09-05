@@ -42,7 +42,7 @@ describe("election foundation rules", () => {
     );
     expect(electionConfigSchema.safeParse({ ...config(), type: "FACULTY" }).success).toBe(false);
     expect(electionConfigSchema.safeParse({ ...config(), type: "CORE_COMMITTEE" }).success).toBe(
-      true,
+      false,
     );
   });
   it("requires valid application dates", () => {

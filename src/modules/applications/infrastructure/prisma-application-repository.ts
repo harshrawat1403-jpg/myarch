@@ -28,7 +28,7 @@ type ApplicationRow = Prisma.FormApplicationGetPayload<{
 }>;
 
 export class PrismaFormApplicationRepository implements ApplicationRepository {
-  constructor(private readonly prisma: PrismaClient, private readonly associateCandidate?: (tx: Prisma.TransactionClient, input: { formId: string; applicationId: string; applicantUserId: string; electionPositionIds?: readonly string[] }) => Promise<void>) {}
+  constructor(private readonly prisma: PrismaClient, private readonly associateCandidate?: (tx: Prisma.TransactionClient, input: { formId: string; applicationId: string; applicantUserId: string; electionPositionIds?: readonly string[]; coreCommitteeSelectionPositionIds?: readonly string[] }) => Promise<void>) {}
 
   async createSubmitted(data: CreateFormApplicationData): Promise<FormApplicationRecord> {
     let applicationId: string;
@@ -57,7 +57,7 @@ export class PrismaFormApplicationRepository implements ApplicationRepository {
             statusEvents: { create: { toStatus: "SUBMITTED", changedByUserId: data.actorUserId } },
           },
         });
-        await this.associateCandidate?.(tx, { formId: data.formId, applicationId: application.id, applicantUserId: data.applicantUserId, electionPositionIds: data.electionPositionIds });
+        await this.associateCandidate?.(tx, { formId: data.formId, applicationId: application.id, applicantUserId: data.applicantUserId, electionPositionIds: data.electionPositionIds, coreCommitteeSelectionPositionIds: data.coreCommitteeSelectionPositionIds });
         return application.id;
       });
     } catch (error) {

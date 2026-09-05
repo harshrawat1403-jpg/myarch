@@ -1,4 +1,5 @@
 import { ElectionError } from "@/modules/elections";
+import { CoreCommitteeSelectionError } from "@/modules/selections";
 import { NextResponse } from "next/server";
 import { withAuth } from "@/modules/auth";
 import { extractRouteParam } from "@/lib/route-params";
@@ -14,9 +15,10 @@ export const submitFormRouteHandler = withAuth(async (req, { actor }, routeConte
   const parsed = SubmitFormRequestSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return badRequest("Invalid application data", parsed.error.flatten().fieldErrors);
   try {
-    return NextResponse.json({ data: await submitFormUseCase.execute({ actor, formId, answers: parsed.data.answers, electionPositionIds: parsed.data.electionPositionIds }) }, { status: 201 });
+    return NextResponse.json({ data: await submitFormUseCase.execute({ actor, formId, answers: parsed.data.answers, electionPositionIds: parsed.data.electionPositionIds, coreCommitteeSelectionPositionIds: parsed.data.coreCommitteeSelectionPositionIds }) }, { status: 201 });
   } catch (error) {
     if (error instanceof ElectionError) return error.kind === "validation" ? badRequest(error.message) : conflict(error.message);
+    if (error instanceof CoreCommitteeSelectionError) return error.kind === "validation" ? badRequest(error.message) : conflict(error.message);
     if (error instanceof NotAuthorizedError) return forbidden(error.message);
     if (error instanceof FormNotAvailableError) return conflict(error.message);
     if (error instanceof DuplicateFormApplicationError) return conflict(error.message);

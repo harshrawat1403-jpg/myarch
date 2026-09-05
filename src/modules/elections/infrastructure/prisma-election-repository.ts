@@ -91,6 +91,8 @@ export class PrismaElectionRepository implements ElectionRepository {
     await tx.$queryRaw`SELECT "id" FROM "elections" WHERE "id" = ${id}::uuid FOR UPDATE`;
     const row = await tx.election.findUnique({ where: { id }, include });
     if (!row) throw new ElectionError("Election not found", "notFound");
+    if (row.type !== "COUNCIL")
+      throw new ElectionError("Core Committee selections are managed outside the election workflow");
     return row;
   }
   private async draft(tx: Prisma.TransactionClient, id: string) {
@@ -176,7 +178,7 @@ export class PrismaElectionRepository implements ElectionRepository {
       await this.draft(tx, id);
       const form = await tx.form.findUnique({
         where: { id: formId },
-        include: { _count: { select: { submissions: true } } },
+        include: { _count: { select: { submissions: true } }, coreCommitteeSelectionApplicationForm: true },
       });
       if (!form || !["DRAFT", "PUBLISHED"].includes(form.status))
         throw new ElectionError("Link a draft or published form", "validation");
@@ -184,6 +186,8 @@ export class PrismaElectionRepository implements ElectionRepository {
         throw new ElectionError(
           "Use a form without existing submissions; this protects existing application semantics",
         );
+      if (form.coreCommitteeSelectionApplicationForm)
+        throw new ElectionError("Form is already associated with a Core Committee selection");
       await tx.electionApplicationForm.upsert({
         where: { electionId: id },
         create: { electionId: id, formId },
@@ -231,7 +235,7 @@ export class PrismaElectionRepository implements ElectionRepository {
             "Publish the form with no deadline or a deadline covering the election application window",
             "validation",
           );
-        validateSchedule(record(row));
+        validateSchedule({ ...record(row), type: "COUNCIL" });
         if (now < row.applicationOpenAt || now >= row.applicationCloseAt)
           throw new ElectionError("Applications can only open within the configured window");
         if (!row.positions.length || row.maxPositionsPerCandidate > row.positions.length)

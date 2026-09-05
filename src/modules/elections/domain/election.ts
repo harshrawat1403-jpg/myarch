@@ -31,7 +31,7 @@ export const electionConfigSchema = z
         (value) => Number(value.slice(5)) === Number(value.slice(0, 4)) + 1,
         "Use consecutive years, e.g. 2026-2027",
       ),
-    type: z.enum(["COUNCIL", "CORE_COMMITTEE"]),
+    type: z.literal("COUNCIL"),
     applicationOpenAt: requiredDate,
     applicationCloseAt: requiredDate,
     correctionOpenAt: optionalDate,

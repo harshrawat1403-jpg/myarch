@@ -16,6 +16,7 @@ export interface CreateFormApplicationData {
   readonly answers: Record<string, unknown>;
   readonly actorUserId: string;
   readonly electionPositionIds?: readonly string[];
+  readonly coreCommitteeSelectionPositionIds?: readonly string[];
 }
 
 export interface ApplicationRepository {

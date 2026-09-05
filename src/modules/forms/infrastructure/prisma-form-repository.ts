@@ -3,7 +3,7 @@ import { PublishedFormImmutableError } from "../domain/errors";
 import type { CreateFormData, CreateFormFieldData, FormFilters, FormRecord, FormStatus, UpdateFormData } from "../domain/entities";
 import type { FormRepository } from "../application/ports/form-repository";
 
-type FormWithFields = PrismaForm & { fields: PrismaFormField[]; electionApplicationForm?: { electionId: string } | null };
+type FormWithFields = PrismaForm & { fields: PrismaFormField[]; electionApplicationForm?: { electionId: string } | null; coreCommitteeSelectionApplicationForm?: { selectionId: string } | null };
 
 export class PrismaFormRepository implements FormRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -18,7 +18,7 @@ export class PrismaFormRepository implements FormRepository {
         createdByUserId: data.createdByUserId,
         fields: { create: data.fields.map(toFieldCreate) },
       },
-      include: { fields: true, electionApplicationForm: true },
+      include: { fields: true, electionApplicationForm: true, coreCommitteeSelectionApplicationForm: true },
     });
     return toDomain(row);
   }
@@ -26,7 +26,7 @@ export class PrismaFormRepository implements FormRepository {
   async findById(id: string): Promise<FormRecord | null> {
     const row = await this.prisma.form.findUnique({
       where: { id },
-      include: { fields: true, electionApplicationForm: true },
+      include: { fields: true, electionApplicationForm: true, coreCommitteeSelectionApplicationForm: true },
     });
     return row ? toDomain(row) : null;
   }
@@ -50,7 +50,7 @@ export class PrismaFormRepository implements FormRepository {
           data: data.fields.map((field) => ({ formId: id, ...toFieldCreate(field) })),
         });
       }
-      const updated = await tx.form.findUnique({ where: { id }, include: { fields: true, electionApplicationForm: true } });
+      const updated = await tx.form.findUnique({ where: { id }, include: { fields: true, electionApplicationForm: true, coreCommitteeSelectionApplicationForm: true } });
       if (!updated) throw new Error("Updated form could not be loaded");
       return updated;
     });
@@ -65,9 +65,12 @@ export class PrismaFormRepository implements FormRepository {
         : { status, archivedAt: at };
     const row = await this.prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "forms" WHERE "id" = ${id}::uuid FOR UPDATE`;
-      const link = await tx.electionApplicationForm.findUnique({ where: { formId: id }, include: { election: true } });
-      if (link?.election.status === "APPLICATION_OPEN") throw new PublishedFormImmutableError();
-      return tx.form.update({ where: { id }, data, include: { fields: true, electionApplicationForm: true } });
+      const [electionLink, selectionLink] = await Promise.all([
+        tx.electionApplicationForm.findUnique({ where: { formId: id }, include: { election: true } }),
+        tx.coreCommitteeSelectionApplicationForm.findUnique({ where: { formId: id }, include: { selection: true } }),
+      ]);
+      if (electionLink?.election.status === "APPLICATION_OPEN" || selectionLink?.selection.status === "APPLICATION_OPEN") throw new PublishedFormImmutableError();
+      return tx.form.update({ where: { id }, data, include: { fields: true, electionApplicationForm: true, coreCommitteeSelectionApplicationForm: true } });
     });
     return toDomain(row);
   }
@@ -78,7 +81,7 @@ export class PrismaFormRepository implements FormRepository {
         status: filters.status,
         title: filters.search ? { contains: filters.search, mode: "insensitive" } : undefined,
       },
-      include: { fields: true, electionApplicationForm: true },
+      include: { fields: true, electionApplicationForm: true, coreCommitteeSelectionApplicationForm: true },
       orderBy: { createdAt: "desc" },
     });
     return rows.map(toDomain);

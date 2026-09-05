@@ -127,6 +127,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
 // entry that would just 403.
 const SECRETARY_ONLY_NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/elections", label: "Elections", icon: Landmark, group: "Administration" },
+  { href: "/dashboard/core-committee-selections", label: "Core Committee Selections", icon: ClipboardCheck, group: "Administration" },
   {
     href: "/dashboard/admin/coordinators",
     label: "Coordinators",

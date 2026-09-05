@@ -22,7 +22,7 @@ export class SubmitFormUseCase {
     notificationService: NotificationService;
   }) {}
 
-  async execute(input: { actor: AuthenticatedActor; formId: string; answers: Record<string, unknown>; electionPositionIds?: readonly string[] }): Promise<FormApplicationRecord> {
+  async execute(input: { actor: AuthenticatedActor; formId: string; answers: Record<string, unknown>; electionPositionIds?: readonly string[]; coreCommitteeSelectionPositionIds?: readonly string[] }): Promise<FormApplicationRecord> {
     if (!canSubmitFormApplication(input.actor)) throw new NotAuthorizedError("Only students may submit forms");
     const form = await this.deps.formRepository.findById(input.formId);
     if (!form || !isFormAvailable(form)) throw new FormNotAvailableError();
@@ -37,6 +37,7 @@ export class SubmitFormUseCase {
       studentProfileId: applicant.studentProfileId,
       answers: input.answers,
       electionPositionIds: input.electionPositionIds,
+      coreCommitteeSelectionPositionIds: input.coreCommitteeSelectionPositionIds,
       actorUserId: input.actor.userId,
     });
     await this.deps.auditRecorder.record({ actorUserId: input.actor.userId, action: AUDIT_ACTIONS.FORM_APPLICATION_SUBMITTED, targetEntityType: "FormApplication", targetEntityId: application.id, metadata: { formId: form.id } });

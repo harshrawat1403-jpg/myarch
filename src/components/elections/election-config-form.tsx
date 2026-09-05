@@ -80,15 +80,8 @@ export function ElectionConfigForm({
           </div>
           <div>
             <Label htmlFor="election-type">Election type</Label>
-            <select
-              id="election-type"
-              name="type"
-              defaultValue={election?.type ?? "COUNCIL"}
-              className="w-full rounded border border-(--color-border) bg-(--color-background) p-2"
-            >
-              <option value="COUNCIL">Student Council</option>
-              <option value="CORE_COMMITTEE">Core Committee</option>
-            </select>
+            <Input id="election-type" name="type" value="COUNCIL" readOnly />
+            <p className="mt-1 text-sm text-(--color-text-secondary)">Department Council election</p>
           </div>
         </div>
         <div>

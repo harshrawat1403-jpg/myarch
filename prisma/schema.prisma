@@ -297,25 +297,25 @@ enum AcademicYearTransitionStatus {
 // ---------------------------------------------------------------------------
 
 model User {
-  createdElections Election[] @relation("ElectionCreator")
-  lockedElections Election[] @relation("ElectionLocker")
-  electionCandidacies ElectionCandidate[]
-  electionScrutinyReviews ElectionScrutinyReview[] @relation("ElectionScrutinyReviewer")
-  electionCorrectionRequests ElectionCorrectionRequest[] @relation("ElectionCorrectionRequester")
+  createdElections              Election[]                     @relation("ElectionCreator")
+  lockedElections               Election[]                     @relation("ElectionLocker")
+  electionCandidacies           ElectionCandidate[]
+  electionScrutinyReviews       ElectionScrutinyReview[]       @relation("ElectionScrutinyReviewer")
+  electionCorrectionRequests    ElectionCorrectionRequest[]    @relation("ElectionCorrectionRequester")
   electionCorrectionSubmissions ElectionCorrectionSubmission[] @relation("ElectionCorrectionSubmitter")
-  electionObjections ElectionObjection[] @relation("ElectionObjectionObjector")
-  reviewedElectionObjections ElectionObjection[] @relation("ElectionObjectionReviewer")
-  electionInterviewPanels ElectionInterviewPanelMember[] @relation("ElectionPanelMember")
-  scheduledElectionInterviews ElectionInterview[] @relation("ElectionInterviewScheduler")
-  lockedElectionFinalCandidates ElectionFinalCandidate[] @relation("ElectionFinalCandidateLocker")
-  shortlistedElectionEntries ElectionShortlistEntry[] @relation("ElectionShortlistActor")
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique
-  passwordHash String
-  role         Role
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  electionObjections            ElectionObjection[]            @relation("ElectionObjectionObjector")
+  reviewedElectionObjections    ElectionObjection[]            @relation("ElectionObjectionReviewer")
+  electionInterviewPanels       ElectionInterviewPanelMember[] @relation("ElectionPanelMember")
+  scheduledElectionInterviews   ElectionInterview[]            @relation("ElectionInterviewScheduler")
+  lockedElectionFinalCandidates ElectionFinalCandidate[]       @relation("ElectionFinalCandidateLocker")
+  shortlistedElectionEntries    ElectionShortlistEntry[]       @relation("ElectionShortlistActor")
+  id                            String                         @id @default(uuid()) @db.Uuid
+  email                         String                         @unique
+  passwordHash                  String
+  role                          Role
+  isActive                      Boolean                        @default(true)
+  createdAt                     DateTime                       @default(now())
+  updatedAt                     DateTime                       @updatedAt
 
   // V3.0 Administration Platform: set true whenever an admin issues a
   // temporary password (account creation or reset) — see
@@ -398,13 +398,25 @@ model User {
 
   // MYARCH Phase 5 — Generic forms and applications. These are deliberately
   // separate from the placement-specific Application model below.
-  createdForms                         Form[]                         @relation("FormCreatedBy")
-  formSubmissions                      FormSubmission[]                @relation("FormSubmissionApplicant")
-  formApplicationReviewerAssignments   FormApplicationReviewer[]       @relation("FormApplicationReviewer")
-  formApplicationReviewAssignments     FormApplicationReviewer[]       @relation("FormApplicationReviewerAssignedBy")
-  formApplicationReviews               FormApplicationReview[]         @relation("FormApplicationReviewReviewer")
-  formApplicationStatusChanges         FormApplicationStatusEvent[]    @relation("FormApplicationStatusChangedBy")
-  formApplicationDecisions             FormApplication[]               @relation("FormApplicationDecidedBy")
+  createdForms                       Form[]                       @relation("FormCreatedBy")
+  formSubmissions                    FormSubmission[]             @relation("FormSubmissionApplicant")
+  formApplicationReviewerAssignments FormApplicationReviewer[]    @relation("FormApplicationReviewer")
+  formApplicationReviewAssignments   FormApplicationReviewer[]    @relation("FormApplicationReviewerAssignedBy")
+  formApplicationReviews             FormApplicationReview[]      @relation("FormApplicationReviewReviewer")
+  formApplicationStatusChanges       FormApplicationStatusEvent[] @relation("FormApplicationStatusChangedBy")
+  formApplicationDecisions           FormApplication[]            @relation("FormApplicationDecidedBy")
+
+  coreCommitteeSelectionsCreated              CoreCommitteeSelection[]                  @relation("CoreCommitteeSelectionCreator")
+  coreCommitteeSelectionsLocked               CoreCommitteeSelection[]                  @relation("CoreCommitteeSelectionLocker")
+  coreCommitteeSelectionCandidates            CoreCommitteeSelectionCandidate[]         @relation("CoreCommitteeSelectionCandidateApplicant")
+  coreCommitteeSelectionScrutinyReviews       CoreCommitteeSelectionScrutinyReview[]    @relation("CoreCommitteeSelectionScrutinyReviewer")
+  coreCommitteeSelectionCorrectionRequests    CoreCommitteeSelectionCorrectionRequest[] @relation("CoreCommitteeSelectionCorrectionRequester")
+  coreCommitteeSelectionCorrectionSubmissions CoreCommitteeSelectionCorrectionRequest[] @relation("CoreCommitteeSelectionCorrectionSubmitter")
+  coreCommitteeSelectionShortlistEntries      CoreCommitteeSelectionShortlistEntry[]    @relation("CoreCommitteeSelectionShortlistedBy")
+  coreCommitteeSelectionInterviews            CoreCommitteeSelectionInterview[]         @relation("CoreCommitteeSelectionInterviewScheduler")
+  coreCommitteeCouncilReviews                 CoreCommitteeCouncilReview[]              @relation("CoreCommitteeCouncilReviewMember")
+  coreCommitteeSelectionDecisionsRecorded     CoreCommitteeSelectionDecision[]          @relation("CoreCommitteeSelectionDecisionRecorder")
+  coreCommitteeSelectionDecisionsFinalized    CoreCommitteeSelectionDecision[]          @relation("CoreCommitteeSelectionDecisionFinalizer")
 
   // MYARCH Edit Mode — inline content overrides for existing public pages.
   updatedContentOverrides ContentOverride[] @relation("ContentOverrideUpdatedBy")
@@ -443,9 +455,9 @@ model RefreshToken {
 // hash of it (see src/lib/opaque-token.ts), matching RefreshToken's own
 // `tokenHash` convention exactly.
 model EmailVerificationToken {
-  id        String  @id @default(uuid()) @db.Uuid
+  id        String @id @default(uuid()) @db.Uuid
   email     String
-  tokenHash String  @unique
+  tokenHash String @unique
 
   userId String? @db.Uuid
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -679,7 +691,7 @@ model StudentProfile {
   recruiterStudentInteractions RecruiterStudentInteraction[]
   recruiterInterestRequests    RecruiterInterestRequest[]
   applications                 Application[]
-  formSubmissions              FormSubmission[] @relation("FormSubmissionStudent")
+  formSubmissions              FormSubmission[]              @relation("FormSubmissionStudent")
   alumniProfile                AlumniProfile?
 
   @@index([batchId])
@@ -1087,12 +1099,13 @@ enum FormApplicationStatus {
 }
 
 model Form {
-  electionApplicationForm ElectionApplicationForm?
-  id          String     @id @default(uuid()) @db.Uuid
-  title       String
-  description String?
-  status      FormStatus @default(DRAFT)
-  deadline    DateTime?
+  electionApplicationForm               ElectionApplicationForm?
+  coreCommitteeSelectionApplicationForm CoreCommitteeSelectionApplicationForm?
+  id                                    String                                 @id @default(uuid()) @db.Uuid
+  title                                 String
+  description                           String?
+  status                                FormStatus                             @default(DRAFT)
+  deadline                              DateTime?
 
   committeeId String?    @db.Uuid
   committee   Committee? @relation(fields: [committeeId], references: [id])
@@ -1115,19 +1128,19 @@ model Form {
 }
 
 model FormField {
-  id          String        @id @default(uuid()) @db.Uuid
-  formId      String        @db.Uuid
-  form        Form          @relation(fields: [formId], references: [id], onDelete: Cascade)
-  key         String
-  label       String
-  type        FormFieldType
-  description String?
-  required    Boolean       @default(false)
-  options     Json?
-  validation  Json?
+  id           String        @id @default(uuid()) @db.Uuid
+  formId       String        @db.Uuid
+  form         Form          @relation(fields: [formId], references: [id], onDelete: Cascade)
+  key          String
+  label        String
+  type         FormFieldType
+  description  String?
+  required     Boolean       @default(false)
+  options      Json?
+  validation   Json?
   displayOrder Int
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   @@unique([formId, key])
   @@index([formId, displayOrder])
@@ -1135,16 +1148,16 @@ model FormField {
 }
 
 model FormSubmission {
-  id              String         @id @default(uuid()) @db.Uuid
-  formId          String         @db.Uuid
-  form            Form           @relation(fields: [formId], references: [id], onDelete: Cascade)
-  applicantUserId String         @db.Uuid
-  applicant       User           @relation("FormSubmissionApplicant", fields: [applicantUserId], references: [id])
-  studentProfileId String        @db.Uuid
-  studentProfile  StudentProfile @relation("FormSubmissionStudent", fields: [studentProfileId], references: [id])
-  answers         Json
-  submittedAt     DateTime       @default(now())
-  createdAt       DateTime       @default(now())
+  id               String         @id @default(uuid()) @db.Uuid
+  formId           String         @db.Uuid
+  form             Form           @relation(fields: [formId], references: [id], onDelete: Cascade)
+  applicantUserId  String         @db.Uuid
+  applicant        User           @relation("FormSubmissionApplicant", fields: [applicantUserId], references: [id])
+  studentProfileId String         @db.Uuid
+  studentProfile   StudentProfile @relation("FormSubmissionStudent", fields: [studentProfileId], references: [id])
+  answers          Json
+  submittedAt      DateTime       @default(now())
+  createdAt        DateTime       @default(now())
 
   application FormApplication?
 
@@ -1155,20 +1168,21 @@ model FormSubmission {
 }
 
 model FormApplication {
-  electionCandidate ElectionCandidate?
-  id              String                @id @default(uuid()) @db.Uuid
-  submissionId    String                @unique @db.Uuid
-  submission      FormSubmission        @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  currentStatus   FormApplicationStatus @default(SUBMITTED)
-  decisionReason  String?
-  decidedByUserId String?               @db.Uuid
-  decidedBy       User?                 @relation("FormApplicationDecidedBy", fields: [decidedByUserId], references: [id])
-  decidedAt       DateTime?
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  electionCandidate               ElectionCandidate?
+  coreCommitteeSelectionCandidate CoreCommitteeSelectionCandidate?
+  id                              String                           @id @default(uuid()) @db.Uuid
+  submissionId                    String                           @unique @db.Uuid
+  submission                      FormSubmission                   @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  currentStatus                   FormApplicationStatus            @default(SUBMITTED)
+  decisionReason                  String?
+  decidedByUserId                 String?                          @db.Uuid
+  decidedBy                       User?                            @relation("FormApplicationDecidedBy", fields: [decidedByUserId], references: [id])
+  decidedAt                       DateTime?
+  createdAt                       DateTime                         @default(now())
+  updatedAt                       DateTime                         @updatedAt
 
-  reviewers   FormApplicationReviewer[]
-  reviews     FormApplicationReview[]
+  reviewers    FormApplicationReviewer[]
+  reviews      FormApplicationReview[]
   statusEvents FormApplicationStatusEvent[]
 
   @@index([currentStatus])
@@ -1176,15 +1190,15 @@ model FormApplication {
 }
 
 model FormApplicationReviewer {
-  id            String          @id @default(uuid()) @db.Uuid
-  applicationId String          @db.Uuid
-  application   FormApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  reviewerUserId String         @db.Uuid
-  reviewer      User            @relation("FormApplicationReviewer", fields: [reviewerUserId], references: [id])
-  assignedByUserId String       @db.Uuid
-  assignedBy    User            @relation("FormApplicationReviewerAssignedBy", fields: [assignedByUserId], references: [id])
-  assignedAt    DateTime        @default(now())
-  unassignedAt  DateTime?
+  id               String          @id @default(uuid()) @db.Uuid
+  applicationId    String          @db.Uuid
+  application      FormApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reviewerUserId   String          @db.Uuid
+  reviewer         User            @relation("FormApplicationReviewer", fields: [reviewerUserId], references: [id])
+  assignedByUserId String          @db.Uuid
+  assignedBy       User            @relation("FormApplicationReviewerAssignedBy", fields: [assignedByUserId], references: [id])
+  assignedAt       DateTime        @default(now())
+  unassignedAt     DateTime?
 
   @@index([applicationId])
   @@index([reviewerUserId, unassignedAt])
@@ -1192,13 +1206,13 @@ model FormApplicationReviewer {
 }
 
 model FormApplicationReview {
-  id            String          @id @default(uuid()) @db.Uuid
-  applicationId String          @db.Uuid
-  application   FormApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  reviewerUserId String         @db.Uuid
-  reviewer      User            @relation("FormApplicationReviewReviewer", fields: [reviewerUserId], references: [id])
-  notes         String
-  createdAt     DateTime        @default(now())
+  id             String          @id @default(uuid()) @db.Uuid
+  applicationId  String          @db.Uuid
+  application    FormApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reviewerUserId String          @db.Uuid
+  reviewer       User            @relation("FormApplicationReviewReviewer", fields: [reviewerUserId], references: [id])
+  notes          String
+  createdAt      DateTime        @default(now())
 
   @@index([applicationId])
   @@index([reviewerUserId])
@@ -1206,15 +1220,15 @@ model FormApplicationReview {
 }
 
 model FormApplicationStatusEvent {
-  id            String                 @id @default(uuid()) @db.Uuid
-  applicationId String                 @db.Uuid
-  application   FormApplication        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  fromStatus    FormApplicationStatus?
-  toStatus      FormApplicationStatus
-  note          String?
-  changedByUserId String               @db.Uuid
-  changedBy     User                   @relation("FormApplicationStatusChangedBy", fields: [changedByUserId], references: [id])
-  occurredAt    DateTime               @default(now())
+  id              String                 @id @default(uuid()) @db.Uuid
+  applicationId   String                 @db.Uuid
+  application     FormApplication        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fromStatus      FormApplicationStatus?
+  toStatus        FormApplicationStatus
+  note            String?
+  changedByUserId String                 @db.Uuid
+  changedBy       User                   @relation("FormApplicationStatusChangedBy", fields: [changedByUserId], references: [id])
+  occurredAt      DateTime               @default(now())
 
   @@index([applicationId])
   @@map("form_application_status_events")
@@ -1395,12 +1409,12 @@ model TaskComment {
 // ---------------------------------------------------------------------------
 
 model MaintenanceIssue {
-  id          String                  @id @default(uuid()) @db.Uuid
+  id          String                 @id @default(uuid()) @db.Uuid
   category    MaintenanceCategory
   location    String
   description String
-  priority    TaskPriority            @default(MEDIUM)
-  status      MaintenanceIssueStatus  @default(SUBMITTED)
+  priority    TaskPriority           @default(MEDIUM)
+  status      MaintenanceIssueStatus @default(SUBMITTED)
 
   // Nullable — MYARCH public Maintenance reporting amendment. Null means
   // this issue was reported anonymously via the public, unauthenticated
@@ -1409,16 +1423,16 @@ model MaintenanceIssue {
   // contact info instead. Never both null and unset — exactly one of
   // {requesterId} or {publicReporterName + publicReporterEmail} is present,
   // enforced at the application layer (no DB constraint expresses an XOR).
-  requesterId String? @db.Uuid
-  requester   User?   @relation("MaintenanceIssueRequester", fields: [requesterId], references: [id])
+  requesterId         String? @db.Uuid
+  requester           User?   @relation("MaintenanceIssueRequester", fields: [requesterId], references: [id])
   // Meaningful only when requesterId is null — the anonymous complainant's
   // own name/email, collected once at submission time. Never used for
   // authorization (an anonymous complainant has no session to authorize
   // with); staff-visible only, for contacting them about their report.
   publicReporterName  String?
   publicReporterEmail String?
-  assigneeId  String? @db.Uuid
-  assignee    User?   @relation("MaintenanceIssueAssignee", fields: [assigneeId], references: [id])
+  assigneeId          String? @db.Uuid
+  assignee            User?   @relation("MaintenanceIssueAssignee", fields: [assigneeId], references: [id])
 
   // SLA deadline — mirrored onto the linked Task's own `deadline` at
   // assignment time so the Task Engine's existing overdue/escalation job
@@ -1434,8 +1448,8 @@ model MaintenanceIssue {
   // worth a dedicated column; the full stage-by-stage history is served by
   // the existing AuditLog (targetEntityType "MaintenanceIssue"), not
   // duplicated here.
-  acknowledgedAt DateTime?
-  resolvedAt     DateTime?
+  acknowledgedAt    DateTime?
+  resolvedAt        DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1450,12 +1464,12 @@ model MaintenanceIssue {
 }
 
 model MaintenanceAttachment {
-  id        String            @id @default(uuid()) @db.Uuid
-  issueId   String            @db.Uuid
-  issue     MaintenanceIssue  @relation(fields: [issueId], references: [id], onDelete: Cascade)
-  fileId    String            @db.Uuid
-  file      FileAsset         @relation("MaintenanceAttachmentFile", fields: [fileId], references: [id])
-  createdAt DateTime          @default(now())
+  id        String           @id @default(uuid()) @db.Uuid
+  issueId   String           @db.Uuid
+  issue     MaintenanceIssue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  fileId    String           @db.Uuid
+  file      FileAsset        @relation("MaintenanceAttachmentFile", fields: [fileId], references: [id])
+  createdAt DateTime         @default(now())
 
   @@index([issueId])
   @@map("maintenance_attachments")
@@ -1468,8 +1482,8 @@ model Request {
   priority    TaskPriority  @default(MEDIUM)
   status      RequestStatus @default(SUBMITTED)
 
-  requesterId String @db.Uuid
-  requester   User   @relation("RequestRequester", fields: [requesterId], references: [id])
+  requesterId String  @db.Uuid
+  requester   User    @relation("RequestRequester", fields: [requesterId], references: [id])
   ownerId     String? @db.Uuid
   owner       User?   @relation("RequestOwner", fields: [ownerId], references: [id])
 
@@ -1492,12 +1506,12 @@ model Request {
 }
 
 model RequestAttachment {
-  id        String   @id @default(uuid()) @db.Uuid
-  requestId String   @db.Uuid
-  request   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  fileId    String   @db.Uuid
+  id        String    @id @default(uuid()) @db.Uuid
+  requestId String    @db.Uuid
+  request   Request   @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fileId    String    @db.Uuid
   file      FileAsset @relation("RequestAttachmentFile", fields: [fileId], references: [id])
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([requestId])
   @@map("request_attachments")
@@ -1570,12 +1584,12 @@ model EventParticipant {
 // (Task Engine rows): a lightweight, unowned, undated todo item — no
 // assignment/deadline/priority machinery, just a label and a done flag.
 model EventChecklistItem {
-  id      String  @id @default(uuid()) @db.Uuid
-  eventId String  @db.Uuid
-  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  label   String
-  isDone  Boolean @default(false)
-  sortOrder Int   @default(0)
+  id        String  @id @default(uuid()) @db.Uuid
+  eventId   String  @db.Uuid
+  event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  label     String
+  isDone    Boolean @default(false)
+  sortOrder Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1668,11 +1682,11 @@ model MeetingParticipant {
 }
 
 model Announcement {
-  id           String                   @id @default(uuid()) @db.Uuid
-  title        String
-  content      String
-  priority     TaskPriority             @default(MEDIUM)
-  audienceType AnnouncementAudienceType @default(EVERYONE)
+  id            String                   @id @default(uuid()) @db.Uuid
+  title         String
+  content       String
+  priority      TaskPriority             @default(MEDIUM)
+  audienceType  AnnouncementAudienceType @default(EVERYONE)
   // Interpretation per audienceType: YEAR -> a batch id (as text); PROGRAM
   // -> a program/department name; COMMITTEE/COUNCIL -> reserved for Phase 4
   // (§5), free text for now since no Committee/Council table exists yet;
@@ -1754,10 +1768,12 @@ model Committee {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships CommitteeMembership[]
-  attachments CommitteeAttachment[]
-  forms       Form[]
-  meetings    Meeting[]
+  memberships                     CommitteeMembership[]
+  attachments                     CommitteeAttachment[]
+  forms                           Form[]
+  meetings                        Meeting[]
+  coreCommitteeCouncilReviews     CoreCommitteeCouncilReview[]
+  coreCommitteeSelectionDecisions CoreCommitteeSelectionDecision[]
 
   @@index([type])
   @@index([status])
@@ -2107,6 +2123,8 @@ model ContentOverride {
 // Phase 6, Slice 1: only application intake states are exposed.
 enum ElectionType {
   COUNCIL
+  // Retained for legacy-row compatibility. New Core Committee selections use
+  // CoreCommitteeSelection and are never created through Election.
   CORE_COMMITTEE
 }
 
@@ -2163,32 +2181,316 @@ enum ElectionInterviewStatus {
   CANCELLED
 }
 
-model Election {
-  id                          String                   @id @default(uuid()) @db.Uuid
+// Core Committee is a Council-led selection process. It deliberately has no
+// voter, ballot, quorum, counting, or election-result records.
+enum CoreCommitteeSelectionStatus {
+  DRAFT
+  APPLICATION_OPEN
+  APPLICATION_CLOSED
+  SCRUTINY
+  CORRECTIONS
+  SHORTLIST
+  INTERVIEWS
+  COUNCIL_REVIEW
+  SELECTION_DECIDED
+  PUBLISHED
+  MEMBERSHIP_CONFIRMED
+  ARCHIVED
+}
+
+enum CoreCommitteeSelectionCandidateStatus {
+  APPLIED
+  ELIGIBLE
+  INELIGIBLE
+  CORRECTION_REQUIRED
+  SHORTLISTED
+  WITHDRAWN
+}
+
+enum CoreCommitteeSelectionCorrectionStatus {
+  OPEN
+  SUBMITTED
+  RESOLVED
+  CANCELLED
+}
+
+enum CoreCommitteeSelectionInterviewStatus {
+  PLANNED
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum CoreCommitteeSelectionDecisionOutcome {
+  SELECTED
+  NOT_SELECTED
+}
+
+enum CoreCommitteeSelectionDecisionState {
+  RECORDED
+  FINALIZED
+}
+
+model CoreCommitteeSelection {
+  id                          String                                    @id @default(uuid()) @db.Uuid
   title                       String
   academicYear                String
-  type                        ElectionType
-  status                      ElectionStatus           @default(DRAFT)
+  status                      CoreCommitteeSelectionStatus              @default(DRAFT)
   applicationOpenAt           DateTime
   applicationCloseAt          DateTime
   correctionOpenAt            DateTime?
   correctionCloseAt           DateTime?
-  campaignEnabled             Boolean                  @default(false)
-  campaignOpenAt              DateTime?
-  campaignCloseAt             DateTime?
-  maxPositionsPerCandidate    Int                      @default(1)
-  studentQuorumPercent        Decimal                  @default(0) @db.Decimal(5, 2)
-  facultyQuorumPercent        Decimal                  @default(0) @db.Decimal(5, 2)
-  exCouncilQuorumPercent      Decimal                  @default(0) @db.Decimal(5, 2)
+  maxPositionsPerCandidate    Int                                       @default(1)
   configurationLockedAt       DateTime?
-  configurationLockedByUserId String?                  @db.Uuid
-  configurationLockedBy       User?                    @relation("ElectionLocker", fields: [configurationLockedByUserId], references: [id], onDelete: Restrict)
+  configurationLockedByUserId String?                                   @db.Uuid
+  configurationLockedBy       User?                                     @relation("CoreCommitteeSelectionLocker", fields: [configurationLockedByUserId], references: [id], onDelete: Restrict)
   openedAt                    DateTime?
   closedAt                    DateTime?
-  createdByUserId             String                   @db.Uuid
-  createdBy                   User                     @relation("ElectionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  createdAt                   DateTime                 @default(now())
-  updatedAt                   DateTime                 @updatedAt
+  createdByUserId             String                                    @db.Uuid
+  createdBy                   User                                      @relation("CoreCommitteeSelectionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdAt                   DateTime                                  @default(now())
+  updatedAt                   DateTime                                  @updatedAt
+  positions                   CoreCommitteeSelectionPosition[]
+  applicationForm             CoreCommitteeSelectionApplicationForm?
+  candidates                  CoreCommitteeSelectionCandidate[]
+  scrutinyReviews             CoreCommitteeSelectionScrutinyReview[]
+  correctionRequests          CoreCommitteeSelectionCorrectionRequest[]
+  shortlistEntries            CoreCommitteeSelectionShortlistEntry[]
+  interviews                  CoreCommitteeSelectionInterview[]
+  councilReviews              CoreCommitteeCouncilReview[]
+  decisions                   CoreCommitteeSelectionDecision[]
+
+  @@index([status, applicationOpenAt, applicationCloseAt])
+  @@index([academicYear, status])
+  @@map("core_committee_selections")
+}
+
+model CoreCommitteeSelectionPosition {
+  id                 String                                    @id @default(uuid()) @db.Uuid
+  selectionId        String                                    @db.Uuid
+  selection          CoreCommitteeSelection                    @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  title              String
+  identityKey        String
+  description        String
+  seats              Int
+  displayOrder       Int                                       @default(0)
+  createdAt          DateTime                                  @default(now())
+  updatedAt          DateTime                                  @updatedAt
+  candidatePositions CoreCommitteeSelectionCandidatePosition[]
+  shortlistEntries   CoreCommitteeSelectionShortlistEntry[]
+  interviews         CoreCommitteeSelectionInterview[]
+  councilReviews     CoreCommitteeCouncilReview[]
+  decisions          CoreCommitteeSelectionDecision[]
+
+  @@unique([selectionId, identityKey])
+  @@unique([id, selectionId])
+  @@index([selectionId, displayOrder])
+  @@map("core_committee_selection_positions")
+}
+
+model CoreCommitteeSelectionApplicationForm {
+  id          String                 @id @default(uuid()) @db.Uuid
+  selectionId String                 @unique @db.Uuid
+  selection   CoreCommitteeSelection @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  formId      String                 @unique @db.Uuid
+  form        Form                   @relation(fields: [formId], references: [id], onDelete: Restrict)
+  createdAt   DateTime               @default(now())
+
+  @@map("core_committee_selection_application_forms")
+}
+
+model CoreCommitteeSelectionCandidate {
+  id                 String                                    @id @default(uuid()) @db.Uuid
+  selectionId        String                                    @db.Uuid
+  selection          CoreCommitteeSelection                    @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  applicationId      String                                    @unique @db.Uuid
+  application        FormApplication                           @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  applicantUserId    String                                    @db.Uuid
+  applicant          User                                      @relation("CoreCommitteeSelectionCandidateApplicant", fields: [applicantUserId], references: [id], onDelete: Restrict)
+  status             CoreCommitteeSelectionCandidateStatus     @default(APPLIED)
+  createdAt          DateTime                                  @default(now())
+  updatedAt          DateTime                                  @updatedAt
+  positions          CoreCommitteeSelectionCandidatePosition[]
+  scrutinyReviews    CoreCommitteeSelectionScrutinyReview[]
+  correctionRequests CoreCommitteeSelectionCorrectionRequest[]
+  shortlistEntries   CoreCommitteeSelectionShortlistEntry[]
+  interviews         CoreCommitteeSelectionInterview[]
+  councilReviews     CoreCommitteeCouncilReview[]
+  decisions          CoreCommitteeSelectionDecision[]
+
+  @@unique([selectionId, applicantUserId])
+  @@unique([id, selectionId])
+  @@index([applicantUserId])
+  @@map("core_committee_selection_candidates")
+}
+
+model CoreCommitteeSelectionCandidatePosition {
+  id          String                          @id @default(uuid()) @db.Uuid
+  selectionId String                          @db.Uuid
+  candidateId String                          @db.Uuid
+  candidate   CoreCommitteeSelectionCandidate @relation(fields: [candidateId, selectionId], references: [id, selectionId], onDelete: Restrict)
+  positionId  String                          @db.Uuid
+  position    CoreCommitteeSelectionPosition  @relation(fields: [positionId, selectionId], references: [id, selectionId], onDelete: Restrict)
+
+  @@unique([candidateId, positionId])
+  @@index([positionId, selectionId])
+  @@map("core_committee_selection_candidate_positions")
+}
+
+model CoreCommitteeSelectionScrutinyReview {
+  id             String                                @id @default(uuid()) @db.Uuid
+  selectionId    String                                @db.Uuid
+  selection      CoreCommitteeSelection                @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  candidateId    String                                @db.Uuid
+  candidate      CoreCommitteeSelectionCandidate       @relation(fields: [candidateId, selectionId], references: [id, selectionId], onDelete: Restrict)
+  decision       CoreCommitteeSelectionCandidateStatus
+  reason         String
+  reviewerUserId String                                @db.Uuid
+  reviewer       User                                  @relation("CoreCommitteeSelectionScrutinyReviewer", fields: [reviewerUserId], references: [id], onDelete: Restrict)
+  createdAt      DateTime                              @default(now())
+
+  @@index([candidateId, createdAt])
+  @@index([selectionId, decision])
+  @@map("core_committee_selection_scrutiny_reviews")
+}
+
+model CoreCommitteeSelectionCorrectionRequest {
+  id                String                                 @id @default(uuid()) @db.Uuid
+  selectionId       String                                 @db.Uuid
+  selection         CoreCommitteeSelection                 @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  candidateId       String                                 @db.Uuid
+  candidate         CoreCommitteeSelectionCandidate        @relation(fields: [candidateId, selectionId], references: [id, selectionId], onDelete: Restrict)
+  instructions      String
+  status            CoreCommitteeSelectionCorrectionStatus @default(OPEN)
+  requestedByUserId String                                 @db.Uuid
+  requestedBy       User                                   @relation("CoreCommitteeSelectionCorrectionRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  statement         String?
+  submittedByUserId String?                                @db.Uuid
+  submittedBy       User?                                  @relation("CoreCommitteeSelectionCorrectionSubmitter", fields: [submittedByUserId], references: [id], onDelete: Restrict, map: "core_committee_selection_correction_requests_submittedBy_fkey")
+  submittedAt       DateTime?
+  resolvedAt        DateTime?
+  createdAt         DateTime                               @default(now())
+
+  @@index([selectionId, candidateId], map: "core_committee_selection_correction_requests_selectionId_candid")
+  @@index([status])
+  @@map("core_committee_selection_correction_requests")
+}
+
+model CoreCommitteeSelectionShortlistEntry {
+  id                  String                          @id @default(uuid()) @db.Uuid
+  selectionId         String                          @db.Uuid
+  selection           CoreCommitteeSelection          @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  candidateId         String                          @db.Uuid
+  candidate           CoreCommitteeSelectionCandidate @relation(fields: [candidateId, selectionId], references: [id, selectionId], onDelete: Restrict)
+  positionId          String                          @db.Uuid
+  position            CoreCommitteeSelectionPosition  @relation(fields: [positionId, selectionId], references: [id, selectionId], onDelete: Restrict)
+  shortlistedByUserId String                          @db.Uuid
+  shortlistedBy       User                            @relation("CoreCommitteeSelectionShortlistedBy", fields: [shortlistedByUserId], references: [id], onDelete: Restrict)
+  createdAt           DateTime                        @default(now())
+
+  @@unique([candidateId, positionId])
+  @@index([selectionId, positionId])
+  @@map("core_committee_selection_shortlist_entries")
+}
+
+model CoreCommitteeSelectionInterview {
+  id                String                                @id @default(uuid()) @db.Uuid
+  selectionId       String                                @db.Uuid
+  selection         CoreCommitteeSelection                @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  candidateId       String                                @db.Uuid
+  candidate         CoreCommitteeSelectionCandidate       @relation(fields: [candidateId, selectionId], references: [id, selectionId], onDelete: Restrict)
+  positionId        String                                @db.Uuid
+  position          CoreCommitteeSelectionPosition        @relation(fields: [positionId, selectionId], references: [id, selectionId], onDelete: Restrict)
+  status            CoreCommitteeSelectionInterviewStatus @default(PLANNED)
+  scheduledAt       DateTime?
+  durationMinutes   Int?
+  mode              String?
+  location          String?
+  candidateAttended Boolean?
+  completedAt       DateTime?
+  scheduledByUserId String                                @db.Uuid
+  scheduledBy       User                                  @relation("CoreCommitteeSelectionInterviewScheduler", fields: [scheduledByUserId], references: [id], onDelete: Restrict)
+  createdAt         DateTime                              @default(now())
+  updatedAt         DateTime                              @updatedAt
+
+  @@unique([candidateId, positionId])
+  @@index([selectionId, status, scheduledAt])
+  @@map("core_committee_selection_interviews")
+}
+
+model CoreCommitteeCouncilReview {
+  id                  String                          @id @default(uuid()) @db.Uuid
+  selectionId         String                          @db.Uuid
+  selection           CoreCommitteeSelection          @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  candidateId         String                          @db.Uuid
+  candidate           CoreCommitteeSelectionCandidate @relation(fields: [candidateId, selectionId], references: [id, selectionId], onDelete: Restrict)
+  positionId          String                          @db.Uuid
+  position            CoreCommitteeSelectionPosition  @relation(fields: [positionId, selectionId], references: [id, selectionId], onDelete: Restrict)
+  councilCommitteeId  String                          @db.Uuid
+  councilCommittee    Committee                       @relation(fields: [councilCommitteeId], references: [id], onDelete: Restrict)
+  councilMemberUserId String                          @db.Uuid
+  councilMember       User                            @relation("CoreCommitteeCouncilReviewMember", fields: [councilMemberUserId], references: [id], onDelete: Restrict)
+  note                String
+  createdAt           DateTime                        @default(now())
+
+  @@unique([candidateId, positionId, councilMemberUserId])
+  @@index([selectionId, councilCommitteeId])
+  @@map("core_committee_council_reviews")
+}
+
+model CoreCommitteeSelectionDecision {
+  id                 String                                @id @default(uuid()) @db.Uuid
+  selectionId        String                                @db.Uuid
+  selection          CoreCommitteeSelection                @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  candidateId        String                                @db.Uuid
+  candidate          CoreCommitteeSelectionCandidate       @relation(fields: [candidateId, selectionId], references: [id, selectionId], onDelete: Restrict)
+  positionId         String                                @db.Uuid
+  position           CoreCommitteeSelectionPosition        @relation(fields: [positionId, selectionId], references: [id, selectionId], onDelete: Restrict)
+  councilCommitteeId String                                @db.Uuid
+  councilCommittee   Committee                             @relation(fields: [councilCommitteeId], references: [id], onDelete: Restrict)
+  outcome            CoreCommitteeSelectionDecisionOutcome
+  state              CoreCommitteeSelectionDecisionState   @default(RECORDED)
+  internalNote       String
+  decidedByUserId    String                                @db.Uuid
+  decidedBy          User                                  @relation("CoreCommitteeSelectionDecisionRecorder", fields: [decidedByUserId], references: [id], onDelete: Restrict)
+  decidedAt          DateTime                              @default(now())
+  finalizedByUserId  String?                               @db.Uuid
+  finalizedBy        User?                                 @relation("CoreCommitteeSelectionDecisionFinalizer", fields: [finalizedByUserId], references: [id], onDelete: Restrict)
+  finalizedAt        DateTime?
+  createdAt          DateTime                              @default(now())
+  updatedAt          DateTime                              @updatedAt
+
+  @@unique([candidateId, positionId])
+  @@index([selectionId, state])
+  @@map("core_committee_selection_decisions")
+}
+
+model Election {
+  id                          String                       @id @default(uuid()) @db.Uuid
+  title                       String
+  academicYear                String
+  type                        ElectionType
+  status                      ElectionStatus               @default(DRAFT)
+  applicationOpenAt           DateTime
+  applicationCloseAt          DateTime
+  correctionOpenAt            DateTime?
+  correctionCloseAt           DateTime?
+  campaignEnabled             Boolean                      @default(false)
+  campaignOpenAt              DateTime?
+  campaignCloseAt             DateTime?
+  maxPositionsPerCandidate    Int                          @default(1)
+  studentQuorumPercent        Decimal                      @default(0) @db.Decimal(5, 2)
+  facultyQuorumPercent        Decimal                      @default(0) @db.Decimal(5, 2)
+  exCouncilQuorumPercent      Decimal                      @default(0) @db.Decimal(5, 2)
+  configurationLockedAt       DateTime?
+  configurationLockedByUserId String?                      @db.Uuid
+  configurationLockedBy       User?                        @relation("ElectionLocker", fields: [configurationLockedByUserId], references: [id], onDelete: Restrict)
+  openedAt                    DateTime?
+  closedAt                    DateTime?
+  createdByUserId             String                       @db.Uuid
+  createdBy                   User                         @relation("ElectionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
   positions                   ElectionPosition[]
   applicationForm             ElectionApplicationForm?
   candidates                  ElectionCandidate[]
@@ -2206,21 +2508,21 @@ model Election {
 }
 
 model ElectionPosition {
-  id           String                      @id @default(uuid()) @db.Uuid
-  electionId   String                      @db.Uuid
-  election     Election                    @relation(fields: [electionId], references: [id], onDelete: Restrict)
-  title        String
-  identityKey  String
-  description  String
-  seats        Int
-  displayOrder Int                         @default(0)
-  createdAt    DateTime                    @default(now())
-  updatedAt    DateTime                    @updatedAt
-  weights      ElectionPositionWeight[]
-  candidates   ElectionCandidatePosition[]
+  id               String                      @id @default(uuid()) @db.Uuid
+  electionId       String                      @db.Uuid
+  election         Election                    @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  title            String
+  identityKey      String
+  description      String
+  seats            Int
+  displayOrder     Int                         @default(0)
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  weights          ElectionPositionWeight[]
+  candidates       ElectionCandidatePosition[]
   shortlistEntries ElectionShortlistEntry[]
-  interviews ElectionInterview[]
-  finalCandidates ElectionFinalCandidate[]
+  interviews       ElectionInterview[]
+  finalCandidates  ElectionFinalCandidate[]
 
   @@unique([electionId, identityKey])
   @@unique([id, electionId])
@@ -2251,23 +2553,23 @@ model ElectionApplicationForm {
 }
 
 model ElectionCandidate {
-  id              String                      @id @default(uuid()) @db.Uuid
-  electionId      String                      @db.Uuid
-  election        Election                    @relation(fields: [electionId], references: [id], onDelete: Restrict)
-  applicationId   String                      @unique @db.Uuid
-  application     FormApplication             @relation(fields: [applicationId], references: [id], onDelete: Restrict)
-  applicantUserId String                      @db.Uuid
-  applicant       User                        @relation(fields: [applicantUserId], references: [id], onDelete: Restrict)
-  status          ElectionCandidateStatus     @default(APPLIED)
-  createdAt       DateTime                    @default(now())
-  updatedAt       DateTime                    @updatedAt
-  positions       ElectionCandidatePosition[]
-  scrutinyReviews ElectionScrutinyReview[]
+  id                 String                      @id @default(uuid()) @db.Uuid
+  electionId         String                      @db.Uuid
+  election           Election                    @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  applicationId      String                      @unique @db.Uuid
+  application        FormApplication             @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  applicantUserId    String                      @db.Uuid
+  applicant          User                        @relation(fields: [applicantUserId], references: [id], onDelete: Restrict)
+  status             ElectionCandidateStatus     @default(APPLIED)
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+  positions          ElectionCandidatePosition[]
+  scrutinyReviews    ElectionScrutinyReview[]
   correctionRequests ElectionCorrectionRequest[]
-  objections ElectionObjection[]
-  shortlistEntries ElectionShortlistEntry[]
-  interviews ElectionInterview[]
-  finalCandidates ElectionFinalCandidate[]
+  objections         ElectionObjection[]
+  shortlistEntries   ElectionShortlistEntry[]
+  interviews         ElectionInterview[]
+  finalCandidates    ElectionFinalCandidate[]
 
   @@unique([electionId, applicantUserId])
   @@unique([id, electionId])
@@ -2289,16 +2591,16 @@ model ElectionCandidatePosition {
 }
 
 model ElectionScrutinyReview {
-  id             String                    @id @default(uuid()) @db.Uuid
-  electionId     String                    @db.Uuid
-  election       Election                  @relation(fields: [electionId], references: [id], onDelete: Restrict)
-  candidateId    String                    @db.Uuid
-  candidate      ElectionCandidate         @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
+  id             String                   @id @default(uuid()) @db.Uuid
+  electionId     String                   @db.Uuid
+  election       Election                 @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  candidateId    String                   @db.Uuid
+  candidate      ElectionCandidate        @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
   decision       ElectionScrutinyDecision
   reason         String
-  reviewerUserId String                    @db.Uuid
-  reviewer       User                      @relation("ElectionScrutinyReviewer", fields: [reviewerUserId], references: [id], onDelete: Restrict)
-  createdAt      DateTime                  @default(now())
+  reviewerUserId String                   @db.Uuid
+  reviewer       User                     @relation("ElectionScrutinyReviewer", fields: [reviewerUserId], references: [id], onDelete: Restrict)
+  createdAt      DateTime                 @default(now())
 
   @@index([candidateId, createdAt])
   @@index([electionId, decision])
@@ -2306,18 +2608,18 @@ model ElectionScrutinyReview {
 }
 
 model ElectionCorrectionRequest {
-  id              String                   @id @default(uuid()) @db.Uuid
-  electionId      String                   @db.Uuid
-  election        Election                 @relation(fields: [electionId], references: [id], onDelete: Restrict)
-  candidateId     String                   @db.Uuid
-  candidate       ElectionCandidate        @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
-  instructions    String
-  status          ElectionCorrectionStatus @default(OPEN)
-  requestedByUserId String                 @db.Uuid
-  requestedBy     User                     @relation("ElectionCorrectionRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
-  resolvedAt      DateTime?
-  createdAt       DateTime                 @default(now())
-  submissions     ElectionCorrectionSubmission[]
+  id                String                         @id @default(uuid()) @db.Uuid
+  electionId        String                         @db.Uuid
+  election          Election                       @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  candidateId       String                         @db.Uuid
+  candidate         ElectionCandidate              @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
+  instructions      String
+  status            ElectionCorrectionStatus       @default(OPEN)
+  requestedByUserId String                         @db.Uuid
+  requestedBy       User                           @relation("ElectionCorrectionRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  resolvedAt        DateTime?
+  createdAt         DateTime                       @default(now())
+  submissions       ElectionCorrectionSubmission[]
 
   @@index([candidateId, status])
   @@index([electionId, status])
@@ -2338,21 +2640,21 @@ model ElectionCorrectionSubmission {
 }
 
 model ElectionObjection {
-  id               String                  @id @default(uuid()) @db.Uuid
-  electionId       String                  @db.Uuid
-  election         Election                @relation(fields: [electionId], references: [id], onDelete: Restrict)
-  candidateId      String                  @db.Uuid
-  candidate        ElectionCandidate       @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
-  objectorUserId   String                  @db.Uuid
-  objector         User                    @relation("ElectionObjectionObjector", fields: [objectorUserId], references: [id], onDelete: Restrict)
-  reason           String
+  id                String                  @id @default(uuid()) @db.Uuid
+  electionId        String                  @db.Uuid
+  election          Election                @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  candidateId       String                  @db.Uuid
+  candidate         ElectionCandidate       @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
+  objectorUserId    String                  @db.Uuid
+  objector          User                    @relation("ElectionObjectionObjector", fields: [objectorUserId], references: [id], onDelete: Restrict)
+  reason            String
   evidenceReference String?
-  status           ElectionObjectionStatus @default(OPEN)
-  reviewedByUserId String?                 @db.Uuid
-  reviewedBy       User?                   @relation("ElectionObjectionReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
-  decisionReason   String?
-  resolvedAt       DateTime?
-  createdAt        DateTime                @default(now())
+  status            ElectionObjectionStatus @default(OPEN)
+  reviewedByUserId  String?                 @db.Uuid
+  reviewedBy        User?                   @relation("ElectionObjectionReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+  decisionReason    String?
+  resolvedAt        DateTime?
+  createdAt         DateTime                @default(now())
 
   @@index([candidateId, status])
   @@index([electionId, status])
@@ -2360,16 +2662,16 @@ model ElectionObjection {
 }
 
 model ElectionShortlistEntry {
-  id            String            @id @default(uuid()) @db.Uuid
-  electionId    String            @db.Uuid
-  election      Election          @relation(fields: [electionId], references: [id], onDelete: Restrict)
-  candidateId   String            @db.Uuid
-  candidate     ElectionCandidate @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
-  positionId    String            @db.Uuid
-  position      ElectionPosition  @relation(fields: [positionId, electionId], references: [id, electionId], onDelete: Restrict)
-  shortlistedByUserId String      @db.Uuid
-  shortlistedBy     User          @relation("ElectionShortlistActor", fields: [shortlistedByUserId], references: [id], onDelete: Restrict)
-  shortlistedAt DateTime          @default(now())
+  id                  String            @id @default(uuid()) @db.Uuid
+  electionId          String            @db.Uuid
+  election            Election          @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  candidateId         String            @db.Uuid
+  candidate           ElectionCandidate @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
+  positionId          String            @db.Uuid
+  position            ElectionPosition  @relation(fields: [positionId, electionId], references: [id, electionId], onDelete: Restrict)
+  shortlistedByUserId String            @db.Uuid
+  shortlistedBy       User              @relation("ElectionShortlistActor", fields: [shortlistedByUserId], references: [id], onDelete: Restrict)
+  shortlistedAt       DateTime          @default(now())
 
   @@unique([candidateId, positionId])
   @@index([electionId, positionId])
@@ -2377,17 +2679,17 @@ model ElectionShortlistEntry {
 }
 
 model ElectionInterviewCriterion {
-  id           String    @id @default(uuid()) @db.Uuid
-  electionId   String    @db.Uuid
-  election     Election  @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  id           String                   @id @default(uuid()) @db.Uuid
+  electionId   String                   @db.Uuid
+  election     Election                 @relation(fields: [electionId], references: [id], onDelete: Restrict)
   name         String
   description  String
-  maxScore     Decimal   @db.Decimal(7, 2)
-  weight       Decimal   @default(1) @db.Decimal(7, 2)
+  maxScore     Decimal                  @db.Decimal(7, 2)
+  weight       Decimal                  @default(1) @db.Decimal(7, 2)
   displayOrder Int
-  required     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  required     Boolean                  @default(true)
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
   scores       ElectionInterviewScore[]
 
   @@unique([electionId, displayOrder])
@@ -2396,27 +2698,27 @@ model ElectionInterviewCriterion {
 }
 
 model ElectionInterview {
-  id               String                  @id @default(uuid()) @db.Uuid
-  electionId       String                  @db.Uuid
-  election         Election                @relation(fields: [electionId], references: [id], onDelete: Restrict)
-  candidateId      String                  @db.Uuid
-  candidate        ElectionCandidate       @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
-  positionId       String                  @db.Uuid
-  position         ElectionPosition        @relation(fields: [positionId, electionId], references: [id, electionId], onDelete: Restrict)
-  status           ElectionInterviewStatus @default(PLANNED)
-  scheduledAt      DateTime?
-  durationMinutes  Int?
-  mode             String?
-  location         String?
+  id                String                         @id @default(uuid()) @db.Uuid
+  electionId        String                         @db.Uuid
+  election          Election                       @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  candidateId       String                         @db.Uuid
+  candidate         ElectionCandidate              @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
+  positionId        String                         @db.Uuid
+  position          ElectionPosition               @relation(fields: [positionId, electionId], references: [id, electionId], onDelete: Restrict)
+  status            ElectionInterviewStatus        @default(PLANNED)
+  scheduledAt       DateTime?
+  durationMinutes   Int?
+  mode              String?
+  location          String?
   candidateAttended Boolean?
-  completedAt      DateTime?
-  scoresLockedAt   DateTime?
-  scheduledByUserId String                 @db.Uuid
-  scheduledBy      User                    @relation("ElectionInterviewScheduler", fields: [scheduledByUserId], references: [id], onDelete: Restrict)
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  panelMembers     ElectionInterviewPanelMember[]
-  scores           ElectionInterviewScore[]
+  completedAt       DateTime?
+  scoresLockedAt    DateTime?
+  scheduledByUserId String                         @db.Uuid
+  scheduledBy       User                           @relation("ElectionInterviewScheduler", fields: [scheduledByUserId], references: [id], onDelete: Restrict)
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+  panelMembers      ElectionInterviewPanelMember[]
+  scores            ElectionInterviewScore[]
 
   @@unique([candidateId, positionId])
   @@index([electionId, status, scheduledAt])
@@ -2424,16 +2726,16 @@ model ElectionInterview {
 }
 
 model ElectionInterviewPanelMember {
-  id             String            @id @default(uuid()) @db.Uuid
-  interviewId    String            @db.Uuid
-  interview      ElectionInterview @relation(fields: [interviewId], references: [id], onDelete: Restrict)
-  userId         String            @db.Uuid
-  user           User              @relation("ElectionPanelMember", fields: [userId], references: [id], onDelete: Restrict)
-  panelRole      String?
+  id                 String                   @id @default(uuid()) @db.Uuid
+  interviewId        String                   @db.Uuid
+  interview          ElectionInterview        @relation(fields: [interviewId], references: [id], onDelete: Restrict)
+  userId             String                   @db.Uuid
+  user               User                     @relation("ElectionPanelMember", fields: [userId], references: [id], onDelete: Restrict)
+  panelRole          String?
   conflictDeclaredAt DateTime?
-  isRecused      Boolean           @default(false)
-  createdAt      DateTime          @default(now())
-  scores         ElectionInterviewScore[]
+  isRecused          Boolean                  @default(false)
+  createdAt          DateTime                 @default(now())
+  scores             ElectionInterviewScore[]
 
   @@unique([interviewId, userId])
   @@index([userId, isRecused])
@@ -2441,17 +2743,17 @@ model ElectionInterviewPanelMember {
 }
 
 model ElectionInterviewScore {
-  id            String                        @id @default(uuid()) @db.Uuid
-  interviewId   String                        @db.Uuid
-  interview     ElectionInterview             @relation(fields: [interviewId], references: [id], onDelete: Restrict)
-  panelMemberId String                        @db.Uuid
-  panelMember   ElectionInterviewPanelMember  @relation(fields: [panelMemberId], references: [id], onDelete: Restrict)
-  criterionId   String                        @db.Uuid
-  criterion     ElectionInterviewCriterion    @relation(fields: [criterionId], references: [id], onDelete: Restrict)
-  score         Decimal                       @db.Decimal(7, 2)
+  id            String                       @id @default(uuid()) @db.Uuid
+  interviewId   String                       @db.Uuid
+  interview     ElectionInterview            @relation(fields: [interviewId], references: [id], onDelete: Restrict)
+  panelMemberId String                       @db.Uuid
+  panelMember   ElectionInterviewPanelMember @relation(fields: [panelMemberId], references: [id], onDelete: Restrict)
+  criterionId   String                       @db.Uuid
+  criterion     ElectionInterviewCriterion   @relation(fields: [criterionId], references: [id], onDelete: Restrict)
+  score         Decimal                      @db.Decimal(7, 2)
   comments      String?
-  submittedAt   DateTime                      @default(now())
-  updatedAt     DateTime                      @updatedAt
+  submittedAt   DateTime                     @default(now())
+  updatedAt     DateTime                     @updatedAt
 
   @@unique([interviewId, panelMemberId, criterionId])
   @@index([interviewId])

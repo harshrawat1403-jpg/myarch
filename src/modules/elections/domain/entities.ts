@@ -1,6 +1,7 @@
 import type { ElectionConfig, ElectionStatus, PositionConfig } from "./election";
-export interface ElectionRecord extends ElectionConfig {
+export interface ElectionRecord extends Omit<ElectionConfig, "type"> {
   id: string;
+  type: "COUNCIL" | "CORE_COMMITTEE";
   status: ElectionStatus;
   configurationLockedAt: Date | null;
   createdAt: Date;
