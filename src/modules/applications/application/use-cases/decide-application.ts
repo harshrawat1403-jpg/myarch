@@ -17,7 +17,7 @@ export class DecideApplicationUseCase {
     if (!canDecideApplication(input.actor)) throw new NotAuthorizedError("Only the Secretary may make the final decision");
     const application = await this.deps.applicationRepository.findById(input.applicationId);
     if (!application) throw new FormApplicationNotFoundError();
-    if (application.electionId) throw new NotAuthorizedError("Election review and decisions are not available in Slice 1");
+    if (application.electionId || application.selectionId) throw new NotAuthorizedError("Governance selection review and decisions are not available here");
     if (application.currentStatus === "SELECTED" || application.currentStatus === "REJECTED") throw new ApplicationAlreadyDecidedError();
     if (application.currentStatus !== "UNDER_REVIEW") throw new InvalidFormApplicationTransitionError(application.currentStatus, input.status);
     const reason = input.reason?.trim() || null;

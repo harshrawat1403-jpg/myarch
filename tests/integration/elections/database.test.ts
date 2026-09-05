@@ -164,6 +164,8 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
   it("makes concurrent association retries idempotent with one candidate audit", async () => {
     const f = await fixture();
     const app = await submit(f);
+    expect(app.electionId).toBe(f.election.id);
+    expect(app.selectionId).toBeNull();
     const associate = () =>
       prisma.$transaction((tx) =>
         associateElectionCandidate(tx, {

@@ -160,6 +160,8 @@ describe.skipIf(!databaseUrl)("Core Committee selection PostgreSQL integrity", (
       actorUserId: studentId,
       answers: { motivation: "generic" },
     });
+    expect(genericApplication.electionId).toBeNull();
+    expect(genericApplication.selectionId).toBeNull();
     expect(
       await prisma.coreCommitteeSelectionCandidate.findFirst({
         where: { applicationId: genericApplication.id },
@@ -178,6 +180,16 @@ describe.skipIf(!databaseUrl)("Core Committee selection PostgreSQL integrity", (
       where: { applicationId: application.id },
     });
     expect(candidate.selectionId).toBe(f.selection.id);
+    expect(application.electionId).toBeNull();
+    expect(application.selectionId).toBe(f.selection.id);
+    expect((await applications.search({})).find((item) => item.id === application.id)).toMatchObject({
+      electionId: null,
+      selectionId: f.selection.id,
+    });
+    expect(await applications.findById(application.id)).toMatchObject({
+      electionId: null,
+      selectionId: f.selection.id,
+    });
   });
   it("enforces candidate-position composite integrity and idempotent association", async () => {
     const f = await fixture();

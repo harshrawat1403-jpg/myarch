@@ -6,6 +6,7 @@ export interface FormApplicationRecord {
   readonly id: string;
   readonly submissionId: string;
   readonly electionId?: string | null;
+  readonly selectionId?: string | null;
   readonly formId: string;
   readonly applicantUserId: string;
   readonly studentProfileId: string;

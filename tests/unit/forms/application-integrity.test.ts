@@ -31,6 +31,8 @@ function application(status: FormApplicationDetail["currentStatus"] = "UNDER_REV
   return {
     id: "application-1",
     submissionId: "submission-1",
+    electionId: null,
+    selectionId: null,
     formId: "form-1",
     applicantUserId: student.userId,
     studentProfileId: student.studentProfileId!,
@@ -125,6 +127,37 @@ describe("Phase 5 application integrity", () => {
     });
 
     return expect(useCase.execute({ actor: secretary, applicationId: "application-1", notes: "Secretary review" })).resolves.toBeDefined();
+  });
+
+  it.each([
+    { electionId: "election-1", selectionId: null },
+    { electionId: null, selectionId: "selection-1" },
+  ])("blocks generic review actions for governance applications %#", async (association) => {
+    const current = { ...application(), ...association };
+    const repository = {
+      findById: vi.fn().mockResolvedValue(current),
+      findActiveReviewer: vi.fn(),
+      assignReviewer: vi.fn(),
+      recordReview: vi.fn(),
+      transitionStatus: vi.fn(),
+    };
+    const auditRecorder = new FakeAuditRecorder();
+    const notificationService = new FakeNotificationService();
+    const assign = new AssignReviewerUseCase({
+      applicationRepository: repository as never,
+      reviewerLookup: { findByUserId: vi.fn() },
+      auditRecorder,
+      notificationService,
+    });
+    const review = new RecordReviewUseCase({ applicationRepository: repository as never, auditRecorder, notificationService });
+    const decide = new DecideApplicationUseCase({ applicationRepository: repository as never, auditRecorder, notificationService });
+
+    await expect(assign.execute({ actor: secretary, applicationId: current.id, reviewerUserId: "reviewer-1" })).rejects.toBeInstanceOf(NotAuthorizedError);
+    await expect(review.execute({ actor: secretary, applicationId: current.id, notes: "Review" })).rejects.toBeInstanceOf(NotAuthorizedError);
+    await expect(decide.execute({ actor: secretary, applicationId: current.id, status: "SELECTED" })).rejects.toBeInstanceOf(NotAuthorizedError);
+    expect(repository.assignReviewer).not.toHaveBeenCalled();
+    expect(repository.recordReview).not.toHaveBeenCalled();
+    expect(repository.transitionStatus).not.toHaveBeenCalled();
   });
 
   it("prevents a student from viewing another student's application", async () => {

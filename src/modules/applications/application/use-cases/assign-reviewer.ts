@@ -16,7 +16,7 @@ export class AssignReviewerUseCase {
     if (!canAssignReviewer(input.actor)) throw new NotAuthorizedError("Only the Secretary may assign reviewers");
     const application = await this.deps.applicationRepository.findById(input.applicationId);
     if (!application) throw new FormApplicationNotFoundError();
-    if (application.electionId) throw new NotAuthorizedError("Election review and decisions are not available in Slice 1");
+    if (application.electionId || application.selectionId) throw new NotAuthorizedError("Governance selection review and decisions are not available here");
     if (application.currentStatus === "SELECTED" || application.currentStatus === "REJECTED") throw new ApplicationAlreadyDecidedError();
     const reviewer = await this.deps.reviewerLookup.findByUserId(input.reviewerUserId);
     if (!reviewer || !reviewer.isActive || (reviewer.role !== "SECRETARY" && reviewer.role !== "COORDINATOR")) throw new ReviewerNotFoundError();
