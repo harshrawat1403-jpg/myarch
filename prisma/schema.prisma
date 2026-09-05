@@ -308,6 +308,11 @@ model User {
   electionInterviewPanels       ElectionInterviewPanelMember[] @relation("ElectionPanelMember")
   scheduledElectionInterviews   ElectionInterview[]            @relation("ElectionInterviewScheduler")
   lockedElectionFinalCandidates ElectionFinalCandidate[]       @relation("ElectionFinalCandidateLocker")
+  electionFacultyRosterEntries  ElectionFacultyRosterEntry[]   @relation("ElectionFacultyRosterUser")
+  electionExCouncilRosterEntries ElectionExCouncilRosterEntry[] @relation("ElectionExCouncilRosterUser")
+  electionVoterSnapshots        ElectionVoterSnapshot[]
+  electionVoterParticipations   ElectionVoterParticipation[]
+  lockedElectionVoterSnapshots  Election[]                     @relation("ElectionVoterSnapshotLocker")
   shortlistedElectionEntries    ElectionShortlistEntry[]       @relation("ElectionShortlistActor")
   id                            String                         @id @default(uuid()) @db.Uuid
   email                         String                         @unique
@@ -2137,12 +2142,18 @@ enum ElectionStatus {
   SHORTLIST
   INTERVIEWS
   FINAL_CANDIDATES
+  VOTING
 }
 
 enum ElectionVoterGroup {
   STUDENT
   FACULTY
   EX_COUNCIL
+}
+
+enum ElectionParticipationStatus {
+  CAST
+  ABSTAINED
 }
 
 enum ElectionCandidateStatus {
@@ -2478,6 +2489,9 @@ model Election {
   campaignEnabled             Boolean                      @default(false)
   campaignOpenAt              DateTime?
   campaignCloseAt             DateTime?
+  votingOpenAt                DateTime?
+  votingCloseAt               DateTime?
+  notaEnabled                 Boolean                      @default(false)
   maxPositionsPerCandidate    Int                          @default(1)
   studentQuorumPercent        Decimal                      @default(0) @db.Decimal(5, 2)
   facultyQuorumPercent        Decimal                      @default(0) @db.Decimal(5, 2)
@@ -2487,6 +2501,9 @@ model Election {
   configurationLockedBy       User?                        @relation("ElectionLocker", fields: [configurationLockedByUserId], references: [id], onDelete: Restrict)
   openedAt                    DateTime?
   closedAt                    DateTime?
+  voterSnapshotLockedAt       DateTime?
+  voterSnapshotLockedByUserId String?                      @db.Uuid
+  voterSnapshotLockedBy       User?                        @relation("ElectionVoterSnapshotLocker", fields: [voterSnapshotLockedByUserId], references: [id], onDelete: Restrict)
   createdByUserId             String                       @db.Uuid
   createdBy                   User                         @relation("ElectionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
   createdAt                   DateTime                     @default(now())
@@ -2501,6 +2518,11 @@ model Election {
   interviewCriteria           ElectionInterviewCriterion[]
   interviews                  ElectionInterview[]
   finalCandidates             ElectionFinalCandidate[]
+  facultyRosterEntries        ElectionFacultyRosterEntry[]
+  exCouncilRosterEntries      ElectionExCouncilRosterEntry[]
+  voterSnapshots              ElectionVoterSnapshot[]
+  voterParticipations         ElectionVoterParticipation[]
+  ballots                     ElectionBallot[]
 
   @@index([status, applicationOpenAt, applicationCloseAt])
   @@index([academicYear, type])
@@ -2523,6 +2545,7 @@ model ElectionPosition {
   shortlistEntries ElectionShortlistEntry[]
   interviews       ElectionInterview[]
   finalCandidates  ElectionFinalCandidate[]
+  ballotChoices    ElectionBallotChoice[]
 
   @@unique([electionId, identityKey])
   @@unique([id, electionId])
@@ -2570,6 +2593,7 @@ model ElectionCandidate {
   shortlistEntries   ElectionShortlistEntry[]
   interviews         ElectionInterview[]
   finalCandidates    ElectionFinalCandidate[]
+  ballotChoices      ElectionBallotChoice[]
 
   @@unique([electionId, applicantUserId])
   @@unique([id, electionId])
@@ -2775,4 +2799,93 @@ model ElectionFinalCandidate {
   @@unique([candidateId, positionId])
   @@index([electionId, positionId])
   @@map("election_final_candidates")
+}
+
+// Council-only eligibility is explicit. Faculty and former Council membership
+// are never inferred from a generic account role or committee history.
+model ElectionFacultyRosterEntry {
+  id         String   @id @default(uuid()) @db.Uuid
+  electionId String   @db.Uuid
+  election   Election @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  userId     String   @db.Uuid
+  user       User     @relation("ElectionFacultyRosterUser", fields: [userId], references: [id], onDelete: Restrict)
+  createdAt  DateTime @default(now())
+
+  @@unique([electionId, userId])
+  @@index([userId])
+  @@map("election_faculty_roster_entries")
+}
+
+model ElectionExCouncilRosterEntry {
+  id         String   @id @default(uuid()) @db.Uuid
+  electionId String   @db.Uuid
+  election   Election @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  userId     String   @db.Uuid
+  user       User     @relation("ElectionExCouncilRosterUser", fields: [userId], references: [id], onDelete: Restrict)
+  createdAt  DateTime @default(now())
+
+  @@unique([electionId, userId])
+  @@index([userId])
+  @@map("election_ex_council_roster_entries")
+}
+
+// Identity-bearing records intentionally have no relation to ballots or
+// choices. They prove eligibility and prevent repeat participation only.
+model ElectionVoterSnapshot {
+  id         String             @id @default(uuid()) @db.Uuid
+  electionId String             @db.Uuid
+  election   Election           @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  userId     String             @db.Uuid
+  user       User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  voterGroup ElectionVoterGroup
+  createdAt  DateTime           @default(now())
+
+  @@unique([electionId, userId])
+  @@unique([id, electionId])
+  @@index([electionId, voterGroup])
+  @@map("election_voter_snapshots")
+}
+
+model ElectionVoterParticipation {
+  id          String                      @id @default(uuid()) @db.Uuid
+  electionId  String                      @db.Uuid
+  election    Election                    @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  userId      String                      @db.Uuid
+  user        User                        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  status      ElectionParticipationStatus
+  submittedAt DateTime                    @default(now())
+
+  @@unique([electionId, userId])
+  @@index([electionId, status])
+  @@map("election_voter_participations")
+}
+
+// A ballot has no voter identifier and ElectionVoterParticipation has no
+// ballot identifier. The database therefore has no voter-to-choice join path.
+model ElectionBallot {
+  id         String                 @id @default(uuid()) @db.Uuid
+  electionId String                 @db.Uuid
+  election   Election               @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  castAt     DateTime               @default(now())
+  choices    ElectionBallotChoice[]
+
+  @@unique([id, electionId])
+  @@index([electionId, castAt])
+  @@map("election_ballots")
+}
+
+model ElectionBallotChoice {
+  id          String             @id @default(uuid()) @db.Uuid
+  ballotId    String             @db.Uuid
+  electionId  String             @db.Uuid
+  ballot      ElectionBallot     @relation(fields: [ballotId, electionId], references: [id, electionId], onDelete: Restrict)
+  positionId  String             @db.Uuid
+  position    ElectionPosition   @relation(fields: [positionId, electionId], references: [id, electionId], onDelete: Restrict)
+  candidateId String?            @db.Uuid
+  candidate   ElectionCandidate? @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
+  isNota      Boolean            @default(false)
+
+  @@unique([ballotId, positionId])
+  @@index([electionId, positionId])
+  @@map("election_ballot_choices")
 }

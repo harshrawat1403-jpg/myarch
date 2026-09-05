@@ -16,7 +16,8 @@ export type ElectionStatus =
   | "CORRECTIONS_OBJECTIONS"
   | "SHORTLIST"
   | "INTERVIEWS"
-  | "FINAL_CANDIDATES";
+  | "FINAL_CANDIDATES"
+  | "VOTING";
 export const voterGroups = ["STUDENT", "FACULTY", "EX_COUNCIL"] as const;
 const percent = z.number().min(0).max(100).multipleOf(0.01);
 const requiredDate = z.union([z.string().min(1), z.date()]).pipe(z.coerce.date());
@@ -39,6 +40,9 @@ export const electionConfigSchema = z
     campaignEnabled: z.boolean().default(false),
     campaignOpenAt: optionalDate,
     campaignCloseAt: optionalDate,
+    votingOpenAt: optionalDate,
+    votingCloseAt: optionalDate,
+    notaEnabled: z.boolean().default(false),
     maxPositionsPerCandidate: z.number().int().min(1).max(100).default(1),
     studentQuorumPercent: percent.default(0),
     facultyQuorumPercent: percent.default(0),
@@ -67,6 +71,7 @@ export function validateSchedule(config: ElectionConfig): void {
   for (const [open, close, label] of [
     [config.correctionOpenAt, config.correctionCloseAt, "Correction/objection"],
     [config.campaignOpenAt, config.campaignCloseAt, "Campaign"],
+    [config.votingOpenAt, config.votingCloseAt, "Voting"],
   ] as const) {
     if (Boolean(open) !== Boolean(close))
       throw new ElectionError(`${label} requires both dates`, "validation");
@@ -81,6 +86,17 @@ export function validateSchedule(config: ElectionConfig): void {
   }
   if (config.campaignEnabled !== Boolean(config.campaignOpenAt && config.campaignCloseAt))
     throw new ElectionError("Campaign configuration and dates must agree", "validation");
+}
+export function assertVotingSchedule(
+  config: Pick<ElectionConfig, "votingOpenAt" | "votingCloseAt">,
+): asserts config is ElectionConfig & { votingOpenAt: Date; votingCloseAt: Date } {
+  if (!config.votingOpenAt || !config.votingCloseAt)
+    throw new ElectionError(
+      "Configure a voting opening and closing time before voting",
+      "validation",
+    );
+  if (config.votingOpenAt >= config.votingCloseAt)
+    throw new ElectionError("Voting opening must precede closing", "validation");
 }
 export function validateWeights(weights: PositionConfig["weights"], locked = false): void {
   if (new Set(weights.map((w) => w.voterGroup)).size !== weights.length)
@@ -109,7 +125,8 @@ export function assertTransition(from: ElectionStatus, to: ElectionStatus): void
     (from === "SCRUTINY" && to === "CORRECTIONS_OBJECTIONS") ||
     (from === "CORRECTIONS_OBJECTIONS" && to === "SHORTLIST") ||
     (from === "SHORTLIST" && to === "INTERVIEWS") ||
-    (from === "INTERVIEWS" && to === "FINAL_CANDIDATES")
+    (from === "INTERVIEWS" && to === "FINAL_CANDIDATES") ||
+    (from === "FINAL_CANDIDATES" && to === "VOTING")
   ))
     throw new ElectionError(`Invalid election transition: ${from} to ${to}`);
 }

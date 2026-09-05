@@ -61,6 +61,18 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
   afterEach(() => vi.useRealTimers());
   afterAll(async () => {
     // Remove only rows created by this test run, respecting restrictive FKs.
+    await prisma.electionBallotChoice.deleteMany({ where: { electionId: { in: electionIds } } });
+    await prisma.electionBallot.deleteMany({ where: { electionId: { in: electionIds } } });
+    await prisma.electionVoterParticipation.deleteMany({
+      where: { electionId: { in: electionIds } },
+    });
+    await prisma.electionVoterSnapshot.deleteMany({ where: { electionId: { in: electionIds } } });
+    await prisma.electionFacultyRosterEntry.deleteMany({
+      where: { electionId: { in: electionIds } },
+    });
+    await prisma.electionExCouncilRosterEntry.deleteMany({
+      where: { electionId: { in: electionIds } },
+    });
     await prisma.electionInterviewScore.deleteMany({
       where: { interview: { electionId: { in: electionIds } } },
     });
@@ -68,14 +80,18 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
       where: { interview: { electionId: { in: electionIds } } },
     });
     await prisma.electionInterview.deleteMany({ where: { electionId: { in: electionIds } } });
-    await prisma.electionInterviewCriterion.deleteMany({ where: { electionId: { in: electionIds } } });
+    await prisma.electionInterviewCriterion.deleteMany({
+      where: { electionId: { in: electionIds } },
+    });
     await prisma.electionFinalCandidate.deleteMany({ where: { electionId: { in: electionIds } } });
     await prisma.electionShortlistEntry.deleteMany({ where: { electionId: { in: electionIds } } });
     await prisma.electionObjection.deleteMany({ where: { electionId: { in: electionIds } } });
     await prisma.electionCorrectionSubmission.deleteMany({
       where: { correctionRequest: { electionId: { in: electionIds } } },
     });
-    await prisma.electionCorrectionRequest.deleteMany({ where: { electionId: { in: electionIds } } });
+    await prisma.electionCorrectionRequest.deleteMany({
+      where: { electionId: { in: electionIds } },
+    });
     await prisma.electionScrutinyReview.deleteMany({ where: { electionId: { in: electionIds } } });
     await prisma.electionCandidatePosition.deleteMany({
       where: { electionId: { in: electionIds } },
@@ -141,6 +157,36 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
       answers: { motivation: "Private answer" },
       electionPositionIds: [value.position.id],
     });
+  }
+  async function votingFixture() {
+    const now = Date.now();
+    const f = await fixture(true, {
+      applicationCloseAt: new Date(now + 1000),
+      votingOpenAt: new Date(now + 2000),
+      votingCloseAt: new Date(now + 3600000),
+      notaEnabled: true,
+    });
+    await submit(f);
+    const candidate = await prisma.electionCandidate.findFirstOrThrow({
+      where: { electionId: f.election.id },
+    });
+    await prisma.election.update({
+      where: { id: f.election.id },
+      data: { status: "FINAL_CANDIDATES" },
+    });
+    await prisma.electionFinalCandidate.create({
+      data: {
+        electionId: f.election.id,
+        candidateId: candidate.id,
+        positionId: f.position.id,
+        lockedByUserId: secretaryId,
+      },
+    });
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(now + 3000));
+    await repository.lockVoterSnapshot({ electionId: f.election.id, actorUserId: secretaryId });
+    await prisma.election.update({ where: { id: f.election.id }, data: { status: "VOTING" } });
+    return { ...f, candidate };
   }
   it("creates candidates atomically and prevents concurrent duplicate submissions", async () => {
     const f = await fixture();
@@ -333,29 +379,172 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
   it("serializes shortlisting and locks completed interview scores before final candidates", async () => {
     const f = await fixture();
     await submit(f);
-    const candidate = await prisma.electionCandidate.findFirstOrThrow({ where: { electionId: f.election.id } });
+    const candidate = await prisma.electionCandidate.findFirstOrThrow({
+      where: { electionId: f.election.id },
+    });
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(f.config.applicationCloseAt.getTime() + 1000));
     await repository.transition(f.election.id, "APPLICATION_CLOSED", secretaryId);
     await repository.transition(f.election.id, "SCRUTINY", secretaryId);
-    await repository.recordScrutiny({ electionId: f.election.id, candidateId: candidate.id, decision: "ELIGIBLE", reason: "Eligible", actorUserId: secretaryId });
+    await repository.recordScrutiny({
+      electionId: f.election.id,
+      candidateId: candidate.id,
+      decision: "ELIGIBLE",
+      reason: "Eligible",
+      actorUserId: secretaryId,
+    });
     await repository.transition(f.election.id, "CORRECTIONS_OBJECTIONS", secretaryId);
     await repository.transition(f.election.id, "SHORTLIST", secretaryId);
     const shortlisted = await Promise.allSettled([
-      repository.shortlist({ electionId: f.election.id, candidateId: candidate.id, positionIds: [f.position.id], actorUserId: secretaryId }),
-      repository.shortlist({ electionId: f.election.id, candidateId: candidate.id, positionIds: [f.position.id], actorUserId: secretaryId }),
+      repository.shortlist({
+        electionId: f.election.id,
+        candidateId: candidate.id,
+        positionIds: [f.position.id],
+        actorUserId: secretaryId,
+      }),
+      repository.shortlist({
+        electionId: f.election.id,
+        candidateId: candidate.id,
+        positionIds: [f.position.id],
+        actorUserId: secretaryId,
+      }),
     ]);
     expect(shortlisted.filter((result) => result.status === "fulfilled")).toHaveLength(1);
-    await repository.saveCriterion({ electionId: f.election.id, name: "Communication", description: "Clear communication", maxScore: 10, weight: 1, displayOrder: 0, required: true, actorUserId: secretaryId });
+    await repository.saveCriterion({
+      electionId: f.election.id,
+      name: "Communication",
+      description: "Clear communication",
+      maxScore: 10,
+      weight: 1,
+      displayOrder: 0,
+      required: true,
+      actorUserId: secretaryId,
+    });
     await repository.transition(f.election.id, "INTERVIEWS", secretaryId);
-    const interview = await repository.createInterview({ electionId: f.election.id, candidateId: candidate.id, positionId: f.position.id, scheduledAt: new Date(Date.now() + 60000), durationMinutes: 30, panelUserIds: [secretaryId], actorUserId: secretaryId });
-    await expect(repository.createInterview({ electionId: f.election.id, candidateId: candidate.id, positionId: f.position.id, panelUserIds: [secretaryId], actorUserId: secretaryId })).rejects.toMatchObject({ code: "P2002" });
-    await repository.completeInterview({ electionId: f.election.id, interviewId: interview.id, candidateAttended: true, actorUserId: secretaryId });
-    const criterion = await prisma.electionInterviewCriterion.findFirstOrThrow({ where: { electionId: f.election.id } });
-    await repository.submitScores({ electionId: f.election.id, interviewId: interview.id, actorUserId: secretaryId, scores: [{ criterionId: criterion.id, score: 8 }] });
-    await repository.lockScores({ electionId: f.election.id, interviewId: interview.id, actorUserId: secretaryId });
-    await expect(repository.submitScores({ electionId: f.election.id, interviewId: interview.id, actorUserId: secretaryId, scores: [{ criterionId: criterion.id, score: 9 }] })).rejects.toThrow("not open");
-    await repository.lockFinalCandidates({ electionId: f.election.id, entries: [{ candidateId: candidate.id, positionId: f.position.id }], actorUserId: secretaryId });
+    const interview = await repository.createInterview({
+      electionId: f.election.id,
+      candidateId: candidate.id,
+      positionId: f.position.id,
+      scheduledAt: new Date(Date.now() + 60000),
+      durationMinutes: 30,
+      panelUserIds: [secretaryId],
+      actorUserId: secretaryId,
+    });
+    await expect(
+      repository.createInterview({
+        electionId: f.election.id,
+        candidateId: candidate.id,
+        positionId: f.position.id,
+        panelUserIds: [secretaryId],
+        actorUserId: secretaryId,
+      }),
+    ).rejects.toMatchObject({ code: "P2002" });
+    await repository.completeInterview({
+      electionId: f.election.id,
+      interviewId: interview.id,
+      candidateAttended: true,
+      actorUserId: secretaryId,
+    });
+    const criterion = await prisma.electionInterviewCriterion.findFirstOrThrow({
+      where: { electionId: f.election.id },
+    });
+    await repository.submitScores({
+      electionId: f.election.id,
+      interviewId: interview.id,
+      actorUserId: secretaryId,
+      scores: [{ criterionId: criterion.id, score: 8 }],
+    });
+    await repository.lockScores({
+      electionId: f.election.id,
+      interviewId: interview.id,
+      actorUserId: secretaryId,
+    });
+    await expect(
+      repository.submitScores({
+        electionId: f.election.id,
+        interviewId: interview.id,
+        actorUserId: secretaryId,
+        scores: [{ criterionId: criterion.id, score: 9 }],
+      }),
+    ).rejects.toThrow("not open");
+    await repository.lockFinalCandidates({
+      electionId: f.election.id,
+      entries: [{ candidateId: candidate.id, positionId: f.position.id }],
+      actorUserId: secretaryId,
+    });
     expect((await repository.get(f.election.id))!.status).toBe("FINAL_CANDIDATES");
+  });
+  it("locks an explicit, conflict-free Council voter snapshot", async () => {
+    const f = await fixture();
+    await repository.saveVoterRosterEntry({
+      electionId: f.election.id,
+      voterGroup: "FACULTY",
+      userId: studentId,
+      actorUserId: secretaryId,
+    });
+    await prisma.election.update({
+      where: { id: f.election.id },
+      data: { status: "FINAL_CANDIDATES" },
+    });
+    await expect(
+      repository.lockVoterSnapshot({ electionId: f.election.id, actorUserId: secretaryId }),
+    ).rejects.toThrow("multiple Council voter groups");
+    const roster = (await repository.voterRoster(f.election.id)) as { faculty: { id: string }[] };
+    await repository.removeVoterRosterEntry({
+      electionId: f.election.id,
+      voterGroup: "FACULTY",
+      entryId: roster.faculty[0]!.id,
+      actorUserId: secretaryId,
+    });
+    await expect(
+      repository.lockVoterSnapshot({ electionId: f.election.id, actorUserId: secretaryId }),
+    ).resolves.toMatchObject({ voters: { STUDENT: expect.any(Number) } });
+  });
+  it("records one secret ballot without a voter-to-ballot relation and rejects concurrent repeats", async () => {
+    const f = await votingFixture();
+    const ballot = await repository.ballot(f.election.id, studentId);
+    expect(JSON.stringify(ballot)).not.toContain("motivation");
+    const vote = () =>
+      repository.castBallot({
+        electionId: f.election.id,
+        userId: studentId,
+        choices: [{ positionId: f.position.id, candidateId: f.candidate.id }],
+      });
+    const results = await Promise.allSettled([vote(), vote()]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const participation = await prisma.electionVoterParticipation.findUniqueOrThrow({
+      where: { electionId_userId: { electionId: f.election.id, userId: studentId } },
+    });
+    const storedBallot = await prisma.electionBallot.findFirstOrThrow({
+      where: { electionId: f.election.id },
+    });
+    expect(participation).not.toHaveProperty("ballotId");
+    expect(storedBallot).not.toHaveProperty("userId");
+    expect(await prisma.electionBallotChoice.count({ where: { electionId: f.election.id } })).toBe(
+      1,
+    );
+  });
+  it("enforces candidate-or-NOTA ballot choices and keeps abstention separate from ballots", async () => {
+    const f = await votingFixture();
+    const ballot = await prisma.electionBallot.create({ data: { electionId: f.election.id } });
+    await expect(
+      prisma.electionBallotChoice.create({
+        data: {
+          ballotId: ballot.id,
+          electionId: f.election.id,
+          positionId: f.position.id,
+          isNota: false,
+        },
+      }),
+    ).rejects.toThrow();
+    await repository.abstain({ electionId: f.election.id, userId: studentId });
+    expect(
+      await prisma.electionVoterParticipation.findUnique({
+        where: { electionId_userId: { electionId: f.election.id, userId: studentId } },
+      }),
+    ).toMatchObject({ status: "ABSTAINED" });
+    expect(await prisma.electionBallotChoice.count({ where: { electionId: f.election.id } })).toBe(
+      0,
+    );
   });
 });

@@ -11,6 +11,18 @@ import { Badge } from "@/components/ui/badge";
 import { FormRenderer } from "@/components/forms/form-renderer";
 import { Textarea } from "@/components/ui/textarea";
 
+type Ballot = {
+  voterGroup: string;
+  participation: { status: "CAST" | "ABSTAINED"; submittedAt: string } | null;
+  notaEnabled: boolean;
+  positions: {
+    id: string;
+    title: string;
+    seats: number;
+    candidates: { id: string; name: string }[];
+  }[];
+};
+
 export default function StudentElectionsPage() {
   const { accessToken } = useAuth();
   const [elections, setElections] = useState<ElectionRecord[]>([]);
@@ -23,6 +35,8 @@ export default function StudentElectionsPage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [correctionStatement, setCorrectionStatement] = useState("");
+  const [ballot, setBallot] = useState<Ballot | null>(null);
+  const [ballotChoices, setBallotChoices] = useState<Record<string, string>>({});
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -46,6 +60,8 @@ export default function StudentElectionsPage() {
     setSubmitted(null);
     setAnswers({});
     setPositionIds([]);
+    setBallot(null);
+    setBallotChoices({});
     try {
       const [current, candidates] = await Promise.all([
         apiClient.get<ElectionRecord>(`/api/elections/${election.id}`, accessToken),
@@ -53,6 +69,8 @@ export default function StudentElectionsPage() {
       ]);
       setSelected(current);
       setMine(candidates);
+      if (current.status === "VOTING")
+        setBallot(await apiClient.get<Ballot>(`/api/elections/${current.id}/ballot`, accessToken));
       if (candidates[0])
         setSubmitted(
           await apiClient.get<StudentFormApplicationView>(
@@ -69,6 +87,44 @@ export default function StudentElectionsPage() {
         );
     } catch (error) {
       setMessage(error instanceof ApiError ? error.message : "Unable to load application");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function submitBallot() {
+    if (!accessToken || !selected || !ballot) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      await apiClient.post(
+        `/api/elections/${selected.id}/ballot`,
+        {
+          choices: ballot.positions.map((position) =>
+            ballotChoices[position.id] === "NOTA"
+              ? { positionId: position.id, isNota: true }
+              : { positionId: position.id, candidateId: ballotChoices[position.id] },
+          ),
+        },
+        accessToken,
+      );
+      await open(selected);
+      setMessage("Your ballot has been submitted.");
+    } catch (error) {
+      setMessage(error instanceof ApiError ? error.message : "Unable to submit ballot");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function abstain() {
+    if (!accessToken || !selected) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      await apiClient.post(`/api/elections/${selected.id}/abstain`, {}, accessToken);
+      await open(selected);
+      setMessage("Your abstention has been recorded.");
+    } catch (error) {
+      setMessage(error instanceof ApiError ? error.message : "Unable to record abstention");
     } finally {
       setBusy(false);
     }
@@ -91,12 +147,28 @@ export default function StudentElectionsPage() {
       setBusy(false);
     }
   }
-  async function candidateAction(candidateId: string, path: string, payload: unknown, success: string) {
+  async function candidateAction(
+    candidateId: string,
+    path: string,
+    payload: unknown,
+    success: string,
+  ) {
     if (!accessToken || !selected) return;
-    setBusy(true); setMessage("");
-    try { await apiClient.post(`/api/elections/${selected.id}/candidates/${candidateId}/${path}`, payload, accessToken); await open(selected); setMessage(success); }
-    catch (error) { setMessage(error instanceof ApiError ? error.message : "Unable to update candidacy"); }
-    finally { setBusy(false); }
+    setBusy(true);
+    setMessage("");
+    try {
+      await apiClient.post(
+        `/api/elections/${selected.id}/candidates/${candidateId}/${path}`,
+        payload,
+        accessToken,
+      );
+      await open(selected);
+      setMessage(success);
+    } catch (error) {
+      setMessage(error instanceof ApiError ? error.message : "Unable to update candidacy");
+    } finally {
+      setBusy(false);
+    }
   }
   const withinWindow =
     selected &&
@@ -161,14 +233,115 @@ export default function StudentElectionsPage() {
               </div>
             ))}
           </section>
+          {ballot && (
+            <section className="space-y-4 border-t border-(--color-border) pt-4">
+              <div>
+                <h3 className="font-medium">Council ballot</h3>
+                <p className="text-sm">
+                  Your voter group: {ballot.voterGroup.replace("_", " ")}. Ballot choices are secret
+                  and cannot be retrieved after submission.
+                </p>
+              </div>
+              {ballot.participation ? (
+                <p>
+                  You have{" "}
+                  {ballot.participation.status === "CAST" ? "submitted a ballot" : "abstained"}.
+                </p>
+              ) : (
+                <>
+                  {ballot.positions.map((position) => (
+                    <fieldset key={position.id} className="space-y-2">
+                      <legend className="font-medium">{position.title}</legend>
+                      {position.candidates.map((candidate) => (
+                        <label key={candidate.id} className="flex gap-2">
+                          <input
+                            type="radio"
+                            name={position.id}
+                            checked={ballotChoices[position.id] === candidate.id}
+                            onChange={() =>
+                              setBallotChoices({ ...ballotChoices, [position.id]: candidate.id })
+                            }
+                          />
+                          {candidate.name}
+                        </label>
+                      ))}
+                      {ballot.notaEnabled && (
+                        <label className="flex gap-2">
+                          <input
+                            type="radio"
+                            name={position.id}
+                            checked={ballotChoices[position.id] === "NOTA"}
+                            onChange={() =>
+                              setBallotChoices({ ...ballotChoices, [position.id]: "NOTA" })
+                            }
+                          />
+                          None of the above
+                        </label>
+                      )}
+                    </fieldset>
+                  ))}
+                  <div className="flex gap-2">
+                    <Button
+                      disabled={
+                        busy || ballot.positions.some((position) => !ballotChoices[position.id])
+                      }
+                      onClick={() => void submitBallot()}
+                    >
+                      Submit secret ballot
+                    </Button>
+                    <Button disabled={busy} variant="secondary" onClick={() => void abstain()}>
+                      Abstain
+                    </Button>
+                  </div>
+                </>
+              )}
+            </section>
+          )}
           {mine.length ? (
             <section className="space-y-4">
               <h3 className="font-medium">My candidacy</h3>
               {mine.map((candidate) => (
                 <div key={candidate.id} className="space-y-2">
-                  <p>{candidate.status} · {candidate.positions.map((p) => p.title).join(", ")}</p>
-                  {candidate.status === "CORRECTION_REQUIRED" && selected.status === "CORRECTIONS_OBJECTIONS" && <div className="space-y-2"><Textarea value={correctionStatement} onChange={(event) => setCorrectionStatement(event.target.value)} placeholder="Explain the correction and cite permitted evidence." /><Button disabled={busy || !correctionStatement.trim()} onClick={() => void candidateAction(candidate.id, "corrections", { statement: correctionStatement.trim() }, "Correction submitted for review")}>Submit correction</Button></div>}
-                  {["SCRUTINY", "CORRECTIONS_OBJECTIONS", "SHORTLIST", "INTERVIEWS"].includes(selected.status) && candidate.status !== "WITHDRAWN" && <Button disabled={busy} variant="destructive" onClick={() => void candidateAction(candidate.id, "withdraw", {}, "Candidacy withdrawn")}>Withdraw candidacy</Button>}
+                  <p>
+                    {candidate.status} · {candidate.positions.map((p) => p.title).join(", ")}
+                  </p>
+                  {candidate.status === "CORRECTION_REQUIRED" &&
+                    selected.status === "CORRECTIONS_OBJECTIONS" && (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={correctionStatement}
+                          onChange={(event) => setCorrectionStatement(event.target.value)}
+                          placeholder="Explain the correction and cite permitted evidence."
+                        />
+                        <Button
+                          disabled={busy || !correctionStatement.trim()}
+                          onClick={() =>
+                            void candidateAction(
+                              candidate.id,
+                              "corrections",
+                              { statement: correctionStatement.trim() },
+                              "Correction submitted for review",
+                            )
+                          }
+                        >
+                          Submit correction
+                        </Button>
+                      </div>
+                    )}
+                  {["SCRUTINY", "CORRECTIONS_OBJECTIONS", "SHORTLIST", "INTERVIEWS"].includes(
+                    selected.status,
+                  ) &&
+                    candidate.status !== "WITHDRAWN" && (
+                      <Button
+                        disabled={busy}
+                        variant="destructive"
+                        onClick={() =>
+                          void candidateAction(candidate.id, "withdraw", {}, "Candidacy withdrawn")
+                        }
+                      >
+                        Withdraw candidacy
+                      </Button>
+                    )}
                 </div>
               ))}
               {submitted && (

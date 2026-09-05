@@ -114,6 +114,7 @@ export const transitionElectionRouteHandler = route(async (req, actor, id) => {
         "CORRECTIONS_OBJECTIONS",
         "SHORTLIST",
         "INTERVIEWS",
+        "VOTING",
       ]),
     })
     .strict()
@@ -125,27 +126,37 @@ export const listElectionCandidatesRouteHandler = route(
   false,
 );
 const candidateId = async (context: unknown) =>
-  z.string().uuid().parse(await extractRouteParam(context, "candidateId"));
+  z
+    .string()
+    .uuid()
+    .parse(await extractRouteParam(context, "candidateId"));
 const interviewId = async (context: unknown) =>
-  z.string().uuid().parse(await extractRouteParam(context, "interviewId"));
+  z
+    .string()
+    .uuid()
+    .parse(await extractRouteParam(context, "interviewId"));
 export const electionProcessingRouteHandler = route(
   (_req, actor, id) => electionUseCases.processing(actor, id),
   false,
 );
 export const scrutinyElectionCandidateRouteHandler = route(
-  async (req, actor, id, context) => electionUseCases.scrutiny(actor, id, await candidateId(context), await body(req)),
+  async (req, actor, id, context) =>
+    electionUseCases.scrutiny(actor, id, await candidateId(context), await body(req)),
   true,
 );
 export const correctionElectionCandidateRouteHandler = route(
-  async (req, actor, id, context) => electionUseCases.correction(actor, id, await candidateId(context), await body(req)),
+  async (req, actor, id, context) =>
+    electionUseCases.correction(actor, id, await candidateId(context), await body(req)),
   false,
 );
 export const objectionElectionCandidateRouteHandler = route(
-  async (req, actor, id, context) => electionUseCases.objection(actor, id, await candidateId(context), await body(req)),
+  async (req, actor, id, context) =>
+    electionUseCases.objection(actor, id, await candidateId(context), await body(req)),
   false,
 );
 export const withdrawElectionCandidateRouteHandler = route(
-  async (req, actor, id, context) => electionUseCases.withdraw(actor, id, await candidateId(context), await body(req)),
+  async (req, actor, id, context) =>
+    electionUseCases.withdraw(actor, id, await candidateId(context), await body(req)),
   false,
 );
 export const shortlistElectionRouteHandler = route(
@@ -165,19 +176,32 @@ export const createElectionInterviewRouteHandler = route(
   201,
 );
 export const completeElectionInterviewRouteHandler = route(
-  async (req, actor, id, context) => electionUseCases.completeInterview(actor, id, await interviewId(context), await body(req)),
+  async (req, actor, id, context) =>
+    electionUseCases.completeInterview(actor, id, await interviewId(context), await body(req)),
   true,
 );
 export const submitElectionInterviewScoresRouteHandler = route(
-  async (req, actor, id, context) => electionUseCases.scores(actor, id, await interviewId(context), await body(req)),
+  async (req, actor, id, context) =>
+    electionUseCases.scores(actor, id, await interviewId(context), await body(req)),
   false,
 );
 export const lockElectionInterviewScoresRouteHandler = route(
-  async (_req, actor, id, context) => electionUseCases.lockScores(actor, id, await interviewId(context)),
+  async (_req, actor, id, context) =>
+    electionUseCases.lockScores(actor, id, await interviewId(context)),
   true,
 );
 export const setElectionPanelRecusalRouteHandler = route(
-  async (req, actor, id, context) => electionUseCases.panelRecusal(actor, id, await interviewId(context), z.string().uuid().parse(await extractRouteParam(context, "panelMemberId")), await body(req)),
+  async (req, actor, id, context) =>
+    electionUseCases.panelRecusal(
+      actor,
+      id,
+      await interviewId(context),
+      z
+        .string()
+        .uuid()
+        .parse(await extractRouteParam(context, "panelMemberId")),
+      await body(req),
+    ),
   true,
 );
 export const lockFinalCandidatesRouteHandler = route(
@@ -188,4 +212,51 @@ export const panelAssignmentsRouteHandler = route(
   (_req, actor) => electionUseCases.panelAssignments(actor),
   false,
   false,
+);
+export const voterRosterRouteHandler = route(
+  (_req, actor, id) => electionUseCases.voterRoster(actor, id),
+  true,
+);
+export const saveVoterRosterEntryRouteHandler = route(
+  async (req, actor, id) => electionUseCases.saveVoterRosterEntry(actor, id, await body(req)),
+  true,
+  true,
+  201,
+);
+export const removeVoterRosterEntryRouteHandler = route(
+  async (req, actor, id, context) =>
+    electionUseCases.removeVoterRosterEntry(
+      actor,
+      id,
+      z.enum(["FACULTY", "EX_COUNCIL"]).parse(new URL(req.url).searchParams.get("voterGroup")),
+      z
+        .string()
+        .uuid()
+        .parse(await extractRouteParam(context, "entryId")),
+    ),
+  true,
+);
+export const lockVoterSnapshotRouteHandler = route(
+  (_req, actor, id) => electionUseCases.lockVoterSnapshot(actor, id),
+  true,
+);
+export const ballotRouteHandler = route(
+  (_req, actor, id) => electionUseCases.ballot(actor, id),
+  false,
+);
+export const castBallotRouteHandler = route(
+  async (req, actor, id) => electionUseCases.castBallot(actor, id, await body(req)),
+  false,
+  true,
+  201,
+);
+export const abstainRouteHandler = route(
+  (_req, actor, id) => electionUseCases.abstain(actor, id),
+  false,
+  true,
+  201,
+);
+export const turnoutRouteHandler = route(
+  (_req, actor, id) => electionUseCases.turnout(actor, id),
+  true,
 );

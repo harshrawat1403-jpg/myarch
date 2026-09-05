@@ -102,11 +102,11 @@ describe("real Phase 6 routes and use cases", () => {
       expect(mocks.repository.create).not.toHaveBeenCalled();
     },
   );
-  it("rejects later lifecycle transitions at the real route", async () => {
+  it("passes the Council voting transition through the real route", async () => {
     expect((await transition(request("SECRETARY", { status: "VOTING" }), context)).status).toBe(
-      400,
+      200,
     );
-    expect(mocks.repository.transition).not.toHaveBeenCalled();
+    expect(mocks.repository.transition).toHaveBeenCalledWith(id, "VOTING", "actor");
   });
   it("scopes the student candidate route to the authenticated user", async () => {
     expect((await candidates(request("STUDENT", undefined, "student-a"), context)).status).toBe(

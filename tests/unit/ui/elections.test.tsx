@@ -117,6 +117,50 @@ describe("election application UI", () => {
       screen.queryByRole("button", { name: "Submit election application" }),
     ).not.toBeInTheDocument();
   });
+  it("submits a Council-only secret ballot without displaying it after participation", async () => {
+    const voting = { ...election, status: "VOTING" };
+    let cast = false;
+    state.fetch.mockImplementation(
+      async (path: string, options?: { method?: string; body?: string }) => {
+        let data: unknown;
+        if (path === "/api/elections") data = [voting];
+        else if (path === "/api/elections/election") data = voting;
+        else if (path.endsWith("/candidates")) data = [];
+        else if (path.endsWith("/ballot") && options?.method === "POST") {
+          cast = true;
+          data = { submitted: true };
+        } else if (path.endsWith("/ballot"))
+          data = {
+            voterGroup: "STUDENT",
+            participation: cast ? { status: "CAST" } : null,
+            notaEnabled: true,
+            positions: [
+              {
+                id: "position",
+                title: "President",
+                seats: 1,
+                candidates: [{ id: "candidate", name: "Candidate One" }],
+              },
+            ],
+          };
+        else throw new Error(`Unexpected request: ${path}`);
+        return { ok: true, json: async () => ({ data }) };
+      },
+    );
+    const user = userEvent.setup();
+    render(<StudentElectionsPage />);
+    await user.click(
+      await screen.findByRole("button", { name: "View election and my application" }),
+    );
+    await user.click(await screen.findByRole("radio", { name: "Candidate One" }));
+    await user.click(screen.getByRole("button", { name: "Submit secret ballot" }));
+    expect(await screen.findByText("You have submitted a ballot.")).toBeInTheDocument();
+    const post = state.fetch.mock.calls.find(
+      ([path, options]) => path === "/api/elections/election/ballot" && options?.method === "POST",
+    );
+    expect(post).toBeTruthy();
+    expect(screen.queryByText("Candidate One")).not.toBeInTheDocument();
+  });
   it("keeps Coordinators out of administration without fetching election data", () => {
     state.role = "COORDINATOR";
     render(<ElectionAdmin />);

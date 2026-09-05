@@ -16,6 +16,8 @@ const scheduleFields = [
   ["correctionCloseAt", "Correction/objection window closes", false],
   ["campaignOpenAt", "Campaign opens", false],
   ["campaignCloseAt", "Campaign closes", false],
+  ["votingOpenAt", "Voting opens", false],
+  ["votingCloseAt", "Voting closes", false],
 ] as const;
 export function ElectionConfigForm({
   election,
@@ -41,6 +43,7 @@ export function ElectionConfigForm({
       type: data.get("type"),
       ...dates,
       campaignEnabled: data.get("campaignEnabled") === "on",
+      notaEnabled: data.get("notaEnabled") === "on",
       maxPositionsPerCandidate: Number(data.get("maxPositionsPerCandidate")),
       ...Object.fromEntries(
         ["student", "faculty", "exCouncil"].map((group) => [
@@ -81,7 +84,9 @@ export function ElectionConfigForm({
           <div>
             <Label htmlFor="election-type">Election type</Label>
             <Input id="election-type" name="type" value="COUNCIL" readOnly />
-            <p className="mt-1 text-sm text-(--color-text-secondary)">Department Council election</p>
+            <p className="mt-1 text-sm text-(--color-text-secondary)">
+              Department Council election
+            </p>
           </div>
         </div>
         <div>
@@ -120,6 +125,10 @@ export function ElectionConfigForm({
             defaultChecked={election?.campaignEnabled}
           />
           Include campaign window
+        </label>
+        <label className="flex gap-2 text-sm">
+          <input type="checkbox" name="notaEnabled" defaultChecked={election?.notaEnabled} />
+          Allow NOTA on Council ballots
         </label>
         <div className="grid gap-4 sm:grid-cols-3">
           {(["student", "faculty", "exCouncil"] as const).map((group) => (

@@ -55,8 +55,18 @@ export interface ElectionRepository {
     decisionReason: string;
     actorUserId: string;
   }): Promise<unknown>;
-  shortlist(input: { electionId: string; candidateId: string; positionIds: string[]; actorUserId: string }): Promise<unknown>;
-  withdraw(input: { electionId: string; candidateId: string; reason?: string; actorUserId: string }): Promise<unknown>;
+  shortlist(input: {
+    electionId: string;
+    candidateId: string;
+    positionIds: string[];
+    actorUserId: string;
+  }): Promise<unknown>;
+  withdraw(input: {
+    electionId: string;
+    candidateId: string;
+    reason?: string;
+    actorUserId: string;
+  }): Promise<unknown>;
   saveCriterion(input: {
     electionId: string;
     criterionId?: string;
@@ -79,11 +89,61 @@ export interface ElectionRepository {
     panelUserIds: string[];
     actorUserId: string;
   }): Promise<unknown>;
-  completeInterview(input: { electionId: string; interviewId: string; candidateAttended: boolean; actorUserId: string }): Promise<unknown>;
-  submitScores(input: { electionId: string; interviewId: string; actorUserId: string; scores: { criterionId: string; score: number; comments?: string }[] }): Promise<unknown>;
-  lockScores(input: { electionId: string; interviewId: string; actorUserId: string }): Promise<unknown>;
-  setPanelRecusal(input: { electionId: string; interviewId: string; panelMemberId: string; isRecused: boolean; actorUserId: string }): Promise<unknown>;
-  lockFinalCandidates(input: { electionId: string; entries: { candidateId: string; positionId: string }[]; actorUserId: string }): Promise<unknown>;
-  processing(actorUserId: string | undefined, electionId: string, isSecretary: boolean): Promise<unknown>;
+  completeInterview(input: {
+    electionId: string;
+    interviewId: string;
+    candidateAttended: boolean;
+    actorUserId: string;
+  }): Promise<unknown>;
+  submitScores(input: {
+    electionId: string;
+    interviewId: string;
+    actorUserId: string;
+    scores: { criterionId: string; score: number; comments?: string }[];
+  }): Promise<unknown>;
+  lockScores(input: {
+    electionId: string;
+    interviewId: string;
+    actorUserId: string;
+  }): Promise<unknown>;
+  setPanelRecusal(input: {
+    electionId: string;
+    interviewId: string;
+    panelMemberId: string;
+    isRecused: boolean;
+    actorUserId: string;
+  }): Promise<unknown>;
+  lockFinalCandidates(input: {
+    electionId: string;
+    entries: { candidateId: string; positionId: string }[];
+    actorUserId: string;
+  }): Promise<unknown>;
+  saveVoterRosterEntry(input: {
+    electionId: string;
+    voterGroup: "FACULTY" | "EX_COUNCIL";
+    userId: string;
+    actorUserId: string;
+  }): Promise<unknown>;
+  removeVoterRosterEntry(input: {
+    electionId: string;
+    voterGroup: "FACULTY" | "EX_COUNCIL";
+    entryId: string;
+    actorUserId: string;
+  }): Promise<unknown>;
+  voterRoster(electionId: string): Promise<unknown>;
+  lockVoterSnapshot(input: { electionId: string; actorUserId: string }): Promise<unknown>;
+  ballot(electionId: string, userId: string): Promise<unknown>;
+  castBallot(input: {
+    electionId: string;
+    userId: string;
+    choices: { positionId: string; candidateId?: string; isNota?: boolean }[];
+  }): Promise<unknown>;
+  abstain(input: { electionId: string; userId: string }): Promise<unknown>;
+  turnout(electionId: string): Promise<unknown>;
+  processing(
+    actorUserId: string | undefined,
+    electionId: string,
+    isSecretary: boolean,
+  ): Promise<unknown>;
   panelAssignments(userId: string): Promise<unknown>;
 }
