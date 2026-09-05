@@ -27,6 +27,7 @@ import { LoadingScreen } from "@/components/loading-screen";
 const NAV_ITEMS: NavItem[] = [
   { href: "/student", label: "Overview", icon: LayoutDashboard },
   { href: "/student/applications", label: "Applications", icon: Briefcase },
+  { href: "/student/elections", label: "Elections", icon: FileText },
   { href: "/student/forms", label: "Forms", icon: FileText },
   { href: "/student/form-applications", label: "Form Submissions", icon: ClipboardList },
   { href: "/student/interests", label: "Interests", icon: Mail },

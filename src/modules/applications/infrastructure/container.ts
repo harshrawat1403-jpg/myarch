@@ -1,3 +1,4 @@
+import { associateElectionCandidate } from "@/modules/elections";
 import { prisma } from "@/lib/prisma";
 import { PrismaAuditRecorder } from "@/lib/audit";
 import { notificationService } from "@/modules/notifications";
@@ -14,7 +15,7 @@ import { AssignReviewerUseCase } from "../application/use-cases/assign-reviewer"
 import { RecordReviewUseCase } from "../application/use-cases/record-review";
 import { DecideApplicationUseCase } from "../application/use-cases/decide-application";
 
-export const applicationRepository = new PrismaFormApplicationRepository(prisma);
+export const applicationRepository = new PrismaFormApplicationRepository(prisma, associateElectionCandidate);
 const applicantLookup = new PrismaApplicantLookup(prisma);
 const reviewerLookup = new PrismaReviewerLookup(prisma);
 const secretaryRecipientLookup = new PrismaSecretaryRecipientLookup(prisma);

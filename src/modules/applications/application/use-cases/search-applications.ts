@@ -12,6 +12,6 @@ export class SearchApplicationsUseCase {
     const results = await this.deps.applicationRepository.search(input.filters);
     if (input.actor.role === "SECRETARY") return results;
     const scope = input.actor.batchScope ?? [];
-    return results.filter((application) => scope.includes(application.applicantBatchId));
+    return results.filter((application) => !application.electionId && scope.includes(application.applicantBatchId));
   }
 }

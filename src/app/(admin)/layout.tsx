@@ -126,6 +126,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
 // { roles: ["SECRETARY"] } server-side, so a Coordinator never sees a nav
 // entry that would just 403.
 const SECRETARY_ONLY_NAV_ITEMS: NavItem[] = [
+  { href: "/dashboard/elections", label: "Elections", icon: Landmark, group: "Administration" },
   {
     href: "/dashboard/admin/coordinators",
     label: "Coordinators",

@@ -20,6 +20,7 @@ export interface FormFieldRecord {
 }
 
 export interface FormRecord {
+  readonly electionId?: string | null;
   readonly id: string;
   readonly title: string;
   readonly description: string | null;

@@ -5,6 +5,7 @@ export type FormApplicationStatus = "SUBMITTED" | "UNDER_REVIEW" | "SELECTED" | 
 export interface FormApplicationRecord {
   readonly id: string;
   readonly submissionId: string;
+  readonly electionId?: string | null;
   readonly formId: string;
   readonly applicantUserId: string;
   readonly studentProfileId: string;

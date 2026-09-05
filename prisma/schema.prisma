@@ -297,6 +297,9 @@ enum AcademicYearTransitionStatus {
 // ---------------------------------------------------------------------------
 
 model User {
+  createdElections Election[] @relation("ElectionCreator")
+  lockedElections Election[] @relation("ElectionLocker")
+  electionCandidacies ElectionCandidate[]
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
   passwordHash String
@@ -1075,6 +1078,7 @@ enum FormApplicationStatus {
 }
 
 model Form {
+  electionApplicationForm ElectionApplicationForm?
   id          String     @id @default(uuid()) @db.Uuid
   title       String
   description String?
@@ -1142,6 +1146,7 @@ model FormSubmission {
 }
 
 model FormApplication {
+  electionCandidate ElectionCandidate?
   id              String                @id @default(uuid()) @db.Uuid
   submissionId    String                @unique @db.Uuid
   submission      FormSubmission        @relation(fields: [submissionId], references: [id], onDelete: Cascade)
@@ -2088,4 +2093,135 @@ model ContentOverride {
   @@index([page])
   @@index([hasDraftChange])
   @@map("content_overrides")
+}
+
+// Phase 6, Slice 1: only application intake states are exposed.
+enum ElectionType {
+  COUNCIL
+  CORE_COMMITTEE
+}
+
+enum ElectionStatus {
+  DRAFT
+  APPLICATION_OPEN
+  APPLICATION_CLOSED
+}
+
+enum ElectionVoterGroup {
+  STUDENT
+  FACULTY
+  EX_COUNCIL
+}
+
+enum ElectionCandidateStatus {
+  APPLIED
+}
+
+model Election {
+  id                          String                   @id @default(uuid()) @db.Uuid
+  title                       String
+  academicYear                String
+  type                        ElectionType
+  status                      ElectionStatus           @default(DRAFT)
+  applicationOpenAt           DateTime
+  applicationCloseAt          DateTime
+  correctionOpenAt            DateTime?
+  correctionCloseAt           DateTime?
+  campaignEnabled             Boolean                  @default(false)
+  campaignOpenAt              DateTime?
+  campaignCloseAt             DateTime?
+  maxPositionsPerCandidate    Int                      @default(1)
+  studentQuorumPercent        Decimal                  @default(0) @db.Decimal(5, 2)
+  facultyQuorumPercent        Decimal                  @default(0) @db.Decimal(5, 2)
+  exCouncilQuorumPercent      Decimal                  @default(0) @db.Decimal(5, 2)
+  configurationLockedAt       DateTime?
+  configurationLockedByUserId String?                  @db.Uuid
+  configurationLockedBy       User?                    @relation("ElectionLocker", fields: [configurationLockedByUserId], references: [id], onDelete: Restrict)
+  openedAt                    DateTime?
+  closedAt                    DateTime?
+  createdByUserId             String                   @db.Uuid
+  createdBy                   User                     @relation("ElectionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdAt                   DateTime                 @default(now())
+  updatedAt                   DateTime                 @updatedAt
+  positions                   ElectionPosition[]
+  applicationForm             ElectionApplicationForm?
+  candidates                  ElectionCandidate[]
+
+  @@index([status, applicationOpenAt, applicationCloseAt])
+  @@index([academicYear, type])
+  @@map("elections")
+}
+
+model ElectionPosition {
+  id           String                      @id @default(uuid()) @db.Uuid
+  electionId   String                      @db.Uuid
+  election     Election                    @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  title        String
+  identityKey  String
+  description  String
+  seats        Int
+  displayOrder Int                         @default(0)
+  createdAt    DateTime                    @default(now())
+  updatedAt    DateTime                    @updatedAt
+  weights      ElectionPositionWeight[]
+  candidates   ElectionCandidatePosition[]
+
+  @@unique([electionId, identityKey])
+  @@unique([id, electionId])
+  @@index([electionId, displayOrder])
+  @@map("election_positions")
+}
+
+model ElectionPositionWeight {
+  id         String             @id @default(uuid()) @db.Uuid
+  positionId String             @db.Uuid
+  position   ElectionPosition   @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  voterGroup ElectionVoterGroup
+  percentage Decimal            @db.Decimal(5, 2)
+
+  @@unique([positionId, voterGroup])
+  @@map("election_position_weights")
+}
+
+model ElectionApplicationForm {
+  id         String   @id @default(uuid()) @db.Uuid
+  electionId String   @unique @db.Uuid
+  election   Election @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  formId     String   @unique @db.Uuid
+  form       Form     @relation(fields: [formId], references: [id], onDelete: Restrict)
+  createdAt  DateTime @default(now())
+
+  @@map("election_application_forms")
+}
+
+model ElectionCandidate {
+  id              String                      @id @default(uuid()) @db.Uuid
+  electionId      String                      @db.Uuid
+  election        Election                    @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  applicationId   String                      @unique @db.Uuid
+  application     FormApplication             @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  applicantUserId String                      @db.Uuid
+  applicant       User                        @relation(fields: [applicantUserId], references: [id], onDelete: Restrict)
+  status          ElectionCandidateStatus     @default(APPLIED)
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  positions       ElectionCandidatePosition[]
+
+  @@unique([electionId, applicantUserId])
+  @@unique([id, electionId])
+  @@index([applicantUserId])
+  @@map("election_candidates")
+}
+
+model ElectionCandidatePosition {
+  id          String            @id @default(uuid()) @db.Uuid
+  electionId  String            @db.Uuid
+  candidateId String            @db.Uuid
+  candidate   ElectionCandidate @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
+  positionId  String            @db.Uuid
+  position    ElectionPosition  @relation(fields: [positionId, electionId], references: [id, electionId], onDelete: Restrict)
+
+  @@unique([candidateId, positionId])
+  @@index([positionId, electionId])
+  @@map("election_candidate_positions")
 }

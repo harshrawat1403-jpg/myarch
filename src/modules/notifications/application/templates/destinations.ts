@@ -117,6 +117,9 @@ export function resolveNotificationDestination(
       return typeof committeeId === "string" && committeeId.length > 0 ? `/committees/${committeeId}` : null;
     }
 
+    case "ELECTION_APPLICATION_OPENED":
+      return "/student/elections";
+
     case "FORM_SUBMITTED":
     case "FORM_APPLICATION_REVIEWER_ASSIGNED":
       return "/dashboard/form-applications";

@@ -12,6 +12,7 @@ export class GetApplicationUseCase {
     const application = await this.deps.applicationRepository.findById(input.applicationId);
     if (!application) throw new FormApplicationNotFoundError();
     if (input.actor.role === "SECRETARY") return application;
+    if (application.electionId) throw new NotAuthorizedError("Only the Secretary may read other election applications");
     if (!canViewApplicationQueue(input.actor) || !canReviewApplication(input.actor, application.reviewers, application.applicantBatchId)) {
       throw new NotAuthorizedError("Reviewer assignment and application scope are required");
     }

@@ -16,7 +16,7 @@ import { ApplicationAlreadyDecidedError, DuplicateFormApplicationError, FormAppl
 
 type ApplicationWithRelations = Prisma.FormApplicationGetPayload<{
   include: {
-    submission: { include: { form: { include: { fields: true } }; applicant: true; studentProfile: true } };
+    submission: { include: { form: { include: { fields: true; electionApplicationForm: true } }; applicant: true; studentProfile: true } };
     reviewers: true;
     reviews: true;
     statusEvents: true;
@@ -24,11 +24,11 @@ type ApplicationWithRelations = Prisma.FormApplicationGetPayload<{
 }>;
 
 type ApplicationRow = Prisma.FormApplicationGetPayload<{
-  include: { submission: { include: { form: true; applicant: true; studentProfile: true } } };
+  include: { submission: { include: { form: { include: { electionApplicationForm: true } }; applicant: true; studentProfile: true } } };
 }>;
 
 export class PrismaFormApplicationRepository implements ApplicationRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient, private readonly associateCandidate?: (tx: Prisma.TransactionClient, input: { formId: string; applicationId: string; applicantUserId: string; electionPositionIds?: readonly string[] }) => Promise<void>) {}
 
   async createSubmitted(data: CreateFormApplicationData): Promise<FormApplicationRecord> {
     let applicationId: string;
@@ -57,6 +57,7 @@ export class PrismaFormApplicationRepository implements ApplicationRepository {
             statusEvents: { create: { toStatus: "SUBMITTED", changedByUserId: data.actorUserId } },
           },
         });
+        await this.associateCandidate?.(tx, { formId: data.formId, applicationId: application.id, applicantUserId: data.applicantUserId, electionPositionIds: data.electionPositionIds });
         return application.id;
       });
     } catch (error) {
@@ -74,7 +75,7 @@ export class PrismaFormApplicationRepository implements ApplicationRepository {
       include: {
         submission: {
           include: {
-            form: { include: { fields: { orderBy: { displayOrder: "asc" } } } },
+            form: { include: { fields: { orderBy: { displayOrder: "asc" } }, electionApplicationForm: true } },
             applicant: true,
             studentProfile: true,
           },
@@ -90,7 +91,7 @@ export class PrismaFormApplicationRepository implements ApplicationRepository {
   async findByApplicantAndForm(applicantUserId: string, formId: string): Promise<FormApplicationRecord | null> {
     const row = await this.prisma.formApplication.findFirst({
       where: { submission: { applicantUserId, formId } },
-      include: { submission: { include: { form: true, applicant: true, studentProfile: true } } },
+      include: { submission: { include: { form: { include: { electionApplicationForm: true } }, applicant: true, studentProfile: true } } },
     });
     return row ? toRecordFromRow(row) : null;
   }
@@ -98,7 +99,7 @@ export class PrismaFormApplicationRepository implements ApplicationRepository {
   async listForApplicant(applicantUserId: string): Promise<readonly FormApplicationSummary[]> {
     const rows = await this.prisma.formApplication.findMany({
       where: { submission: { applicantUserId } },
-      include: { submission: { include: { form: true, applicant: true, studentProfile: true } } },
+      include: { submission: { include: { form: { include: { electionApplicationForm: true } }, applicant: true, studentProfile: true } } },
       orderBy: { createdAt: "desc" },
     });
     return rows.map(toSummaryFromRow);
@@ -115,7 +116,7 @@ export class PrismaFormApplicationRepository implements ApplicationRepository {
             : {}),
         },
       },
-      include: { submission: { include: { form: true, applicant: true, studentProfile: true } } },
+      include: { submission: { include: { form: { include: { electionApplicationForm: true } }, applicant: true, studentProfile: true } } },
       orderBy: { createdAt: "desc" },
     });
     return rows.map(toSummaryFromRow);
@@ -255,6 +256,7 @@ function toRecordFromRow(row: ApplicationRow): FormApplicationRecord {
   return {
     id: row.id,
     submissionId: row.submissionId,
+    electionId: row.submission.form.electionApplicationForm?.electionId ?? null,
     formId: row.submission.formId,
     applicantUserId: row.submission.applicantUserId,
     studentProfileId: row.submission.studentProfileId,

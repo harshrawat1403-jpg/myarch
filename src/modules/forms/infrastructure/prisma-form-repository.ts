@@ -3,7 +3,7 @@ import { PublishedFormImmutableError } from "../domain/errors";
 import type { CreateFormData, CreateFormFieldData, FormFilters, FormRecord, FormStatus, UpdateFormData } from "../domain/entities";
 import type { FormRepository } from "../application/ports/form-repository";
 
-type FormWithFields = PrismaForm & { fields: PrismaFormField[] };
+type FormWithFields = PrismaForm & { fields: PrismaFormField[]; electionApplicationForm?: { electionId: string } | null };
 
 export class PrismaFormRepository implements FormRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -18,7 +18,7 @@ export class PrismaFormRepository implements FormRepository {
         createdByUserId: data.createdByUserId,
         fields: { create: data.fields.map(toFieldCreate) },
       },
-      include: { fields: true },
+      include: { fields: true, electionApplicationForm: true },
     });
     return toDomain(row);
   }
@@ -26,7 +26,7 @@ export class PrismaFormRepository implements FormRepository {
   async findById(id: string): Promise<FormRecord | null> {
     const row = await this.prisma.form.findUnique({
       where: { id },
-      include: { fields: true },
+      include: { fields: true, electionApplicationForm: true },
     });
     return row ? toDomain(row) : null;
   }
@@ -50,7 +50,7 @@ export class PrismaFormRepository implements FormRepository {
           data: data.fields.map((field) => ({ formId: id, ...toFieldCreate(field) })),
         });
       }
-      const updated = await tx.form.findUnique({ where: { id }, include: { fields: true } });
+      const updated = await tx.form.findUnique({ where: { id }, include: { fields: true, electionApplicationForm: true } });
       if (!updated) throw new Error("Updated form could not be loaded");
       return updated;
     });
@@ -63,10 +63,11 @@ export class PrismaFormRepository implements FormRepository {
       : status === "CLOSED"
         ? { status, closedAt: at }
         : { status, archivedAt: at };
-    const row = await this.prisma.form.update({
-      where: { id },
-      data,
-      include: { fields: true },
+    const row = await this.prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT "id" FROM "forms" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      const link = await tx.electionApplicationForm.findUnique({ where: { formId: id }, include: { election: true } });
+      if (link?.election.status === "APPLICATION_OPEN") throw new PublishedFormImmutableError();
+      return tx.form.update({ where: { id }, data, include: { fields: true, electionApplicationForm: true } });
     });
     return toDomain(row);
   }
@@ -77,7 +78,7 @@ export class PrismaFormRepository implements FormRepository {
         status: filters.status,
         title: filters.search ? { contains: filters.search, mode: "insensitive" } : undefined,
       },
-      include: { fields: true },
+      include: { fields: true, electionApplicationForm: true },
       orderBy: { createdAt: "desc" },
     });
     return rows.map(toDomain);
@@ -100,6 +101,7 @@ function toFieldCreate(field: CreateFormFieldData) {
 function toDomain(row: FormWithFields): FormRecord {
   return {
     id: row.id,
+    electionId: row.electionApplicationForm?.electionId ?? null,
     title: row.title,
     description: row.description,
     status: row.status,

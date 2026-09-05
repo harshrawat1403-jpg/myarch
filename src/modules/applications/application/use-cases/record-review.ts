@@ -17,6 +17,7 @@ export class RecordReviewUseCase {
     if (!notes || notes.length > APPLICATION_REVIEW_NOTES_MAX_LENGTH) throw new Error("Review notes are required and must be within the allowed length");
     const application = await this.deps.applicationRepository.findById(input.applicationId);
     if (!application) throw new FormApplicationNotFoundError();
+    if (application.electionId) throw new NotAuthorizedError("Election review and decisions are not available in Slice 1");
     if (application.currentStatus !== "SUBMITTED" && application.currentStatus !== "UNDER_REVIEW") {
       throw new InvalidFormApplicationTransitionError(application.currentStatus, "REVIEW");
     }

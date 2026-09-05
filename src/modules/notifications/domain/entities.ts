@@ -56,6 +56,7 @@ export type NotificationTemplateId =
   // committee are plain Meeting rows, which (like every meeting today) send
   // no notification of their own — neither gets a new template here.
   | "COMMITTEE_MEMBER_ADDED"
+  | "ELECTION_APPLICATION_OPENED"
   | "FORM_SUBMITTED"
   | "FORM_APPLICATION_REVIEWER_ASSIGNED"
   | "FORM_APPLICATION_UNDER_REVIEW"
