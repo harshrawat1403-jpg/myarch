@@ -313,6 +313,7 @@ model User {
   electionVoterSnapshots        ElectionVoterSnapshot[]
   electionVoterParticipations   ElectionVoterParticipation[]
   lockedElectionVoterSnapshots  Election[]                     @relation("ElectionVoterSnapshotLocker")
+  countedElectionResults        ElectionResultSnapshot[]       @relation("ElectionResultCounter")
   shortlistedElectionEntries    ElectionShortlistEntry[]       @relation("ElectionShortlistActor")
   id                            String                         @id @default(uuid()) @db.Uuid
   email                         String                         @unique
@@ -2143,6 +2144,22 @@ enum ElectionStatus {
   INTERVIEWS
   FINAL_CANDIDATES
   VOTING
+  COUNTING
+  RESULT_REVIEW
+}
+
+enum ElectionResultStatus {
+  RESULT_REVIEW
+  QUORUM_FAILED
+  NOTA_WON
+  RUNOFF_REQUIRED
+}
+
+enum ElectionPositionResultStatus {
+  WINNER_PENDING_VERIFICATION
+  QUORUM_FAILED
+  NOTA_WON
+  RUNOFF_REQUIRED
 }
 
 enum ElectionVoterGroup {
@@ -2523,6 +2540,7 @@ model Election {
   voterSnapshots              ElectionVoterSnapshot[]
   voterParticipations         ElectionVoterParticipation[]
   ballots                     ElectionBallot[]
+  resultSnapshots             ElectionResultSnapshot[]
 
   @@index([status, applicationOpenAt, applicationCloseAt])
   @@index([academicYear, type])
@@ -2546,6 +2564,7 @@ model ElectionPosition {
   interviews       ElectionInterview[]
   finalCandidates  ElectionFinalCandidate[]
   ballotChoices    ElectionBallotChoice[]
+  resultPositions  ElectionPositionResult[]
 
   @@unique([electionId, identityKey])
   @@unique([id, electionId])
@@ -2594,6 +2613,7 @@ model ElectionCandidate {
   interviews         ElectionInterview[]
   finalCandidates    ElectionFinalCandidate[]
   ballotChoices      ElectionBallotChoice[]
+  resultEntries      ElectionCandidateResult[]
 
   @@unique([electionId, applicantUserId])
   @@unique([id, electionId])
@@ -2867,11 +2887,101 @@ model ElectionBallot {
   electionId String                 @db.Uuid
   election   Election               @relation(fields: [electionId], references: [id], onDelete: Restrict)
   castAt     DateTime               @default(now())
+  // Copied from the locked snapshot without any voter identifier or relation.
+  voterGroup ElectionVoterGroup?
   choices    ElectionBallotChoice[]
 
   @@unique([id, electionId])
   @@index([electionId, castAt])
+  @@index([electionId, voterGroup])
   @@map("election_ballots")
+}
+
+// Council result records are aggregate-only snapshots. They intentionally
+// have no relation to ElectionVoterParticipation or User voters.
+model ElectionResultSnapshot {
+  id              String                       @id @default(uuid()) @db.Uuid
+  electionId      String                       @db.Uuid
+  election        Election                     @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  version         Int
+  status          ElectionResultStatus
+  countedAt       DateTime                     @default(now())
+  countedByUserId String                       @db.Uuid
+  countedBy       User                         @relation("ElectionResultCounter", fields: [countedByUserId], references: [id], onDelete: Restrict)
+  positions       ElectionPositionResult[]
+
+  @@unique([electionId, version])
+  @@index([electionId, countedAt])
+  @@map("election_result_snapshots")
+}
+
+model ElectionPositionResult {
+  id             String                       @id @default(uuid()) @db.Uuid
+  snapshotId     String                       @db.Uuid
+  snapshot       ElectionResultSnapshot       @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+  electionId     String                       @db.Uuid
+  positionId     String                       @db.Uuid
+  position       ElectionPosition             @relation(fields: [positionId, electionId], references: [id, electionId], onDelete: Restrict)
+  positionTitle  String
+  status         ElectionPositionResultStatus
+  notaFinalScore Decimal                      @default(0) @db.Decimal(24, 18)
+  groups         ElectionPositionGroupResult[]
+  candidates     ElectionCandidateResult[]
+
+  @@unique([snapshotId, positionId])
+  @@index([electionId, positionId])
+  @@map("election_position_results")
+}
+
+model ElectionPositionGroupResult {
+  id                  String                        @id @default(uuid()) @db.Uuid
+  positionResultId    String                        @db.Uuid
+  positionResult      ElectionPositionResult        @relation(fields: [positionResultId], references: [id], onDelete: Restrict)
+  voterGroup          ElectionVoterGroup
+  eligibleCount       Int
+  participationCount  Int
+  abstentionCount     Int
+  notaVoteCount       Int
+  scoringDenominator  Int
+  quorumPercent       Decimal                       @db.Decimal(5, 2)
+  quorumMet           Boolean
+  configuredWeight    Decimal                       @db.Decimal(5, 2)
+  notaNormalizedScore Decimal                       @default(0) @db.Decimal(24, 18)
+  candidateScores     ElectionCandidateGroupResult[]
+
+  @@unique([positionResultId, voterGroup])
+  @@map("election_position_group_results")
+}
+
+model ElectionCandidateResult {
+  id                  String                        @id @default(uuid()) @db.Uuid
+  positionResultId    String                        @db.Uuid
+  positionResult      ElectionPositionResult        @relation(fields: [positionResultId], references: [id], onDelete: Restrict)
+  electionId          String                        @db.Uuid
+  candidateId         String                        @db.Uuid
+  candidate           ElectionCandidate             @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
+  candidateName       String
+  rawRank             Int
+  isProvisionalWinner Boolean                       @default(false)
+  finalScore          Decimal                       @db.Decimal(24, 18)
+  groups              ElectionCandidateGroupResult[]
+
+  @@unique([positionResultId, candidateId])
+  @@index([candidateId])
+  @@map("election_candidate_results")
+}
+
+model ElectionCandidateGroupResult {
+  id                    String                       @id @default(uuid()) @db.Uuid
+  candidateResultId     String                       @db.Uuid
+  candidateResult       ElectionCandidateResult      @relation(fields: [candidateResultId], references: [id], onDelete: Restrict)
+  positionGroupResultId String                       @db.Uuid
+  positionGroupResult   ElectionPositionGroupResult  @relation(fields: [positionGroupResultId], references: [id], onDelete: Restrict)
+  rawVoteCount          Int
+  normalizedScore       Decimal                      @db.Decimal(24, 18)
+
+  @@unique([candidateResultId, positionGroupResultId])
+  @@map("election_candidate_group_results")
 }
 
 model ElectionBallotChoice {

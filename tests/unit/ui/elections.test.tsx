@@ -172,4 +172,26 @@ describe("election application UI", () => {
     expect(screen.getByLabelText("Election title")).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Save configuration" })).not.toBeInTheDocument();
   });
+  it("renders Council position seats as read-only one", async () => {
+    state.role = "SECRETARY";
+    const draft = { ...election, status: "DRAFT" };
+    state.fetch.mockImplementation(async (path: string) => ({
+      ok: true,
+      json: async () => ({
+        data:
+          path === "/api/elections/election"
+            ? draft
+            : path.endsWith("/candidates")
+              ? []
+              : [],
+      }),
+    }));
+    render(<ElectionAdmin id="election" />);
+    const seats = await screen.findAllByLabelText("Seats");
+    expect(seats).not.toHaveLength(0);
+    seats.forEach((seat) => {
+      expect(seat).toHaveValue("1");
+      expect(seat).toHaveAttribute("readonly");
+    });
+  });
 });

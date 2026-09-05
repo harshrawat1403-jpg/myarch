@@ -457,4 +457,16 @@ export class ElectionUseCases {
     requireSecretary(actor);
     return this.repository.turnout(id);
   }
+  async closeVoting(actor: AuthenticatedActor, id: string) {
+    requireSecretary(actor);
+    return this.repository.closeVoting({ electionId: id, actorUserId: actor.userId });
+  }
+  async countResults(actor: AuthenticatedActor, id: string) {
+    requireSecretary(actor);
+    return this.repository.countResults({ electionId: id, actorUserId: actor.userId });
+  }
+  async results(actor: AuthenticatedActor, id: string) {
+    requireSecretary(actor);
+    return this.repository.results(id);
+  }
 }

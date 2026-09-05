@@ -16,6 +16,37 @@ import { FormRenderer } from "@/components/forms/form-renderer";
 import { ElectionConfigForm } from "./election-config-form";
 import { ElectionProcessingAdmin } from "./election-processing-admin";
 
+type ElectionResultReview = {
+  version: number;
+  status: string;
+  countedAt: string;
+  positions: {
+    id: string;
+    positionTitle: string;
+    status: string;
+    notaFinalScore: string | number;
+    groups: {
+      voterGroup: string;
+      eligibleCount: number;
+      participationCount: number;
+      abstentionCount: number;
+      notaVoteCount: number;
+      scoringDenominator: number;
+      quorumPercent: string | number;
+      quorumMet: boolean;
+      configuredWeight: string | number;
+    }[];
+    candidates: {
+      id: string;
+      candidateName: string;
+      rawRank: number;
+      isProvisionalWinner: boolean;
+      finalScore: string | number;
+      groups: { rawVoteCount: number; normalizedScore: string | number }[];
+    }[];
+  }[];
+};
+
 export function ElectionAdmin({ id }: { id?: string }) {
   const { accessToken, role } = useAuth();
   const router = useRouter();
@@ -24,6 +55,7 @@ export function ElectionAdmin({ id }: { id?: string }) {
   const [forms, setForms] = useState<FormRecord[]>([]);
   const [candidates, setCandidates] = useState<CandidateRecord[]>([]);
   const [application, setApplication] = useState<FormApplicationDetail | null>(null);
+  const [results, setResults] = useState<ElectionResultReview | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   async function load() {
@@ -37,6 +69,9 @@ export function ElectionAdmin({ id }: { id?: string }) {
       setElection(detail);
       setCandidates(candidateRows);
       setForms(formRows);
+      if (detail.status === "RESULT_REVIEW")
+        setResults(await apiClient.get<ElectionResultReview>(`/api/elections/${id}/results`, accessToken));
+      else setResults(null);
     } else setItems(await apiClient.get<ElectionRecord[]>("/api/elections", accessToken));
   }
   useEffect(() => {
@@ -157,6 +192,32 @@ export function ElectionAdmin({ id }: { id?: string }) {
                       Close applications
                     </Button>
                   )
+                )}
+                {election.status === "VOTING" && (
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      act(
+                        () => apiClient.post(`/api/elections/${id}/voting/close`, {}, accessToken!),
+                        "Voting closed; the authoritative count can now begin",
+                      )
+                    }
+                  >
+                    Close voting
+                  </Button>
+                )}
+                {election.status === "COUNTING" && (
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      act(
+                        () => apiClient.post(`/api/elections/${id}/results/count`, {}, accessToken!),
+                        "Result snapshot created for administrative review",
+                      )
+                    }
+                  >
+                    Count Council election
+                  </Button>
                 )}
               </div>
               <p className="text-sm text-(--color-text-secondary)">
@@ -302,6 +363,7 @@ export function ElectionAdmin({ id }: { id?: string }) {
               ))}
             </Card>
             <ElectionProcessingAdmin election={election} accessToken={accessToken!} reload={load} />
+            {results && <ResultReview result={results} />}
             {application && (
               <Card className="space-y-4">
                 <div className="flex justify-between">
@@ -339,7 +401,7 @@ function PositionEditor({
     void onSave({
       title: data.get("title"),
       description: data.get("description"),
-      seats: Number(data.get("seats")),
+      seats: council ? 1 : Number(data.get("seats")),
       displayOrder: Number(data.get("displayOrder")),
       weights: council
         ? ["STUDENT", "FACULTY", "EX_COUNCIL"].map((voterGroup) => ({
@@ -363,17 +425,24 @@ function PositionEditor({
             <Textarea name="description" maxLength={5000} defaultValue={position?.description} />
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-sm">
-              Seats
-              <Input
-                name="seats"
-                type="number"
-                min={1}
-                max={1000}
-                required
-                defaultValue={position?.seats ?? 1}
-              />
-            </label>
+            {council ? (
+              <label className="text-sm">
+                Seats
+                <Input name="seats" value={1} readOnly aria-label="Seats" />
+              </label>
+            ) : (
+              <label className="text-sm">
+                Seats
+                <Input
+                  name="seats"
+                  type="number"
+                  min={1}
+                  max={1000}
+                  required
+                  defaultValue={position?.seats ?? 1}
+                />
+              </label>
+            )}
             <label className="text-sm">
               Display order
               <Input
@@ -419,6 +488,50 @@ function PositionEditor({
           )}
         </fieldset>
       </form>
+    </Card>
+  );
+}
+
+function ResultReview({ result }: { result: ElectionResultReview }) {
+  return (
+    <Card className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">Council result review</h2>
+        <p className="text-sm text-(--color-text-secondary)">
+          Version {result.version} · counted {new Date(result.countedAt).toLocaleString()} · UNVERIFIED / PENDING CERTIFICATION
+        </p>
+      </div>
+      {result.positions.map((position) => (
+        <section key={position.id} className="space-y-3 border-t border-(--color-border) pt-3">
+          <div className="flex flex-wrap justify-between gap-2">
+            <h3 className="font-medium">{position.positionTitle}</h3>
+            <Badge variant="neutral">{position.status}</Badge>
+          </div>
+          <div className="grid gap-2 text-sm sm:grid-cols-3">
+            {position.groups.map((group) => (
+              <div key={group.voterGroup} className="rounded border border-(--color-border) p-2">
+                <p className="font-medium">{group.voterGroup.replace("_", " ")}</p>
+                <p>Eligible: {group.eligibleCount}; participated: {group.participationCount}</p>
+                <p>Quorum: {group.quorumPercent}% ({group.quorumMet ? "met" : "failed"})</p>
+                <p>NOTA: {group.notaVoteCount}; abstained: {group.abstentionCount}</p>
+                <p>Scoring denominator: {group.scoringDenominator}; weight: {group.configuredWeight}%</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm">NOTA weighted score: {String(position.notaFinalScore)}</p>
+          {position.candidates.map((candidate) => (
+            <div key={candidate.id} className="rounded border border-(--color-border) p-3 text-sm">
+              <p className="font-medium">
+                #{candidate.rawRank} {candidate.candidateName} {candidate.isProvisionalWinner ? "· provisional winner" : ""}
+              </p>
+              <p>Final weighted score: {String(candidate.finalScore)}</p>
+              <p>
+                {candidate.groups.map((group, index) => `Group ${index + 1}: ${group.rawVoteCount} raw / ${String(group.normalizedScore)}`).join(" · ")}
+              </p>
+            </div>
+          ))}
+        </section>
+      ))}
     </Card>
   );
 }

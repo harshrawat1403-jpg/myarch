@@ -5,7 +5,9 @@ export interface ElectionRecord extends Omit<ElectionConfig, "type"> {
   status: ElectionStatus;
   configurationLockedAt: Date | null;
   createdAt: Date;
-  positions: (PositionConfig & { id: string })[];
+  // Stored rows remain numeric so legacy data can be rejected at the Council
+  // lifecycle boundary rather than being asserted to be valid during reads.
+  positions: (Omit<PositionConfig, "seats"> & { id: string; seats: number })[];
   applicationForm: { formId: string; title: string; status: string } | null;
 }
 export interface CandidateRecord {

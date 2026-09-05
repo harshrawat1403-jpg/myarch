@@ -17,7 +17,9 @@ export type ElectionStatus =
   | "SHORTLIST"
   | "INTERVIEWS"
   | "FINAL_CANDIDATES"
-  | "VOTING";
+  | "VOTING"
+  | "COUNTING"
+  | "RESULT_REVIEW";
 export const voterGroups = ["STUDENT", "FACULTY", "EX_COUNCIL"] as const;
 const percent = z.number().min(0).max(100).multipleOf(0.01);
 const requiredDate = z.union([z.string().min(1), z.date()]).pipe(z.coerce.date());
@@ -54,7 +56,12 @@ export const positionSchema = z
   .object({
     title: z.string().trim().min(1).max(150),
     description: z.string().trim().max(5000).default(""),
-    seats: z.number().int().positive().max(1000),
+    // Council elections use one choice and produce one provisional winner per
+    // position. Core Committee selections have their own position schema.
+    seats: z
+      .number()
+      .int()
+      .refine((seats): boolean => seats === 1, "Council election positions require one seat"),
     displayOrder: z.number().int().min(0).default(0),
     weights: z
       .array(z.object({ voterGroup: z.enum(voterGroups), percentage: percent }).strict())
@@ -98,6 +105,10 @@ export function assertVotingSchedule(
   if (config.votingOpenAt >= config.votingCloseAt)
     throw new ElectionError("Voting opening must precede closing", "validation");
 }
+export function assertCouncilSingleSeat(positions: readonly { seats: number }[]): void {
+  if (positions.some((position) => position.seats !== 1))
+    throw new ElectionError("Council election positions must have exactly one seat", "validation");
+}
 export function validateWeights(weights: PositionConfig["weights"], locked = false): void {
   if (new Set(weights.map((w) => w.voterGroup)).size !== weights.length)
     throw new ElectionError("Duplicate voter group", "validation");
@@ -126,7 +137,9 @@ export function assertTransition(from: ElectionStatus, to: ElectionStatus): void
     (from === "CORRECTIONS_OBJECTIONS" && to === "SHORTLIST") ||
     (from === "SHORTLIST" && to === "INTERVIEWS") ||
     (from === "INTERVIEWS" && to === "FINAL_CANDIDATES") ||
-    (from === "FINAL_CANDIDATES" && to === "VOTING")
+    (from === "FINAL_CANDIDATES" && to === "VOTING") ||
+    (from === "VOTING" && to === "COUNTING") ||
+    (from === "COUNTING" && to === "RESULT_REVIEW")
   ))
     throw new ElectionError(`Invalid election transition: ${from} to ${to}`);
 }

@@ -140,6 +140,9 @@ export interface ElectionRepository {
   }): Promise<unknown>;
   abstain(input: { electionId: string; userId: string }): Promise<unknown>;
   turnout(electionId: string): Promise<unknown>;
+  closeVoting(input: { electionId: string; actorUserId: string }): Promise<unknown>;
+  countResults(input: { electionId: string; actorUserId: string }): Promise<unknown>;
+  results(electionId: string): Promise<unknown>;
   processing(
     actorUserId: string | undefined,
     electionId: string,

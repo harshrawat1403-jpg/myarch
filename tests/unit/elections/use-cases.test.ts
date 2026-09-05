@@ -27,6 +27,9 @@ function setup() {
     transition: vi.fn().mockResolvedValue(record),
     candidates: vi.fn().mockResolvedValue([]),
     activeStudentUserIds: vi.fn().mockResolvedValue(["student"]),
+    closeVoting: vi.fn(),
+    countResults: vi.fn(),
+    results: vi.fn(),
   };
   const notifications = { notify: vi.fn() };
   return {
@@ -83,6 +86,9 @@ describe("election use cases and permissions", () => {
         () => useCases.deletePosition(actor, "election", "position"),
         () => useCases.linkForm(actor, "election", "form"),
         () => useCases.transition(actor, "election", "APPLICATION_OPEN"),
+        () => useCases.closeVoting(actor, "election"),
+        () => useCases.countResults(actor, "election"),
+        () => useCases.results(actor, "election"),
       ])
         await expect(operation()).rejects.toBeInstanceOf(NotAuthorizedError);
       for (const method of [
@@ -92,6 +98,9 @@ describe("election use cases and permissions", () => {
         repository.deletePosition,
         repository.linkForm,
         repository.transition,
+        repository.closeVoting,
+        repository.countResults,
+        repository.results,
       ])
         expect(method).not.toHaveBeenCalled();
     },

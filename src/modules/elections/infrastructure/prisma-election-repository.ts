@@ -4,6 +4,7 @@ import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import { NotAuthorizedError } from "@/lib/errors";
 import type { ElectionRepository } from "../application/ports/election-repository";
 import {
+  assertCouncilSingleSeat,
   assertDraft,
   assertTransition,
   assertVotingSchedule,
@@ -14,6 +15,7 @@ import {
   type PositionConfig,
 } from "../domain/election";
 import type { ElectionRecord } from "../domain/entities";
+import { computePositionResult, type ResultVoterGroup } from "../domain/results";
 
 const include = {
   positions: { include: { weights: true }, orderBy: { displayOrder: "asc" as const } },
@@ -83,12 +85,14 @@ export class PrismaElectionRepository implements ElectionRepository {
     actorUserId: string,
     action: string,
     id: string,
+    metadata?: Record<string, unknown>,
   ) {
     await new PrismaAuditRecorder(tx).record({
       actorUserId,
       action,
       targetEntityType: "Election",
       targetEntityId: id,
+      metadata,
     });
   }
   private async locked(tx: Prisma.TransactionClient, id: string) {
@@ -134,7 +138,9 @@ export class PrismaElectionRepository implements ElectionRepository {
     actorUserId: string,
   ) {
     return this.prisma.$transaction(async (tx) => {
-      await this.draft(tx, id);
+      const election = await this.draft(tx, id);
+      if (election.type === "COUNCIL" && config.seats !== 1)
+        throw new ElectionError("Council election positions must have exactly one seat", "validation");
       const { weights, ...fields } = config;
       const data = {
         ...fields,
@@ -232,6 +238,7 @@ export class PrismaElectionRepository implements ElectionRepository {
       )
         throw new ElectionError("Configure interview criteria before starting interviews");
       if (status === "VOTING") {
+        assertCouncilSingleSeat(record(row).positions);
         assertVotingSchedule(record(row));
         if (!row.voterSnapshotLockedAt || !row.voterSnapshotLockedByUserId)
           throw new ElectionError("Lock the Council voter snapshot before opening voting");
@@ -1261,7 +1268,7 @@ export class PrismaElectionRepository implements ElectionRepository {
       const election = await this.votingElection(tx, input.electionId);
       const snapshot = await tx.electionVoterSnapshot.findUnique({
         where: { electionId_userId: { electionId: input.electionId, userId: input.userId } },
-        select: { id: true },
+        select: { id: true, voterGroup: true },
       });
       if (!snapshot)
         throw new NotAuthorizedError("You are not in the locked Council voter snapshot");
@@ -1305,6 +1312,7 @@ export class PrismaElectionRepository implements ElectionRepository {
       await tx.electionBallot.create({
         data: {
           electionId: input.electionId,
+          voterGroup: snapshot.voterGroup,
           choices: {
             create: input.choices.map((choice) => ({
               isNota: choice.isNota === true,
@@ -1371,6 +1379,273 @@ export class PrismaElectionRepository implements ElectionRepository {
     const cast = submitted.CAST ?? 0;
     const abstained = submitted.ABSTAINED ?? 0;
     return { eligible, cast, abstained, participation: cast + abstained };
+  }
+  async closeVoting(input: { electionId: string; actorUserId: string }) {
+    return this.prisma.$transaction(async (tx) => {
+      const election = await this.locked(tx, input.electionId);
+      if (election.status !== "VOTING") throw new ElectionError("Voting is not open for this election");
+      assertCouncilSingleSeat(record(election).positions);
+      if (!election.votingCloseAt || new Date() < election.votingCloseAt)
+        throw new ElectionError("Voting cannot close before its configured closing time", "validation");
+      const updated = await tx.election.updateMany({
+        where: { id: input.electionId, status: "VOTING" },
+        data: { status: "COUNTING" },
+      });
+      if (updated.count !== 1) throw new ElectionError("Election state changed; refresh and retry");
+      await this.audit(tx, input.actorUserId, AUDIT_ACTIONS.ELECTION_VOTING_CLOSED, input.electionId);
+      return record(await this.locked(tx, input.electionId));
+    });
+  }
+  async countResults(input: { electionId: string; actorUserId: string }) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const election = await this.locked(tx, input.electionId);
+        if (election.status !== "COUNTING")
+          throw new ElectionError("Close voting before starting the authoritative count");
+        if (!election.voterSnapshotLockedAt || !election.voterSnapshotLockedByUserId)
+          throw new ElectionError("Lock the Council voter snapshot before counting", "validation");
+        assertCouncilSingleSeat(record(election).positions);
+        if (await tx.electionResultSnapshot.count({ where: { electionId: input.electionId } }))
+          throw new ElectionError("A result snapshot already exists; recounts are not available in Slice 4");
+
+        const groups: ResultVoterGroup[] = ["STUDENT", "FACULTY", "EX_COUNCIL"];
+        for (const position of election.positions) {
+          const byGroup = new Map(position.weights.map((weight) => [weight.voterGroup, weight.percentage]));
+          if (
+            byGroup.size !== groups.length ||
+            groups.some((group) => !byGroup.has(group)) ||
+            ![...byGroup.values()].reduce((sum, weight) => sum.plus(weight), new Prisma.Decimal(0)).equals(100)
+          )
+            throw new ElectionError("Council position weights must be locked for all voter groups and total 100%", "validation");
+        }
+        const finalCandidates = await tx.electionFinalCandidate.findMany({
+          where: { electionId: input.electionId },
+          include: {
+            position: { select: { id: true, title: true, seats: true, weights: true } },
+            candidate: {
+              include: { applicant: { select: { email: true, studentProfile: { select: { fullName: true } } } } },
+            },
+          },
+        });
+        const candidatesByPosition = new Map<string, typeof finalCandidates>();
+        for (const candidate of finalCandidates) {
+          const entries = candidatesByPosition.get(candidate.positionId) ?? [];
+          entries.push(candidate);
+          candidatesByPosition.set(candidate.positionId, entries);
+        }
+        if (
+          election.positions.some(
+            (position) => !(candidatesByPosition.get(position.id)?.length),
+          )
+        )
+          throw new ElectionError("Every Council position requires final candidates before counting", "validation");
+
+        const [snapshotRows, ballots, participationRows] = await Promise.all([
+          tx.electionVoterSnapshot.groupBy({
+            by: ["voterGroup"],
+            where: { electionId: input.electionId },
+            _count: { _all: true },
+          }),
+          tx.electionBallot.findMany({
+            where: { electionId: input.electionId },
+            select: { id: true, voterGroup: true, choices: { select: { positionId: true, candidateId: true, isNota: true } } },
+          }),
+          tx.$queryRaw<{ voterGroup: ResultVoterGroup; status: "CAST" | "ABSTAINED"; count: number }[]>`
+            SELECT s."voterGroup", p."status", COUNT(*)::integer AS "count"
+            FROM "election_voter_participations" p
+            JOIN "election_voter_snapshots" s
+              ON s."electionId" = p."electionId" AND s."userId" = p."userId"
+            WHERE p."electionId" = ${input.electionId}::uuid
+            GROUP BY s."voterGroup", p."status"`,
+        ]);
+        if (ballots.some((ballot) => ballot.voterGroup === null))
+          throw new ElectionError("A legacy ballot has no anonymous voter group and cannot be counted", "validation");
+        const eligible = new Map(groups.map((group) => [group, 0]));
+        snapshotRows.forEach((row) => eligible.set(row.voterGroup, row._count._all));
+        const participation = new Map(groups.map((group) => [group, { cast: 0, abstained: 0 }]));
+        participationRows.forEach((row) => {
+          const group = participation.get(row.voterGroup)!;
+          if (row.status === "CAST") group.cast = row.count;
+          else group.abstained = row.count;
+        });
+        if (ballots.length !== [...participation.values()].reduce((sum, row) => sum + row.cast, 0))
+          throw new ElectionError("Ballot and participation totals do not agree; counting stopped", "validation");
+        const ballotsByGroup = new Map(groups.map((group) => [group, 0]));
+        const positionIds = new Set(election.positions.map((position) => position.id));
+        const validFinalCandidate = new Set(
+          finalCandidates.map((candidate) => `${candidate.positionId}:${candidate.candidateId}`),
+        );
+        const tallies = new Map(
+          election.positions.map((position) => [
+            position.id,
+            new Map(
+              groups.map((group) => [
+                group,
+                { nota: 0, votes: new Map((candidatesByPosition.get(position.id) ?? []).map((candidate) => [candidate.candidateId, 0])) },
+              ]),
+            ),
+          ]),
+        );
+        for (const ballot of ballots) {
+          const voterGroup = ballot.voterGroup as ResultVoterGroup;
+          if (!groups.includes(voterGroup)) throw new ElectionError("Ballot has an invalid voter group", "validation");
+          ballotsByGroup.set(voterGroup, ballotsByGroup.get(voterGroup)! + 1);
+          if (ballot.choices.length !== positionIds.size)
+            throw new ElectionError("A ballot does not contain exactly one choice for every position", "validation");
+          const seenPositions = new Set<string>();
+          for (const choice of ballot.choices) {
+            if (!positionIds.has(choice.positionId) || seenPositions.has(choice.positionId))
+              throw new ElectionError("A ballot contains an invalid or duplicate position", "validation");
+            seenPositions.add(choice.positionId);
+            if (choice.isNota) {
+              if (!election.notaEnabled || choice.candidateId)
+                throw new ElectionError("A ballot contains an invalid NOTA choice", "validation");
+              tallies.get(choice.positionId)!.get(voterGroup)!.nota += 1;
+            } else {
+              if (!choice.candidateId || !validFinalCandidate.has(`${choice.positionId}:${choice.candidateId}`))
+                throw new ElectionError("A ballot contains a non-final candidate choice", "validation");
+              const votes = tallies.get(choice.positionId)!.get(voterGroup)!.votes;
+              votes.set(choice.candidateId, (votes.get(choice.candidateId) ?? 0) + 1);
+            }
+          }
+        }
+        for (const group of groups)
+          if (ballotsByGroup.get(group) !== participation.get(group)!.cast)
+            throw new ElectionError("Ballot group totals do not agree with participation; counting stopped", "validation");
+
+        const computed = election.positions.map((position) => {
+          const positionCandidates = candidatesByPosition.get(position.id)!;
+          return {
+            position,
+            result: computePositionResult(
+              positionCandidates.map((candidate) => ({
+                id: candidate.candidateId,
+                name: candidate.candidate.applicant.studentProfile?.fullName ?? candidate.candidate.applicant.email,
+              })),
+              groups.map((voterGroup) => {
+                const tally = tallies.get(position.id)!.get(voterGroup)!;
+                const voting = participation.get(voterGroup)!;
+                const quorumPercent =
+                  voterGroup === "STUDENT"
+                    ? election.studentQuorumPercent
+                    : voterGroup === "FACULTY"
+                      ? election.facultyQuorumPercent
+                      : election.exCouncilQuorumPercent;
+                return {
+                  voterGroup,
+                  eligibleCount: eligible.get(voterGroup)!,
+                  participationCount: voting.cast + voting.abstained,
+                  abstentionCount: voting.abstained,
+                  notaVoteCount: tally.nota,
+                  quorumPercent,
+                  configuredWeight: position.weights.find((weight) => weight.voterGroup === voterGroup)!.percentage,
+                  candidateVotes: tally.votes,
+                };
+              }),
+            ),
+          };
+        });
+        const overallStatus = computed.some((entry) => entry.result.status === "QUORUM_FAILED")
+          ? "QUORUM_FAILED"
+          : computed.some((entry) => entry.result.status === "RUNOFF_REQUIRED")
+            ? "RUNOFF_REQUIRED"
+            : computed.some((entry) => entry.result.status === "NOTA_WON")
+              ? "NOTA_WON"
+              : "RESULT_REVIEW";
+        const snapshot = await tx.electionResultSnapshot.create({
+          data: { electionId: input.electionId, version: 1, status: overallStatus, countedByUserId: input.actorUserId },
+        });
+        for (const entry of computed) {
+          const positionResult = await tx.electionPositionResult.create({
+            data: {
+              snapshotId: snapshot.id,
+              electionId: input.electionId,
+              positionId: entry.position.id,
+              positionTitle: entry.position.title,
+              status: entry.result.status,
+              notaFinalScore: entry.result.notaFinalScore,
+            },
+          });
+          const groupRows = new Map<string, string>();
+          for (const group of entry.result.groups) {
+            const row = await tx.electionPositionGroupResult.create({
+              data: {
+                positionResultId: positionResult.id,
+                voterGroup: group.voterGroup,
+                eligibleCount: group.eligibleCount,
+                participationCount: group.participationCount,
+                abstentionCount: group.abstentionCount,
+                notaVoteCount: group.notaVoteCount,
+                scoringDenominator: group.scoringDenominator,
+                quorumPercent: group.quorumPercent,
+                quorumMet: group.quorumMet,
+                configuredWeight: group.configuredWeight,
+                notaNormalizedScore: group.notaNormalizedScore,
+              },
+            });
+            groupRows.set(group.voterGroup, row.id);
+          }
+          for (const candidate of entry.result.candidates) {
+            const candidateResult = await tx.electionCandidateResult.create({
+              data: {
+                positionResultId: positionResult.id,
+                electionId: input.electionId,
+                candidateId: candidate.id,
+                candidateName: candidate.name,
+                rawRank: candidate.rawRank,
+                isProvisionalWinner: candidate.isProvisionalWinner,
+                finalScore: candidate.finalScore,
+              },
+            });
+            await tx.electionCandidateGroupResult.createMany({
+              data: candidate.groups.map((group) => ({
+                candidateResultId: candidateResult.id,
+                positionGroupResultId: groupRows.get(group.voterGroup)!,
+                rawVoteCount: group.rawVoteCount,
+                normalizedScore: group.normalizedScore,
+              })),
+            });
+          }
+        }
+        const state = await tx.election.updateMany({
+          where: { id: input.electionId, status: "COUNTING" },
+          data: { status: "RESULT_REVIEW" },
+        });
+        if (state.count !== 1) throw new ElectionError("Election state changed; refresh and retry");
+        await this.audit(tx, input.actorUserId, AUDIT_ACTIONS.ELECTION_COUNT_STARTED, input.electionId, { version: snapshot.version });
+        await this.audit(tx, input.actorUserId, AUDIT_ACTIONS.ELECTION_RESULT_VERSION_CREATED, input.electionId, { version: snapshot.version });
+        await this.audit(tx, input.actorUserId, AUDIT_ACTIONS.ELECTION_RESULT_COUNTED, input.electionId, { version: snapshot.version, status: overallStatus });
+        if (overallStatus === "QUORUM_FAILED")
+          await this.audit(tx, input.actorUserId, AUDIT_ACTIONS.ELECTION_QUORUM_FAILED, input.electionId, { version: snapshot.version });
+        if (overallStatus === "NOTA_WON")
+          await this.audit(tx, input.actorUserId, AUDIT_ACTIONS.ELECTION_NOTA_WON, input.electionId, { version: snapshot.version });
+        if (overallStatus === "RUNOFF_REQUIRED")
+          await this.audit(tx, input.actorUserId, AUDIT_ACTIONS.ELECTION_RUNOFF_REQUIRED, input.electionId, { version: snapshot.version });
+        return { version: snapshot.version, status: overallStatus };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+  async results(electionId: string) {
+    const election = await this.prisma.election.findUnique({ where: { id: electionId }, select: { type: true } });
+    if (!election) throw new ElectionError("Election not found", "notFound");
+    if (election.type !== "COUNCIL")
+      throw new ElectionError("Core Committee selections are managed outside the election workflow");
+    const result = await this.prisma.electionResultSnapshot.findFirst({
+      where: { electionId },
+      orderBy: { version: "desc" },
+      include: {
+        positions: {
+          orderBy: { position: { displayOrder: "asc" } },
+          include: {
+            groups: { orderBy: { voterGroup: "asc" } },
+            candidates: { orderBy: [{ rawRank: "asc" }, { candidateName: "asc" }], include: { groups: true } },
+          },
+        },
+      },
+    });
+    if (!result) throw new ElectionError("No counted result is available", "notFound");
+    return result;
   }
   async processing(actorUserId: string | undefined, electionId: string, isSecretary: boolean) {
     const candidates = await this.prisma.electionCandidate.findMany({

@@ -61,6 +61,19 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
   afterEach(() => vi.useRealTimers());
   afterAll(async () => {
     // Remove only rows created by this test run, respecting restrictive FKs.
+    await prisma.electionCandidateGroupResult.deleteMany({
+      where: { candidateResult: { positionResult: { snapshot: { electionId: { in: electionIds } } } } },
+    });
+    await prisma.electionCandidateResult.deleteMany({
+      where: { positionResult: { snapshot: { electionId: { in: electionIds } } } },
+    });
+    await prisma.electionPositionGroupResult.deleteMany({
+      where: { positionResult: { snapshot: { electionId: { in: electionIds } } } },
+    });
+    await prisma.electionPositionResult.deleteMany({
+      where: { snapshot: { electionId: { in: electionIds } } },
+    });
+    await prisma.electionResultSnapshot.deleteMany({ where: { electionId: { in: electionIds } } });
     await prisma.electionBallotChoice.deleteMany({ where: { electionId: { in: electionIds } } });
     await prisma.electionBallot.deleteMany({ where: { electionId: { in: electionIds } } });
     await prisma.electionVoterParticipation.deleteMany({
@@ -161,8 +174,9 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
   async function votingFixture() {
     const now = Date.now();
     const f = await fixture(true, {
-      applicationCloseAt: new Date(now + 1000),
-      votingOpenAt: new Date(now + 2000),
+      // Full-suite database contention can exceed a one-second setup window.
+      applicationCloseAt: new Date(now + 60000),
+      votingOpenAt: new Date(now + 61000),
       votingCloseAt: new Date(now + 3600000),
       notaEnabled: true,
     });
@@ -183,7 +197,7 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
       },
     });
     vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date(now + 3000));
+    vi.setSystemTime(new Date(now + 62000));
     await repository.lockVoterSnapshot({ electionId: f.election.id, actorUserId: secretaryId });
     await prisma.election.update({ where: { id: f.election.id }, data: { status: "VOTING" } });
     return { ...f, candidate };
@@ -545,6 +559,57 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
     ).toMatchObject({ status: "ABSTAINED" });
     expect(await prisma.electionBallotChoice.count({ where: { electionId: f.election.id } })).toBe(
       0,
+    );
+  });
+  it("closes voting once and creates one immutable Council result snapshot under concurrent counts", async () => {
+    const f = await votingFixture();
+    await repository.castBallot({
+      electionId: f.election.id,
+      userId: studentId,
+      choices: [{ positionId: f.position.id, candidateId: f.candidate.id }],
+    });
+    vi.setSystemTime(new Date(f.config.votingCloseAt!.getTime() + 1));
+    await expect(repository.countResults({ electionId: f.election.id, actorUserId: secretaryId })).rejects.toThrow(
+      "Close voting",
+    );
+    await repository.closeVoting({ electionId: f.election.id, actorUserId: secretaryId });
+    const counted = await Promise.allSettled([
+      repository.countResults({ electionId: f.election.id, actorUserId: secretaryId }),
+      repository.countResults({ electionId: f.election.id, actorUserId: secretaryId }),
+    ]);
+    expect(counted.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const snapshot = await prisma.electionResultSnapshot.findFirstOrThrow({
+      where: { electionId: f.election.id },
+      include: { positions: { include: { groups: true, candidates: { include: { groups: true } } } } },
+    });
+    expect(snapshot.version).toBe(1);
+    expect(snapshot.positions[0]!.status).toBe("WINNER_PENDING_VERIFICATION");
+    expect(snapshot.positions[0]!.groups.find((group) => group.voterGroup === "STUDENT")).toMatchObject({
+      eligibleCount: expect.any(Number),
+      participationCount: 1,
+      scoringDenominator: 1,
+    });
+    const administrative = await repository.results(f.election.id);
+    expect(JSON.stringify(administrative)).not.toContain(studentId);
+    await expect(
+      prisma.electionCandidateResult.update({
+        where: { id: snapshot.positions[0]!.candidates[0]!.id },
+        data: { finalScore: 0 },
+      }),
+    ).rejects.toThrow("immutable");
+    await expect(repository.countResults({ electionId: f.election.id, actorUserId: secretaryId })).rejects.toThrow(
+      "Close voting",
+    );
+  });
+  it("refuses malformed multi-seat Council positions before voting can close for counting", async () => {
+    const f = await votingFixture();
+    await prisma.electionPosition.update({ where: { id: f.position.id }, data: { seats: 2 } });
+    vi.setSystemTime(new Date(f.config.votingCloseAt!.getTime() + 1));
+    await expect(
+      repository.closeVoting({ electionId: f.election.id, actorUserId: secretaryId }),
+    ).rejects.toThrow("exactly one seat");
+    expect((await prisma.election.findUniqueOrThrow({ where: { id: f.election.id } })).status).toBe(
+      "VOTING",
     );
   });
 });

@@ -297,6 +297,11 @@ export default function StudentElectionsPage() {
               )}
             </section>
           )}
+          {(selected.status === "COUNTING" || selected.status === "RESULT_REVIEW") && (
+            <p className="rounded border border-(--color-border) p-3 text-sm">
+              Voting is closed. Results are pending verification and publication.
+            </p>
+          )}
           {mine.length ? (
             <section className="space-y-4">
               <h3 className="font-medium">My candidacy</h3>

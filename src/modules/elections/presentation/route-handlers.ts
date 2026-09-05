@@ -260,3 +260,17 @@ export const turnoutRouteHandler = route(
   (_req, actor, id) => electionUseCases.turnout(actor, id),
   true,
 );
+export const closeVotingRouteHandler = route(
+  (_req, actor, id) => electionUseCases.closeVoting(actor, id),
+  true,
+);
+export const countElectionResultsRouteHandler = route(
+  (_req, actor, id) => electionUseCases.countResults(actor, id),
+  true,
+  true,
+  201,
+);
+export const electionResultsRouteHandler = route(
+  (_req, actor, id) => electionUseCases.results(actor, id),
+  true,
+);
