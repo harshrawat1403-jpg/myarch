@@ -118,6 +118,7 @@ export function resolveNotificationDestination(
     }
 
     case "ELECTION_APPLICATION_OPENED":
+    case "ELECTION_PROCESSING_UPDATED":
       return "/student/elections";
 
     case "FORM_SUBMITTED":

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FormRenderer } from "@/components/forms/form-renderer";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function StudentElectionsPage() {
   const { accessToken } = useAuth();
@@ -21,6 +22,7 @@ export default function StudentElectionsPage() {
   const [submitted, setSubmitted] = useState<StudentFormApplicationView | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [correctionStatement, setCorrectionStatement] = useState("");
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -89,6 +91,13 @@ export default function StudentElectionsPage() {
       setBusy(false);
     }
   }
+  async function candidateAction(candidateId: string, path: string, payload: unknown, success: string) {
+    if (!accessToken || !selected) return;
+    setBusy(true); setMessage("");
+    try { await apiClient.post(`/api/elections/${selected.id}/candidates/${candidateId}/${path}`, payload, accessToken); await open(selected); setMessage(success); }
+    catch (error) { setMessage(error instanceof ApiError ? error.message : "Unable to update candidacy"); }
+    finally { setBusy(false); }
+  }
   const withinWindow =
     selected &&
     selected.status === "APPLICATION_OPEN" &&
@@ -156,9 +165,11 @@ export default function StudentElectionsPage() {
             <section className="space-y-4">
               <h3 className="font-medium">My candidacy</h3>
               {mine.map((candidate) => (
-                <p key={candidate.id}>
-                  {candidate.status} · {candidate.positions.map((p) => p.title).join(", ")}
-                </p>
+                <div key={candidate.id} className="space-y-2">
+                  <p>{candidate.status} · {candidate.positions.map((p) => p.title).join(", ")}</p>
+                  {candidate.status === "CORRECTION_REQUIRED" && selected.status === "CORRECTIONS_OBJECTIONS" && <div className="space-y-2"><Textarea value={correctionStatement} onChange={(event) => setCorrectionStatement(event.target.value)} placeholder="Explain the correction and cite permitted evidence." /><Button disabled={busy || !correctionStatement.trim()} onClick={() => void candidateAction(candidate.id, "corrections", { statement: correctionStatement.trim() }, "Correction submitted for review")}>Submit correction</Button></div>}
+                  {["SCRUTINY", "CORRECTIONS_OBJECTIONS", "SHORTLIST", "INTERVIEWS"].includes(selected.status) && candidate.status !== "WITHDRAWN" && <Button disabled={busy} variant="destructive" onClick={() => void candidateAction(candidate.id, "withdraw", {}, "Candidacy withdrawn")}>Withdraw candidacy</Button>}
+                </div>
               ))}
               {submitted && (
                 <FormRenderer fields={submitted.fields} answers={submitted.answers} readOnly />

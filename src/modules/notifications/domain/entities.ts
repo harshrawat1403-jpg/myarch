@@ -57,6 +57,7 @@ export type NotificationTemplateId =
   // no notification of their own — neither gets a new template here.
   | "COMMITTEE_MEMBER_ADDED"
   | "ELECTION_APPLICATION_OPENED"
+  | "ELECTION_PROCESSING_UPDATED"
   | "FORM_SUBMITTED"
   | "FORM_APPLICATION_REVIEWER_ASSIGNED"
   | "FORM_APPLICATION_UNDER_REVIEW"

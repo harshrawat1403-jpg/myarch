@@ -61,6 +61,22 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
   afterEach(() => vi.useRealTimers());
   afterAll(async () => {
     // Remove only rows created by this test run, respecting restrictive FKs.
+    await prisma.electionInterviewScore.deleteMany({
+      where: { interview: { electionId: { in: electionIds } } },
+    });
+    await prisma.electionInterviewPanelMember.deleteMany({
+      where: { interview: { electionId: { in: electionIds } } },
+    });
+    await prisma.electionInterview.deleteMany({ where: { electionId: { in: electionIds } } });
+    await prisma.electionInterviewCriterion.deleteMany({ where: { electionId: { in: electionIds } } });
+    await prisma.electionFinalCandidate.deleteMany({ where: { electionId: { in: electionIds } } });
+    await prisma.electionShortlistEntry.deleteMany({ where: { electionId: { in: electionIds } } });
+    await prisma.electionObjection.deleteMany({ where: { electionId: { in: electionIds } } });
+    await prisma.electionCorrectionSubmission.deleteMany({
+      where: { correctionRequest: { electionId: { in: electionIds } } },
+    });
+    await prisma.electionCorrectionRequest.deleteMany({ where: { electionId: { in: electionIds } } });
+    await prisma.electionScrutinyReview.deleteMany({ where: { electionId: { in: electionIds } } });
     await prisma.electionCandidatePosition.deleteMany({
       where: { electionId: { in: electionIds } },
     });
@@ -311,5 +327,33 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
     const mine = await repository.candidates(f.election.id, studentId);
     expect(mine).toHaveLength(1);
     expect(JSON.stringify(mine)).not.toContain("Private answer");
+  });
+  it("serializes shortlisting and locks completed interview scores before final candidates", async () => {
+    const f = await fixture();
+    await submit(f);
+    const candidate = await prisma.electionCandidate.findFirstOrThrow({ where: { electionId: f.election.id } });
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(f.config.applicationCloseAt.getTime() + 1000));
+    await repository.transition(f.election.id, "APPLICATION_CLOSED", secretaryId);
+    await repository.transition(f.election.id, "SCRUTINY", secretaryId);
+    await repository.recordScrutiny({ electionId: f.election.id, candidateId: candidate.id, decision: "ELIGIBLE", reason: "Eligible", actorUserId: secretaryId });
+    await repository.transition(f.election.id, "CORRECTIONS_OBJECTIONS", secretaryId);
+    await repository.transition(f.election.id, "SHORTLIST", secretaryId);
+    const shortlisted = await Promise.allSettled([
+      repository.shortlist({ electionId: f.election.id, candidateId: candidate.id, positionIds: [f.position.id], actorUserId: secretaryId }),
+      repository.shortlist({ electionId: f.election.id, candidateId: candidate.id, positionIds: [f.position.id], actorUserId: secretaryId }),
+    ]);
+    expect(shortlisted.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    await repository.saveCriterion({ electionId: f.election.id, name: "Communication", description: "Clear communication", maxScore: 10, weight: 1, displayOrder: 0, required: true, actorUserId: secretaryId });
+    await repository.transition(f.election.id, "INTERVIEWS", secretaryId);
+    const interview = await repository.createInterview({ electionId: f.election.id, candidateId: candidate.id, positionId: f.position.id, scheduledAt: new Date(Date.now() + 60000), durationMinutes: 30, panelUserIds: [secretaryId], actorUserId: secretaryId });
+    await expect(repository.createInterview({ electionId: f.election.id, candidateId: candidate.id, positionId: f.position.id, panelUserIds: [secretaryId], actorUserId: secretaryId })).rejects.toMatchObject({ code: "P2002" });
+    await repository.completeInterview({ electionId: f.election.id, interviewId: interview.id, candidateAttended: true, actorUserId: secretaryId });
+    const criterion = await prisma.electionInterviewCriterion.findFirstOrThrow({ where: { electionId: f.election.id } });
+    await repository.submitScores({ electionId: f.election.id, interviewId: interview.id, actorUserId: secretaryId, scores: [{ criterionId: criterion.id, score: 8 }] });
+    await repository.lockScores({ electionId: f.election.id, interviewId: interview.id, actorUserId: secretaryId });
+    await expect(repository.submitScores({ electionId: f.election.id, interviewId: interview.id, actorUserId: secretaryId, scores: [{ criterionId: criterion.id, score: 9 }] })).rejects.toThrow("not open");
+    await repository.lockFinalCandidates({ electionId: f.election.id, entries: [{ candidateId: candidate.id, positionId: f.position.id }], actorUserId: secretaryId });
+    expect((await repository.get(f.election.id))!.status).toBe("FINAL_CANDIDATES");
   });
 });

@@ -43,7 +43,7 @@ function route(operation: Operation, admin: boolean, withId = true, status = 200
         throw error;
       }
     },
-    { roles: admin ? ["SECRETARY"] : ["SECRETARY", "STUDENT"] },
+    { roles: admin ? ["SECRETARY"] : undefined },
   );
 }
 const body = (req: NextRequest) => req.json().catch(() => null);
@@ -106,12 +106,86 @@ export const linkElectionFormRouteHandler = route(async (req, actor, id) => {
 }, true);
 export const transitionElectionRouteHandler = route(async (req, actor, id) => {
   const input = z
-    .object({ status: z.enum(["APPLICATION_OPEN", "APPLICATION_CLOSED"]) })
+    .object({
+      status: z.enum([
+        "APPLICATION_OPEN",
+        "APPLICATION_CLOSED",
+        "SCRUTINY",
+        "CORRECTIONS_OBJECTIONS",
+        "SHORTLIST",
+        "INTERVIEWS",
+      ]),
+    })
     .strict()
     .parse(await body(req));
   return electionUseCases.transition(actor, id, input.status);
 }, true);
 export const listElectionCandidatesRouteHandler = route(
   (_req, actor, id) => electionUseCases.candidates(actor, id),
+  false,
+);
+const candidateId = async (context: unknown) =>
+  z.string().uuid().parse(await extractRouteParam(context, "candidateId"));
+const interviewId = async (context: unknown) =>
+  z.string().uuid().parse(await extractRouteParam(context, "interviewId"));
+export const electionProcessingRouteHandler = route(
+  (_req, actor, id) => electionUseCases.processing(actor, id),
+  false,
+);
+export const scrutinyElectionCandidateRouteHandler = route(
+  async (req, actor, id, context) => electionUseCases.scrutiny(actor, id, await candidateId(context), await body(req)),
+  true,
+);
+export const correctionElectionCandidateRouteHandler = route(
+  async (req, actor, id, context) => electionUseCases.correction(actor, id, await candidateId(context), await body(req)),
+  false,
+);
+export const objectionElectionCandidateRouteHandler = route(
+  async (req, actor, id, context) => electionUseCases.objection(actor, id, await candidateId(context), await body(req)),
+  false,
+);
+export const withdrawElectionCandidateRouteHandler = route(
+  async (req, actor, id, context) => electionUseCases.withdraw(actor, id, await candidateId(context), await body(req)),
+  false,
+);
+export const shortlistElectionRouteHandler = route(
+  async (req, actor, id) => electionUseCases.shortlist(actor, id, await body(req)),
+  true,
+);
+export const createElectionCriterionRouteHandler = route(
+  async (req, actor, id) => electionUseCases.criterion(actor, id, undefined, await body(req)),
+  true,
+  true,
+  201,
+);
+export const createElectionInterviewRouteHandler = route(
+  async (req, actor, id) => electionUseCases.interview(actor, id, await body(req)),
+  true,
+  true,
+  201,
+);
+export const completeElectionInterviewRouteHandler = route(
+  async (req, actor, id, context) => electionUseCases.completeInterview(actor, id, await interviewId(context), await body(req)),
+  true,
+);
+export const submitElectionInterviewScoresRouteHandler = route(
+  async (req, actor, id, context) => electionUseCases.scores(actor, id, await interviewId(context), await body(req)),
+  false,
+);
+export const lockElectionInterviewScoresRouteHandler = route(
+  async (_req, actor, id, context) => electionUseCases.lockScores(actor, id, await interviewId(context)),
+  true,
+);
+export const setElectionPanelRecusalRouteHandler = route(
+  async (req, actor, id, context) => electionUseCases.panelRecusal(actor, id, await interviewId(context), z.string().uuid().parse(await extractRouteParam(context, "panelMemberId")), await body(req)),
+  true,
+);
+export const lockFinalCandidatesRouteHandler = route(
+  async (req, actor, id) => electionUseCases.finalCandidates(actor, id, await body(req)),
+  true,
+);
+export const panelAssignmentsRouteHandler = route(
+  (_req, actor) => electionUseCases.panelAssignments(actor),
+  false,
   false,
 );

@@ -8,7 +8,15 @@ export class ElectionError extends Error {
     super(message);
   }
 }
-export type ElectionStatus = "DRAFT" | "APPLICATION_OPEN" | "APPLICATION_CLOSED";
+export type ElectionStatus =
+  | "DRAFT"
+  | "APPLICATION_OPEN"
+  | "APPLICATION_CLOSED"
+  | "SCRUTINY"
+  | "CORRECTIONS_OBJECTIONS"
+  | "SHORTLIST"
+  | "INTERVIEWS"
+  | "FINAL_CANDIDATES";
 export const voterGroups = ["STUDENT", "FACULTY", "EX_COUNCIL"] as const;
 const percent = z.number().min(0).max(100).multipleOf(0.01);
 const requiredDate = z.union([z.string().min(1), z.date()]).pipe(z.coerce.date());
@@ -96,7 +104,12 @@ export function assertDraft(status: ElectionStatus): void {
 export function assertTransition(from: ElectionStatus, to: ElectionStatus): void {
   if (!(
     (from === "DRAFT" && to === "APPLICATION_OPEN") ||
-    (from === "APPLICATION_OPEN" && to === "APPLICATION_CLOSED")
+    (from === "APPLICATION_OPEN" && to === "APPLICATION_CLOSED") ||
+    (from === "APPLICATION_CLOSED" && to === "SCRUTINY") ||
+    (from === "SCRUTINY" && to === "CORRECTIONS_OBJECTIONS") ||
+    (from === "CORRECTIONS_OBJECTIONS" && to === "SHORTLIST") ||
+    (from === "SHORTLIST" && to === "INTERVIEWS") ||
+    (from === "INTERVIEWS" && to === "FINAL_CANDIDATES")
   ))
     throw new ElectionError(`Invalid election transition: ${from} to ${to}`);
 }

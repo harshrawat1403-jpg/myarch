@@ -1,4 +1,4 @@
-import type { ElectionConfig, PositionConfig } from "../../domain/election";
+import type { ElectionConfig, ElectionStatus, PositionConfig } from "../../domain/election";
 import type { CandidateRecord, ElectionRecord } from "../../domain/entities";
 export interface ElectionRepository {
   list(includeDrafts: boolean): Promise<ElectionRecord[]>;
@@ -15,9 +15,75 @@ export interface ElectionRepository {
   linkForm(id: string, formId: string, actorUserId: string): Promise<ElectionRecord>;
   transition(
     id: string,
-    status: "APPLICATION_OPEN" | "APPLICATION_CLOSED",
+    status: Exclude<ElectionStatus, "DRAFT" | "FINAL_CANDIDATES">,
     actorUserId: string,
   ): Promise<ElectionRecord>;
   candidates(id: string, applicantUserId?: string): Promise<CandidateRecord[]>;
   activeStudentUserIds(): Promise<string[]>;
+  recordScrutiny(input: {
+    electionId: string;
+    candidateId: string;
+    decision: "ELIGIBLE" | "INELIGIBLE" | "CORRECTION_REQUIRED";
+    reason: string;
+    actorUserId: string;
+  }): Promise<unknown>;
+  requestCorrection(input: {
+    electionId: string;
+    candidateId: string;
+    instructions: string;
+    actorUserId: string;
+  }): Promise<unknown>;
+  submitCorrection(input: {
+    electionId: string;
+    candidateId: string;
+    statement: string;
+    evidenceReference?: string;
+    actorUserId: string;
+  }): Promise<unknown>;
+  createObjection(input: {
+    electionId: string;
+    candidateId: string;
+    reason: string;
+    evidenceReference?: string;
+    actorUserId: string;
+  }): Promise<unknown>;
+  resolveObjection(input: {
+    electionId: string;
+    candidateId: string;
+    objectionId: string;
+    status: "RESOLVED" | "DISMISSED";
+    decisionReason: string;
+    actorUserId: string;
+  }): Promise<unknown>;
+  shortlist(input: { electionId: string; candidateId: string; positionIds: string[]; actorUserId: string }): Promise<unknown>;
+  withdraw(input: { electionId: string; candidateId: string; reason?: string; actorUserId: string }): Promise<unknown>;
+  saveCriterion(input: {
+    electionId: string;
+    criterionId?: string;
+    name: string;
+    description: string;
+    maxScore: number;
+    weight: number;
+    displayOrder: number;
+    required: boolean;
+    actorUserId: string;
+  }): Promise<unknown>;
+  createInterview(input: {
+    electionId: string;
+    candidateId: string;
+    positionId: string;
+    scheduledAt?: Date;
+    durationMinutes?: number;
+    mode?: string;
+    location?: string;
+    panelUserIds: string[];
+    actorUserId: string;
+  }): Promise<unknown>;
+  completeInterview(input: { electionId: string; interviewId: string; candidateAttended: boolean; actorUserId: string }): Promise<unknown>;
+  submitScores(input: { electionId: string; interviewId: string; actorUserId: string; scores: { criterionId: string; score: number; comments?: string }[] }): Promise<unknown>;
+  lockScores(input: { electionId: string; interviewId: string; actorUserId: string }): Promise<unknown>;
+  setPanelRecusal(input: { electionId: string; interviewId: string; panelMemberId: string; isRecused: boolean; actorUserId: string }): Promise<unknown>;
+  lockFinalCandidates(input: { electionId: string; entries: { candidateId: string; positionId: string }[]; actorUserId: string }): Promise<unknown>;
+  processing(actorUserId: string | undefined, electionId: string, isSecretary: boolean): Promise<unknown>;
+  panelAssignments(userId: string): Promise<unknown>;
 }

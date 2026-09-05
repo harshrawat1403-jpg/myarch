@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { FormRenderer } from "@/components/forms/form-renderer";
 import { ElectionConfigForm } from "./election-config-form";
+import { ElectionProcessingAdmin } from "./election-processing-admin";
 
 export function ElectionAdmin({ id }: { id?: string }) {
   const { accessToken, role } = useAuth();
@@ -300,6 +301,7 @@ export function ElectionAdmin({ id }: { id?: string }) {
                 </div>
               ))}
             </Card>
+            <ElectionProcessingAdmin election={election} accessToken={accessToken!} reload={load} />
             {application && (
               <Card className="space-y-4">
                 <div className="flex justify-between">

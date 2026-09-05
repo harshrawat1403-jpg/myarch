@@ -1,4 +1,5 @@
 import { electionApplicationOpenedTemplate, electionApplicationOpenedInAppTemplate } from "./definitions/election-application-opened";
+import { electionProcessingUpdatedTemplate, electionProcessingUpdatedInAppTemplate } from "./definitions/election-processing-updated";
 import type { NotificationChannel, NotificationTemplateId } from "../../domain/entities";
 import type { EmailTemplateDefinition, InAppTemplateDefinition } from "./types";
 import { profileApprovedTemplate, profileApprovedInAppTemplate } from "./definitions/profile-approved";
@@ -113,6 +114,7 @@ export const EMAIL_TEMPLATE_REGISTRY: Record<NotificationTemplateId, EmailTempla
   ANNOUNCEMENT_PUBLISHED: announcementPublishedTemplate,
   COMMITTEE_MEMBER_ADDED: committeeMemberAddedTemplate,
   ELECTION_APPLICATION_OPENED: electionApplicationOpenedTemplate,
+  ELECTION_PROCESSING_UPDATED: electionProcessingUpdatedTemplate,
   FORM_SUBMITTED: formSubmittedTemplate,
   FORM_APPLICATION_REVIEWER_ASSIGNED: formApplicationReviewerAssignedTemplate,
   FORM_APPLICATION_UNDER_REVIEW: formApplicationUnderReviewTemplate,
@@ -149,6 +151,7 @@ export const IN_APP_TEMPLATE_REGISTRY: Record<NotificationTemplateId, InAppTempl
   ANNOUNCEMENT_PUBLISHED: announcementPublishedInAppTemplate,
   COMMITTEE_MEMBER_ADDED: committeeMemberAddedInAppTemplate,
   ELECTION_APPLICATION_OPENED: electionApplicationOpenedInAppTemplate,
+  ELECTION_PROCESSING_UPDATED: electionProcessingUpdatedInAppTemplate,
   FORM_SUBMITTED: formSubmittedInAppTemplate,
   FORM_APPLICATION_REVIEWER_ASSIGNED: formApplicationReviewerAssignedInAppTemplate,
   FORM_APPLICATION_UNDER_REVIEW: formApplicationUnderReviewInAppTemplate,
@@ -217,6 +220,7 @@ export const NOTIFICATION_CHANNELS: Record<NotificationTemplateId, readonly Noti
   // IN_APP-only" rule (e.g. TASK_ASSIGNED, MAINTENANCE_ISSUE_SUBMITTED).
   COMMITTEE_MEMBER_ADDED: ["IN_APP"],
   ELECTION_APPLICATION_OPENED: ["IN_APP"],
+  ELECTION_PROCESSING_UPDATED: ["EMAIL", "IN_APP"],
   FORM_SUBMITTED: ["IN_APP"],
   FORM_APPLICATION_REVIEWER_ASSIGNED: ["IN_APP"],
   FORM_APPLICATION_UNDER_REVIEW: ["IN_APP"],

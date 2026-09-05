@@ -13,7 +13,14 @@ export interface CandidateRecord {
   applicationId: string;
   applicantUserId: string;
   applicantName: string;
-  status: "APPLIED";
+  status:
+    | "APPLIED"
+    | "ELIGIBLE"
+    | "INELIGIBLE"
+    | "CORRECTION_REQUIRED"
+    | "SHORTLISTED"
+    | "WITHDRAWN"
+    | "FINAL_CANDIDATE";
   createdAt: Date;
   positions: { id: string; title: string }[];
 }
