@@ -121,6 +121,12 @@ export function resolveNotificationDestination(
     case "ELECTION_PROCESSING_UPDATED":
       return "/student/elections";
 
+    case "CORE_COMMITTEE_SELECTION_RESULT_PUBLISHED":
+    case "CORE_COMMITTEE_SELECTION_SELECTED":
+    case "CORE_COMMITTEE_SELECTION_NOT_SELECTED":
+    case "CORE_COMMITTEE_SELECTION_MEMBERSHIP_CONFIRMED":
+      return null;
+
     case "FORM_SUBMITTED":
     case "FORM_APPLICATION_REVIEWER_ASSIGNED":
       return "/dashboard/form-applications";

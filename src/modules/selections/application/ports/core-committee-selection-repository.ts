@@ -7,6 +7,62 @@ import type {
   CoreCommitteeSelectionCandidateRecord,
   CoreCommitteeSelectionRecord,
 } from "../../domain/entities";
+
+export interface CoreCommitteeSelectionLifecycleNotificationRecipients {
+  selectionId: string;
+  selectionTitle: string;
+  candidateUserIds: string[];
+  selectedCandidateUserIds: string[];
+  notSelectedCandidateUserIds: string[];
+}
+
+export interface CoreCommitteeSelectionPublicationResult {
+  published: true;
+  idempotent: boolean;
+  notificationRecipients?: CoreCommitteeSelectionLifecycleNotificationRecipients;
+}
+
+export interface CoreCommitteeSelectionAppointmentResult {
+  confirmed: true;
+  idempotent: boolean;
+  committeeId?: string;
+  appointmentCount?: number;
+  notificationRecipients?: {
+    selectionId: string;
+    selectionTitle: string;
+    selectedCandidateUserIds: string[];
+  };
+}
+
+export interface CoreCommitteeSelectionCouncilProcessingDTO {
+  candidates: Array<{
+    id: string;
+    applicantUserId: string;
+    candidateName: string;
+    status: string;
+    positions: Array<{ positionId: string; title: string }>;
+    scrutiny: Array<{ decision: string; createdAt: Date }>;
+    shortlist: Array<{ positionId: string; createdAt: Date }>;
+    interviews: Array<{
+      positionId: string;
+      scheduledAt: Date | null;
+      durationMinutes: number | null;
+      mode: string | null;
+      location: string | null;
+      candidateAttended: boolean | null;
+      completedAt: Date | null;
+    }>;
+    decisions: Array<{
+      positionId: string;
+      outcome: "SELECTED" | "NOT_SELECTED";
+      state: "RECORDED" | "FINALIZED";
+      decidedAt: Date;
+      finalizedAt: Date | null;
+    }>;
+  }>;
+  positions: Array<{ id: string; title: string; seats: number; displayOrder: number }>;
+}
+
 export interface CoreCommitteeSelectionRepository {
   list(includeDrafts: boolean): Promise<CoreCommitteeSelectionRecord[]>;
   get(id: string): Promise<CoreCommitteeSelectionRecord | null>;
@@ -103,5 +159,17 @@ export interface CoreCommitteeSelectionRepository {
     decisionId: string;
     actorUserId: string;
   }): Promise<unknown>;
-  processing(selectionId: string, applicantUserId?: string): Promise<unknown>;
+  internalProcessing(selectionId: string): Promise<unknown>;
+  councilProcessing(selectionId: string): Promise<CoreCommitteeSelectionCouncilProcessingDTO>;
+  publish(input: {
+    selectionId: string;
+    actorUserId: string;
+  }): Promise<CoreCommitteeSelectionPublicationResult>;
+  publishedResults(selectionId: string): Promise<unknown>;
+  appointmentPreview(selectionId: string): Promise<unknown>;
+  confirmAppointments(input: {
+    selectionId: string;
+    actorUserId: string;
+  }): Promise<CoreCommitteeSelectionAppointmentResult>;
+  archive(input: { selectionId: string; actorUserId: string }): Promise<unknown>;
 }

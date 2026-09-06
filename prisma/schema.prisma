@@ -297,38 +297,38 @@ enum AcademicYearTransitionStatus {
 // ---------------------------------------------------------------------------
 
 model User {
-  createdElections              Election[]                     @relation("ElectionCreator")
-  lockedElections               Election[]                     @relation("ElectionLocker")
-  electionCandidacies           ElectionCandidate[]
-  electionScrutinyReviews       ElectionScrutinyReview[]       @relation("ElectionScrutinyReviewer")
-  electionCorrectionRequests    ElectionCorrectionRequest[]    @relation("ElectionCorrectionRequester")
-  electionCorrectionSubmissions ElectionCorrectionSubmission[] @relation("ElectionCorrectionSubmitter")
-  electionObjections            ElectionObjection[]            @relation("ElectionObjectionObjector")
-  reviewedElectionObjections    ElectionObjection[]            @relation("ElectionObjectionReviewer")
-  electionInterviewPanels       ElectionInterviewPanelMember[] @relation("ElectionPanelMember")
-  scheduledElectionInterviews   ElectionInterview[]            @relation("ElectionInterviewScheduler")
-  lockedElectionFinalCandidates ElectionFinalCandidate[]       @relation("ElectionFinalCandidateLocker")
-  electionFacultyRosterEntries  ElectionFacultyRosterEntry[]   @relation("ElectionFacultyRosterUser")
-  electionExCouncilRosterEntries ElectionExCouncilRosterEntry[] @relation("ElectionExCouncilRosterUser")
-  electionVoterSnapshots        ElectionVoterSnapshot[]
-  electionVoterParticipations   ElectionVoterParticipation[]
-  lockedElectionVoterSnapshots  Election[]                     @relation("ElectionVoterSnapshotLocker")
-  countedElectionResults        ElectionResultSnapshot[]       @relation("ElectionResultCounter")
-  assignedElectionVerifications ElectionResultVerifierAssignment[] @relation("ElectionResultVerifier")
-  assignedElectionVerifiers     ElectionResultVerifierAssignment[] @relation("ElectionResultVerifierAssigner")
-  completedElectionVerifications ElectionResultVerification[]  @relation("ElectionResultVerifier")
-  certifiedElectionResults      ElectionCertification[]        @relation("ElectionResultCertifier")
-  publishedElectionResults      ElectionResultPublication[]    @relation("ElectionResultPublisher")
-  confirmedElectionAppointments ElectionAppointment[]          @relation("ElectionAppointmentConfirmer")
-  appointedThroughElections     ElectionAppointment[]          @relation("ElectionAppointmentUser")
-  shortlistedElectionEntries    ElectionShortlistEntry[]       @relation("ElectionShortlistActor")
-  id                            String                         @id @default(uuid()) @db.Uuid
-  email                         String                         @unique
-  passwordHash                  String
-  role                          Role
-  isActive                      Boolean                        @default(true)
-  createdAt                     DateTime                       @default(now())
-  updatedAt                     DateTime                       @updatedAt
+  createdElections               Election[]                         @relation("ElectionCreator")
+  lockedElections                Election[]                         @relation("ElectionLocker")
+  electionCandidacies            ElectionCandidate[]
+  electionScrutinyReviews        ElectionScrutinyReview[]           @relation("ElectionScrutinyReviewer")
+  electionCorrectionRequests     ElectionCorrectionRequest[]        @relation("ElectionCorrectionRequester")
+  electionCorrectionSubmissions  ElectionCorrectionSubmission[]     @relation("ElectionCorrectionSubmitter")
+  electionObjections             ElectionObjection[]                @relation("ElectionObjectionObjector")
+  reviewedElectionObjections     ElectionObjection[]                @relation("ElectionObjectionReviewer")
+  electionInterviewPanels        ElectionInterviewPanelMember[]     @relation("ElectionPanelMember")
+  scheduledElectionInterviews    ElectionInterview[]                @relation("ElectionInterviewScheduler")
+  lockedElectionFinalCandidates  ElectionFinalCandidate[]           @relation("ElectionFinalCandidateLocker")
+  electionFacultyRosterEntries   ElectionFacultyRosterEntry[]       @relation("ElectionFacultyRosterUser")
+  electionExCouncilRosterEntries ElectionExCouncilRosterEntry[]     @relation("ElectionExCouncilRosterUser")
+  electionVoterSnapshots         ElectionVoterSnapshot[]
+  electionVoterParticipations    ElectionVoterParticipation[]
+  lockedElectionVoterSnapshots   Election[]                         @relation("ElectionVoterSnapshotLocker")
+  countedElectionResults         ElectionResultSnapshot[]           @relation("ElectionResultCounter")
+  assignedElectionVerifications  ElectionResultVerifierAssignment[] @relation("ElectionResultVerifier")
+  assignedElectionVerifiers      ElectionResultVerifierAssignment[] @relation("ElectionResultVerifierAssigner")
+  completedElectionVerifications ElectionResultVerification[]       @relation("ElectionResultVerifier")
+  certifiedElectionResults       ElectionCertification[]            @relation("ElectionResultCertifier")
+  publishedElectionResults       ElectionResultPublication[]        @relation("ElectionResultPublisher")
+  confirmedElectionAppointments  ElectionAppointment[]              @relation("ElectionAppointmentConfirmer")
+  appointedThroughElections      ElectionAppointment[]              @relation("ElectionAppointmentUser")
+  shortlistedElectionEntries     ElectionShortlistEntry[]           @relation("ElectionShortlistActor")
+  id                             String                             @id @default(uuid()) @db.Uuid
+  email                          String                             @unique
+  passwordHash                   String
+  role                           Role
+  isActive                       Boolean                            @default(true)
+  createdAt                      DateTime                           @default(now())
+  updatedAt                      DateTime                           @updatedAt
 
   // V3.0 Administration Platform: set true whenever an admin issues a
   // temporary password (account creation or reset) — see
@@ -430,6 +430,9 @@ model User {
   coreCommitteeCouncilReviews                 CoreCommitteeCouncilReview[]              @relation("CoreCommitteeCouncilReviewMember")
   coreCommitteeSelectionDecisionsRecorded     CoreCommitteeSelectionDecision[]          @relation("CoreCommitteeSelectionDecisionRecorder")
   coreCommitteeSelectionDecisionsFinalized    CoreCommitteeSelectionDecision[]          @relation("CoreCommitteeSelectionDecisionFinalizer")
+  coreCommitteeSelectionPublications          CoreCommitteeSelectionPublication[]       @relation("CoreCommitteeSelectionPublisher")
+  coreCommitteeSelectionAppointmentsConfirmed CoreCommitteeSelectionAppointment[]       @relation("CoreCommitteeSelectionAppointmentConfirmer")
+  coreCommitteeSelectionAppointmentsReceived  CoreCommitteeSelectionAppointment[]       @relation("CoreCommitteeSelectionAppointedUser")
 
   // MYARCH Edit Mode — inline content overrides for existing public pages.
   updatedContentOverrides ContentOverride[] @relation("ContentOverrideUpdatedBy")
@@ -1781,13 +1784,14 @@ model Committee {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships                     CommitteeMembership[]
-  attachments                     CommitteeAttachment[]
-  forms                           Form[]
-  meetings                        Meeting[]
-  coreCommitteeCouncilReviews     CoreCommitteeCouncilReview[]
-  coreCommitteeSelectionDecisions CoreCommitteeSelectionDecision[]
-  electionAppointments            ElectionAppointment[]
+  memberships                        CommitteeMembership[]
+  attachments                        CommitteeAttachment[]
+  forms                              Form[]
+  meetings                           Meeting[]
+  coreCommitteeCouncilReviews        CoreCommitteeCouncilReview[]
+  coreCommitteeSelectionDecisions    CoreCommitteeSelectionDecision[]
+  electionAppointments               ElectionAppointment[]
+  coreCommitteeSelectionAppointments CoreCommitteeSelectionAppointment[]
 
   @@index([type])
   @@index([status])
@@ -1822,8 +1826,9 @@ model CommitteeMembership {
   startDate    DateTime  @default(now())
   endDate      DateTime?
 
-  createdAt DateTime @default(now())
-  electionAppointment ElectionAppointment?
+  createdAt                         DateTime                           @default(now())
+  electionAppointment               ElectionAppointment?
+  coreCommitteeSelectionAppointment CoreCommitteeSelectionAppointment?
 
   @@index([committeeId])
   @@index([userId])
@@ -2306,6 +2311,8 @@ model CoreCommitteeSelection {
   interviews                  CoreCommitteeSelectionInterview[]
   councilReviews              CoreCommitteeCouncilReview[]
   decisions                   CoreCommitteeSelectionDecision[]
+  publication                 CoreCommitteeSelectionPublication?
+  appointments                CoreCommitteeSelectionAppointment[]
 
   @@index([status, applicationOpenAt, applicationCloseAt])
   @@index([academicYear, status])
@@ -2313,21 +2320,22 @@ model CoreCommitteeSelection {
 }
 
 model CoreCommitteeSelectionPosition {
-  id                 String                                    @id @default(uuid()) @db.Uuid
-  selectionId        String                                    @db.Uuid
-  selection          CoreCommitteeSelection                    @relation(fields: [selectionId], references: [id], onDelete: Restrict)
-  title              String
-  identityKey        String
-  description        String
-  seats              Int
-  displayOrder       Int                                       @default(0)
-  createdAt          DateTime                                  @default(now())
-  updatedAt          DateTime                                  @updatedAt
-  candidatePositions CoreCommitteeSelectionCandidatePosition[]
-  shortlistEntries   CoreCommitteeSelectionShortlistEntry[]
-  interviews         CoreCommitteeSelectionInterview[]
-  councilReviews     CoreCommitteeCouncilReview[]
-  decisions          CoreCommitteeSelectionDecision[]
+  id                                 String                                    @id @default(uuid()) @db.Uuid
+  selectionId                        String                                    @db.Uuid
+  selection                          CoreCommitteeSelection                    @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  title                              String
+  identityKey                        String
+  description                        String
+  seats                              Int
+  displayOrder                       Int                                       @default(0)
+  createdAt                          DateTime                                  @default(now())
+  updatedAt                          DateTime                                  @updatedAt
+  candidatePositions                 CoreCommitteeSelectionCandidatePosition[]
+  shortlistEntries                   CoreCommitteeSelectionShortlistEntry[]
+  interviews                         CoreCommitteeSelectionInterview[]
+  councilReviews                     CoreCommitteeCouncilReview[]
+  decisions                          CoreCommitteeSelectionDecision[]
+  coreCommitteeSelectionAppointments CoreCommitteeSelectionAppointment[]
 
   @@unique([selectionId, identityKey])
   @@unique([id, selectionId])
@@ -2347,23 +2355,24 @@ model CoreCommitteeSelectionApplicationForm {
 }
 
 model CoreCommitteeSelectionCandidate {
-  id                 String                                    @id @default(uuid()) @db.Uuid
-  selectionId        String                                    @db.Uuid
-  selection          CoreCommitteeSelection                    @relation(fields: [selectionId], references: [id], onDelete: Restrict)
-  applicationId      String                                    @unique @db.Uuid
-  application        FormApplication                           @relation(fields: [applicationId], references: [id], onDelete: Restrict)
-  applicantUserId    String                                    @db.Uuid
-  applicant          User                                      @relation("CoreCommitteeSelectionCandidateApplicant", fields: [applicantUserId], references: [id], onDelete: Restrict)
-  status             CoreCommitteeSelectionCandidateStatus     @default(APPLIED)
-  createdAt          DateTime                                  @default(now())
-  updatedAt          DateTime                                  @updatedAt
-  positions          CoreCommitteeSelectionCandidatePosition[]
-  scrutinyReviews    CoreCommitteeSelectionScrutinyReview[]
-  correctionRequests CoreCommitteeSelectionCorrectionRequest[]
-  shortlistEntries   CoreCommitteeSelectionShortlistEntry[]
-  interviews         CoreCommitteeSelectionInterview[]
-  councilReviews     CoreCommitteeCouncilReview[]
-  decisions          CoreCommitteeSelectionDecision[]
+  id                                 String                                    @id @default(uuid()) @db.Uuid
+  selectionId                        String                                    @db.Uuid
+  selection                          CoreCommitteeSelection                    @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  applicationId                      String                                    @unique @db.Uuid
+  application                        FormApplication                           @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  applicantUserId                    String                                    @db.Uuid
+  applicant                          User                                      @relation("CoreCommitteeSelectionCandidateApplicant", fields: [applicantUserId], references: [id], onDelete: Restrict)
+  status                             CoreCommitteeSelectionCandidateStatus     @default(APPLIED)
+  createdAt                          DateTime                                  @default(now())
+  updatedAt                          DateTime                                  @updatedAt
+  positions                          CoreCommitteeSelectionCandidatePosition[]
+  scrutinyReviews                    CoreCommitteeSelectionScrutinyReview[]
+  correctionRequests                 CoreCommitteeSelectionCorrectionRequest[]
+  shortlistEntries                   CoreCommitteeSelectionShortlistEntry[]
+  interviews                         CoreCommitteeSelectionInterview[]
+  councilReviews                     CoreCommitteeCouncilReview[]
+  decisions                          CoreCommitteeSelectionDecision[]
+  coreCommitteeSelectionAppointments CoreCommitteeSelectionAppointment[]
 
   @@unique([selectionId, applicantUserId])
   @@unique([id, selectionId])
@@ -2506,44 +2515,81 @@ model CoreCommitteeSelectionDecision {
   finalizedAt        DateTime?
   createdAt          DateTime                              @default(now())
   updatedAt          DateTime                              @updatedAt
+  appointment        CoreCommitteeSelectionAppointment?
 
   @@unique([candidateId, positionId])
   @@index([selectionId, state])
   @@map("core_committee_selection_decisions")
 }
 
+model CoreCommitteeSelectionPublication {
+  id                String                 @id @default(uuid()) @db.Uuid
+  selectionId       String                 @unique @db.Uuid
+  selection         CoreCommitteeSelection @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  publishedByUserId String                 @db.Uuid
+  publishedBy       User                   @relation("CoreCommitteeSelectionPublisher", fields: [publishedByUserId], references: [id], onDelete: Restrict)
+  publishedAt       DateTime               @default(now())
+
+  @@map("core_committee_selection_publications")
+}
+
+model CoreCommitteeSelectionAppointment {
+  id                String                          @id @default(uuid()) @db.Uuid
+  selectionId       String                          @db.Uuid
+  selection         CoreCommitteeSelection          @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  decisionId        String                          @unique @db.Uuid
+  decision          CoreCommitteeSelectionDecision  @relation(fields: [decisionId], references: [id], onDelete: Restrict)
+  candidateId       String                          @db.Uuid
+  candidate         CoreCommitteeSelectionCandidate @relation(fields: [candidateId, selectionId], references: [id, selectionId], onDelete: Restrict)
+  positionId        String                          @db.Uuid
+  position          CoreCommitteeSelectionPosition  @relation(fields: [positionId, selectionId], references: [id, selectionId], onDelete: Restrict)
+  committeeId       String                          @db.Uuid
+  committee         Committee                       @relation(fields: [committeeId], references: [id], onDelete: Restrict)
+  membershipId      String                          @unique @db.Uuid
+  membership        CommitteeMembership             @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  appointedUserId   String                          @db.Uuid
+  appointedUser     User                            @relation("CoreCommitteeSelectionAppointedUser", fields: [appointedUserId], references: [id], onDelete: Restrict)
+  confirmedByUserId String                          @db.Uuid
+  confirmedBy       User                            @relation("CoreCommitteeSelectionAppointmentConfirmer", fields: [confirmedByUserId], references: [id], onDelete: Restrict)
+  appointedAt       DateTime                        @default(now())
+
+  @@unique([selectionId, candidateId, positionId])
+  @@index([committeeId])
+  @@map("core_committee_selection_appointments")
+}
+
 model Election {
-  id                          String                       @id @default(uuid()) @db.Uuid
+  id                          String                         @id @default(uuid()) @db.Uuid
   title                       String
   academicYear                String
   type                        ElectionType
-  status                      ElectionStatus               @default(DRAFT)
+  status                      ElectionStatus                 @default(DRAFT)
   applicationOpenAt           DateTime
   applicationCloseAt          DateTime
   correctionOpenAt            DateTime?
   correctionCloseAt           DateTime?
-  campaignEnabled             Boolean                      @default(false)
+  campaignEnabled             Boolean                        @default(false)
   campaignOpenAt              DateTime?
   campaignCloseAt             DateTime?
   votingOpenAt                DateTime?
   votingCloseAt               DateTime?
-  notaEnabled                 Boolean                      @default(false)
-  maxPositionsPerCandidate    Int                          @default(1)
-  studentQuorumPercent        Decimal                      @default(0) @db.Decimal(5, 2)
-  facultyQuorumPercent        Decimal                      @default(0) @db.Decimal(5, 2)
-  exCouncilQuorumPercent      Decimal                      @default(0) @db.Decimal(5, 2)
+  notaEnabled                 Boolean                        @default(false)
+  maxPositionsPerCandidate    Int                            @default(1)
+  studentQuorumPercent        Decimal                        @default(0) @db.Decimal(5, 2)
+  facultyQuorumPercent        Decimal                        @default(0) @db.Decimal(5, 2)
+  exCouncilQuorumPercent      Decimal                        @default(0) @db.Decimal(5, 2)
   configurationLockedAt       DateTime?
-  configurationLockedByUserId String?                      @db.Uuid
-  configurationLockedBy       User?                        @relation("ElectionLocker", fields: [configurationLockedByUserId], references: [id], onDelete: Restrict)
+  configurationLockedByUserId String?                        @db.Uuid
+  configurationLockedBy       User?                          @relation("ElectionLocker", fields: [configurationLockedByUserId], references: [id], onDelete: Restrict)
   openedAt                    DateTime?
   closedAt                    DateTime?
   voterSnapshotLockedAt       DateTime?
-  voterSnapshotLockedByUserId String?                      @db.Uuid
-  voterSnapshotLockedBy       User?                        @relation("ElectionVoterSnapshotLocker", fields: [voterSnapshotLockedByUserId], references: [id], onDelete: Restrict)
-  createdByUserId             String                       @db.Uuid
-  createdBy                   User                         @relation("ElectionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  createdAt                   DateTime                     @default(now())
-  updatedAt                   DateTime                     @updatedAt
+  voterSnapshotLockedByUserId String?                        @db.Uuid
+  voterSnapshotLockedBy       User?                          @relation("ElectionVoterSnapshotLocker", fields: [voterSnapshotLockedByUserId], references: [id], onDelete: Restrict)
+  createdByUserId             String                         @db.Uuid
+  createdBy                   User                           @relation("ElectionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdAt                   DateTime                       @default(now())
+  updatedAt                   DateTime                       @updatedAt
   positions                   ElectionPosition[]
   applicationForm             ElectionApplicationForm?
   candidates                  ElectionCandidate[]
@@ -2919,14 +2965,14 @@ model ElectionBallot {
 // Council result records are aggregate-only snapshots. They intentionally
 // have no relation to ElectionVoterParticipation or User voters.
 model ElectionResultSnapshot {
-  id              String                       @id @default(uuid()) @db.Uuid
-  electionId      String                       @db.Uuid
-  election        Election                     @relation(fields: [electionId], references: [id], onDelete: Restrict)
-  version         Int
-  status          ElectionResultStatus
-  countedAt       DateTime                     @default(now())
-  countedByUserId String                       @db.Uuid
-  countedBy       User                         @relation("ElectionResultCounter", fields: [countedByUserId], references: [id], onDelete: Restrict)
+  id                 String                            @id @default(uuid()) @db.Uuid
+  electionId         String                            @db.Uuid
+  election           Election                          @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  version            Int
+  status             ElectionResultStatus
+  countedAt          DateTime                          @default(now())
+  countedByUserId    String                            @db.Uuid
+  countedBy          User                              @relation("ElectionResultCounter", fields: [countedByUserId], references: [id], onDelete: Restrict)
   positions          ElectionPositionResult[]
   verifierAssignment ElectionResultVerifierAssignment?
   verification       ElectionResultVerification?
@@ -2941,15 +2987,15 @@ model ElectionResultSnapshot {
 }
 
 model ElectionPositionResult {
-  id             String                       @id @default(uuid()) @db.Uuid
-  snapshotId     String                       @db.Uuid
-  snapshot       ElectionResultSnapshot       @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
-  electionId     String                       @db.Uuid
-  positionId     String                       @db.Uuid
-  position       ElectionPosition             @relation(fields: [positionId, electionId], references: [id, electionId], onDelete: Restrict)
+  id             String                        @id @default(uuid()) @db.Uuid
+  snapshotId     String                        @db.Uuid
+  snapshot       ElectionResultSnapshot        @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+  electionId     String                        @db.Uuid
+  positionId     String                        @db.Uuid
+  position       ElectionPosition              @relation(fields: [positionId, electionId], references: [id, electionId], onDelete: Restrict)
   positionTitle  String
   status         ElectionPositionResultStatus
-  notaFinalScore Decimal                      @default(0) @db.Decimal(24, 18)
+  notaFinalScore Decimal                       @default(0) @db.Decimal(24, 18)
   groups         ElectionPositionGroupResult[]
   candidates     ElectionCandidateResult[]
   appointment    ElectionAppointment?
@@ -2961,19 +3007,19 @@ model ElectionPositionResult {
 }
 
 model ElectionPositionGroupResult {
-  id                  String                        @id @default(uuid()) @db.Uuid
-  positionResultId    String                        @db.Uuid
-  positionResult      ElectionPositionResult        @relation(fields: [positionResultId], references: [id], onDelete: Restrict)
+  id                  String                         @id @default(uuid()) @db.Uuid
+  positionResultId    String                         @db.Uuid
+  positionResult      ElectionPositionResult         @relation(fields: [positionResultId], references: [id], onDelete: Restrict)
   voterGroup          ElectionVoterGroup
   eligibleCount       Int
   participationCount  Int
   abstentionCount     Int
   notaVoteCount       Int
   scoringDenominator  Int
-  quorumPercent       Decimal                       @db.Decimal(5, 2)
+  quorumPercent       Decimal                        @db.Decimal(5, 2)
   quorumMet           Boolean
-  configuredWeight    Decimal                       @db.Decimal(5, 2)
-  notaNormalizedScore Decimal                       @default(0) @db.Decimal(24, 18)
+  configuredWeight    Decimal                        @db.Decimal(5, 2)
+  notaNormalizedScore Decimal                        @default(0) @db.Decimal(24, 18)
   candidateScores     ElectionCandidateGroupResult[]
 
   @@unique([positionResultId, voterGroup])
@@ -2981,16 +3027,16 @@ model ElectionPositionGroupResult {
 }
 
 model ElectionCandidateResult {
-  id                  String                        @id @default(uuid()) @db.Uuid
-  positionResultId    String                        @db.Uuid
-  positionResult      ElectionPositionResult        @relation(fields: [positionResultId], references: [id], onDelete: Restrict)
-  electionId          String                        @db.Uuid
-  candidateId         String                        @db.Uuid
-  candidate           ElectionCandidate             @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
+  id                  String                         @id @default(uuid()) @db.Uuid
+  positionResultId    String                         @db.Uuid
+  positionResult      ElectionPositionResult         @relation(fields: [positionResultId], references: [id], onDelete: Restrict)
+  electionId          String                         @db.Uuid
+  candidateId         String                         @db.Uuid
+  candidate           ElectionCandidate              @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
   candidateName       String
   rawRank             Int
-  isProvisionalWinner Boolean                       @default(false)
-  finalScore          Decimal                       @db.Decimal(24, 18)
+  isProvisionalWinner Boolean                        @default(false)
+  finalScore          Decimal                        @db.Decimal(24, 18)
   groups              ElectionCandidateGroupResult[]
 
   @@unique([positionResultId, candidateId])
@@ -2999,29 +3045,28 @@ model ElectionCandidateResult {
 }
 
 model ElectionCandidateGroupResult {
-  id                    String                       @id @default(uuid()) @db.Uuid
-  candidateResultId     String                       @db.Uuid
-  candidateResult       ElectionCandidateResult      @relation(fields: [candidateResultId], references: [id], onDelete: Restrict)
-  positionGroupResultId String                       @db.Uuid
-  positionGroupResult   ElectionPositionGroupResult  @relation(fields: [positionGroupResultId], references: [id], onDelete: Restrict)
+  id                    String                      @id @default(uuid()) @db.Uuid
+  candidateResultId     String                      @db.Uuid
+  candidateResult       ElectionCandidateResult     @relation(fields: [candidateResultId], references: [id], onDelete: Restrict)
+  positionGroupResultId String                      @db.Uuid
+  positionGroupResult   ElectionPositionGroupResult @relation(fields: [positionGroupResultId], references: [id], onDelete: Restrict)
   rawVoteCount          Int
-  normalizedScore       Decimal                      @db.Decimal(24, 18)
+  normalizedScore       Decimal                     @db.Decimal(24, 18)
 
   @@unique([candidateResultId, positionGroupResultId])
   @@map("election_candidate_group_results")
 }
 
-
 model ElectionResultVerifierAssignment {
-  id               String                           @id @default(uuid()) @db.Uuid
-  electionId       String                           @db.Uuid
-  snapshotId       String                           @db.Uuid
-  snapshot         ElectionResultSnapshot           @relation(fields: [snapshotId, electionId], references: [id, electionId], onDelete: Restrict)
-  verifierUserId   String                           @db.Uuid
-  verifier         User                             @relation("ElectionResultVerifier", fields: [verifierUserId], references: [id], onDelete: Restrict)
-  assignedByUserId String                           @db.Uuid
-  assignedBy       User                             @relation("ElectionResultVerifierAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
-  assignedAt       DateTime                         @default(now())
+  id               String                      @id @default(uuid()) @db.Uuid
+  electionId       String                      @db.Uuid
+  snapshotId       String                      @db.Uuid
+  snapshot         ElectionResultSnapshot      @relation(fields: [snapshotId, electionId], references: [id, electionId], onDelete: Restrict)
+  verifierUserId   String                      @db.Uuid
+  verifier         User                        @relation("ElectionResultVerifier", fields: [verifierUserId], references: [id], onDelete: Restrict)
+  assignedByUserId String                      @db.Uuid
+  assignedBy       User                        @relation("ElectionResultVerifierAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+  assignedAt       DateTime                    @default(now())
   verification     ElectionResultVerification?
 
   @@unique([electionId])

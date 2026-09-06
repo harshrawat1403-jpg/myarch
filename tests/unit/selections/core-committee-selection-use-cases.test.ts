@@ -33,12 +33,21 @@ function setup(currentCouncil: string | null = "council") {
     recordCouncilReview: vi.fn(),
     recordDecision: vi.fn(),
     finalizeDecision: vi.fn(),
-    processing: vi.fn(),
+    internalProcessing: vi.fn(),
+    councilProcessing: vi.fn(),
+    publish: vi.fn(),
+    publishedResults: vi.fn(),
+    appointmentPreview: vi.fn(),
+    confirmAppointments: vi.fn(),
+    archive: vi.fn(),
   };
+  const notifications = { notify: vi.fn().mockResolvedValue(undefined) };
   return {
     repository,
+    notifications,
     useCases: new CoreCommitteeSelectionUseCases(
       repository as unknown as CoreCommitteeSelectionRepository,
+      notifications,
     ),
   };
 }
@@ -95,5 +104,60 @@ describe("Core Committee selection authority", () => {
       useCases.create({ role: "COORDINATOR", userId: "coordinator" }, {}),
     ).rejects.toBeInstanceOf(NotAuthorizedError);
     expect(repository.recordCouncilReview).not.toHaveBeenCalled();
+  });
+  it("uses the internal projection only for the Secretary and the safe projection for current Council", async () => {
+    const { useCases, repository } = setup();
+    repository.internalProcessing.mockResolvedValue({ candidates: [{ decisions: [{ internalNote: "internal" }] }] });
+    repository.councilProcessing.mockResolvedValue({ candidates: [{ decisions: [{ outcome: "SELECTED" }] }] });
+    await expect(useCases.processing(secretary, "selection")).resolves.toEqual({
+      candidates: [{ decisions: [{ internalNote: "internal" }] }],
+    });
+    await expect(useCases.processing(councilMember, "selection")).resolves.toEqual({
+      candidates: [{ decisions: [{ outcome: "SELECTED" }] }],
+    });
+    expect(repository.internalProcessing).toHaveBeenCalledWith("selection");
+    expect(repository.councilProcessing).toHaveBeenCalledWith("selection");
+    const denied = setup(null);
+    await expect(denied.useCases.processing(councilMember, "selection")).rejects.toBeInstanceOf(
+      NotAuthorizedError,
+    );
+  });
+  it("notifies each recipient once after committed publication and membership confirmation", async () => {
+    const { useCases, repository, notifications } = setup();
+    repository.publish.mockResolvedValue({
+      published: true,
+      idempotent: false,
+      notificationRecipients: {
+        selectionId: "selection",
+        selectionTitle: "Core",
+        candidateUserIds: ["selected", "selected", "not-selected"],
+        selectedCandidateUserIds: ["selected"],
+        notSelectedCandidateUserIds: ["selected", "not-selected"],
+      },
+    });
+    repository.confirmAppointments.mockResolvedValue({
+      confirmed: true,
+      idempotent: false,
+      notificationRecipients: {
+        selectionId: "selection",
+        selectionTitle: "Core",
+        selectedCandidateUserIds: ["selected", "selected"],
+      },
+    });
+    await useCases.publish(secretary, "selection");
+    await useCases.confirmAppointments(secretary, "selection");
+    expect(notifications.notify).toHaveBeenCalledTimes(5);
+    expect(notifications.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientUserId: "selected", template: "CORE_COMMITTEE_SELECTION_SELECTED" }),
+    );
+    expect(notifications.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientUserId: "not-selected", template: "CORE_COMMITTEE_SELECTION_NOT_SELECTED" }),
+    );
+    expect(notifications.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientUserId: "selected", template: "CORE_COMMITTEE_SELECTION_MEMBERSHIP_CONFIRMED" }),
+    );
+    repository.publish.mockResolvedValue({ published: true, idempotent: true });
+    await useCases.publish(secretary, "selection");
+    expect(notifications.notify).toHaveBeenCalledTimes(5);
   });
 });

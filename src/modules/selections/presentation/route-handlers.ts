@@ -179,3 +179,24 @@ export const finalizeCoreCommitteeSelectionDecisionRouteHandler = route(
     coreCommitteeSelectionUseCases.finalizeDecision(actor, id, await decisionId(context)),
   true,
 );
+export const publishCoreCommitteeSelectionRouteHandler = route(
+  (_req, actor, id) => coreCommitteeSelectionUseCases.publish(actor, id),
+  true,
+);
+export const coreCommitteeSelectionAppointmentPreviewRouteHandler = route(
+  (_req, actor, id) => coreCommitteeSelectionUseCases.appointmentPreview(actor, id),
+  true,
+);
+export const confirmCoreCommitteeSelectionAppointmentsRouteHandler = route(
+  (_req, actor, id) => coreCommitteeSelectionUseCases.confirmAppointments(actor, id),
+  true,
+);
+export const archiveCoreCommitteeSelectionRouteHandler = route(
+  (_req, actor, id) => coreCommitteeSelectionUseCases.archive(actor, id),
+  true,
+);
+
+export const publishedCoreCommitteeSelectionResultsRouteHandler = route(
+  (_req, actor, id) => coreCommitteeSelectionUseCases.publishedResults(actor, id),
+  false,
+);

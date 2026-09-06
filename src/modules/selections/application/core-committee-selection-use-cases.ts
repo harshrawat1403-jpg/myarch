@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/modules/auth";
+import type { NotificationService } from "@/modules/notifications";
 import { NotAuthorizedError } from "@/lib/errors";
 import {
   CoreCommitteeSelectionError,
@@ -13,7 +14,10 @@ export function requireSelectionSecretary(actor: AuthenticatedActor) {
     throw new NotAuthorizedError("Only the Secretary may administer Core Committee selections");
 }
 export class CoreCommitteeSelectionUseCases {
-  constructor(private readonly repository: CoreCommitteeSelectionRepository) {}
+  constructor(
+    private readonly repository: CoreCommitteeSelectionRepository,
+    private readonly notifications: NotificationService,
+  ) {}
   async list(actor: AuthenticatedActor) {
     if (actor.role !== "SECRETARY" && actor.role !== "STUDENT")
       throw new NotAuthorizedError(
@@ -86,7 +90,7 @@ export class CoreCommitteeSelectionUseCases {
   }
   async processing(actor: AuthenticatedActor, selectionId: string) {
     await this.get(actor, selectionId);
-    if (actor.role === "SECRETARY") return this.repository.processing(selectionId);
+    if (actor.role === "SECRETARY") return this.repository.internalProcessing(selectionId);
     if (actor.role !== "STUDENT")
       throw new NotAuthorizedError(
         "Only current Council members may access Core Committee review data",
@@ -96,7 +100,7 @@ export class CoreCommitteeSelectionUseCases {
       throw new NotAuthorizedError(
         "Only active current Council members may access Core Committee review data",
       );
-    return this.repository.processing(selectionId);
+    return this.repository.councilProcessing(selectionId);
   }
   async scrutiny(
     actor: AuthenticatedActor,
@@ -247,5 +251,66 @@ export class CoreCommitteeSelectionUseCases {
   async finalizeDecision(actor: AuthenticatedActor, selectionId: string, decisionId: string) {
     requireSelectionSecretary(actor);
     return this.repository.finalizeDecision({ selectionId, decisionId, actorUserId: actor.userId });
+  }
+  async publishedResults(actor: AuthenticatedActor, selectionId: string) {
+    await this.get(actor, selectionId);
+    return this.repository.publishedResults(selectionId);
+  }
+  async publish(actor: AuthenticatedActor, selectionId: string) {
+    requireSelectionSecretary(actor);
+    const result = await this.repository.publish({ selectionId, actorUserId: actor.userId });
+    if (!result.idempotent && result.notificationRecipients) {
+      const recipients = result.notificationRecipients;
+      await this.notifyUnique(recipients.candidateUserIds, "CORE_COMMITTEE_SELECTION_RESULT_PUBLISHED", {
+        selectionId: recipients.selectionId,
+        selectionTitle: recipients.selectionTitle,
+      });
+      await this.notifyUnique(
+        recipients.selectedCandidateUserIds,
+        "CORE_COMMITTEE_SELECTION_SELECTED",
+        { selectionId: recipients.selectionId, selectionTitle: recipients.selectionTitle },
+      );
+      const selected = new Set(recipients.selectedCandidateUserIds);
+      await this.notifyUnique(
+        recipients.notSelectedCandidateUserIds.filter((userId) => !selected.has(userId)),
+        "CORE_COMMITTEE_SELECTION_NOT_SELECTED",
+        { selectionId: recipients.selectionId, selectionTitle: recipients.selectionTitle },
+      );
+    }
+    return result;
+  }
+  async appointmentPreview(actor: AuthenticatedActor, selectionId: string) {
+    requireSelectionSecretary(actor);
+    return this.repository.appointmentPreview(selectionId);
+  }
+  async confirmAppointments(actor: AuthenticatedActor, selectionId: string) {
+    requireSelectionSecretary(actor);
+    const result = await this.repository.confirmAppointments({ selectionId, actorUserId: actor.userId });
+    if (!result.idempotent && result.notificationRecipients)
+      await this.notifyUnique(
+        result.notificationRecipients.selectedCandidateUserIds,
+        "CORE_COMMITTEE_SELECTION_MEMBERSHIP_CONFIRMED",
+        result.notificationRecipients,
+      );
+    return result;
+  }
+  async archive(actor: AuthenticatedActor, selectionId: string) {
+    requireSelectionSecretary(actor);
+    return this.repository.archive({ selectionId, actorUserId: actor.userId });
+  }
+  private async notifyUnique(
+    recipientUserIds: readonly string[],
+    template:
+      | "CORE_COMMITTEE_SELECTION_RESULT_PUBLISHED"
+      | "CORE_COMMITTEE_SELECTION_SELECTED"
+      | "CORE_COMMITTEE_SELECTION_NOT_SELECTED"
+      | "CORE_COMMITTEE_SELECTION_MEMBERSHIP_CONFIRMED",
+    context: Record<string, unknown>,
+  ) {
+    await Promise.all(
+      [...new Set(recipientUserIds)].map((recipientUserId) =>
+        this.notifications.notify({ recipientUserId, template, context }),
+      ),
+    );
   }
 }

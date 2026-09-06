@@ -75,6 +75,9 @@ describe.skipIf(!databaseUrl)("Core Committee selection PostgreSQL integrity", (
     ).id;
   });
   afterAll(async () => {
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "core_committee_selection_decisions" DISABLE TRIGGER core_selection_finalized_decision_immutable',
+    );
     await prisma.coreCommitteeSelectionDecision.deleteMany({
       where: { selectionId: { in: selectionIds } },
     });
@@ -112,6 +115,9 @@ describe.skipIf(!databaseUrl)("Core Committee selection PostgreSQL integrity", (
     await prisma.auditLog.deleteMany({ where: { actorUserId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.batch.delete({ where: { id: batchId } });
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "core_committee_selection_decisions" ENABLE TRIGGER core_selection_finalized_decision_immutable',
+    );
     await prisma.$disconnect();
   });
   async function fixture(link = true) {
@@ -242,6 +248,10 @@ describe.skipIf(!databaseUrl)("Core Committee selection PostgreSQL integrity", (
       where: { id: f.selection.id },
       data: { status: "COUNCIL_REVIEW" },
     });
+    await prisma.coreCommitteeSelectionCandidate.update({
+      where: { id: candidate.id },
+      data: { status: "SHORTLISTED" },
+    });
     const council = await prisma.committee.create({
       data: {
         name: `Council ${randomUUID()}`,
@@ -254,7 +264,7 @@ describe.skipIf(!databaseUrl)("Core Committee selection PostgreSQL integrity", (
     expect(await repository.currentCouncilCommittee(f.selection.id, councilMemberId)).toBe(
       council.id,
     );
-    await repository.recordCouncilReview({
+    const review = await repository.recordCouncilReview({
       selectionId: f.selection.id,
       candidateId: candidate.id,
       positionId: f.position.id,
@@ -271,6 +281,24 @@ describe.skipIf(!databaseUrl)("Core Committee selection PostgreSQL integrity", (
       outcome: "SELECTED",
       internalNote: "Recorded Council decision",
     });
+    expect(review).not.toHaveProperty("note");
+    expect(decision).not.toHaveProperty("internalNote");
+    const internalProcessing = await repository.internalProcessing(f.selection.id);
+    expect(internalProcessing.candidates[0]?.councilReviews[0]?.note).toBe("Reviewed");
+    expect(internalProcessing.candidates[0]?.decisions[0]?.internalNote).toBe(
+      "Recorded Council decision",
+    );
+    const councilProcessing = await repository.councilProcessing(f.selection.id);
+    expect(councilProcessing.candidates[0]).toMatchObject({
+      applicantUserId: studentId,
+      candidateName: "Core Test Student",
+      positions: [{ positionId: f.position.id, title: "Design Lead" }],
+      decisions: [{ outcome: "SELECTED", state: "RECORDED" }],
+    });
+    expect(councilProcessing.candidates[0]).not.toHaveProperty("councilReviews");
+    expect(councilProcessing.candidates[0]).not.toHaveProperty("correctionRequests");
+    expect(councilProcessing.candidates[0]?.decisions[0]).not.toHaveProperty("internalNote");
+    expect(councilProcessing.candidates[0]?.decisions[0]).not.toHaveProperty("decidedByUserId");
     await repository.finalizeDecision({
       selectionId: f.selection.id,
       decisionId: decision.id,

@@ -60,6 +60,16 @@ import {
   formSubmittedInAppTemplate,
   formSubmittedTemplate,
 } from "./definitions/form-application";
+import {
+  coreCommitteeSelectionMembershipConfirmedInAppTemplate,
+  coreCommitteeSelectionMembershipConfirmedTemplate,
+  coreCommitteeSelectionNotSelectedInAppTemplate,
+  coreCommitteeSelectionNotSelectedTemplate,
+  coreCommitteeSelectionResultPublishedInAppTemplate,
+  coreCommitteeSelectionResultPublishedTemplate,
+  coreCommitteeSelectionSelectedInAppTemplate,
+  coreCommitteeSelectionSelectedTemplate,
+} from "./definitions/core-committee-selection";
 
 /**
  * Every known template, keyed by the id business use cases pass to
@@ -115,6 +125,10 @@ export const EMAIL_TEMPLATE_REGISTRY: Record<NotificationTemplateId, EmailTempla
   COMMITTEE_MEMBER_ADDED: committeeMemberAddedTemplate,
   ELECTION_APPLICATION_OPENED: electionApplicationOpenedTemplate,
   ELECTION_PROCESSING_UPDATED: electionProcessingUpdatedTemplate,
+  CORE_COMMITTEE_SELECTION_RESULT_PUBLISHED: coreCommitteeSelectionResultPublishedTemplate,
+  CORE_COMMITTEE_SELECTION_SELECTED: coreCommitteeSelectionSelectedTemplate,
+  CORE_COMMITTEE_SELECTION_NOT_SELECTED: coreCommitteeSelectionNotSelectedTemplate,
+  CORE_COMMITTEE_SELECTION_MEMBERSHIP_CONFIRMED: coreCommitteeSelectionMembershipConfirmedTemplate,
   FORM_SUBMITTED: formSubmittedTemplate,
   FORM_APPLICATION_REVIEWER_ASSIGNED: formApplicationReviewerAssignedTemplate,
   FORM_APPLICATION_UNDER_REVIEW: formApplicationUnderReviewTemplate,
@@ -152,6 +166,10 @@ export const IN_APP_TEMPLATE_REGISTRY: Record<NotificationTemplateId, InAppTempl
   COMMITTEE_MEMBER_ADDED: committeeMemberAddedInAppTemplate,
   ELECTION_APPLICATION_OPENED: electionApplicationOpenedInAppTemplate,
   ELECTION_PROCESSING_UPDATED: electionProcessingUpdatedInAppTemplate,
+  CORE_COMMITTEE_SELECTION_RESULT_PUBLISHED: coreCommitteeSelectionResultPublishedInAppTemplate,
+  CORE_COMMITTEE_SELECTION_SELECTED: coreCommitteeSelectionSelectedInAppTemplate,
+  CORE_COMMITTEE_SELECTION_NOT_SELECTED: coreCommitteeSelectionNotSelectedInAppTemplate,
+  CORE_COMMITTEE_SELECTION_MEMBERSHIP_CONFIRMED: coreCommitteeSelectionMembershipConfirmedInAppTemplate,
   FORM_SUBMITTED: formSubmittedInAppTemplate,
   FORM_APPLICATION_REVIEWER_ASSIGNED: formApplicationReviewerAssignedInAppTemplate,
   FORM_APPLICATION_UNDER_REVIEW: formApplicationUnderReviewInAppTemplate,
@@ -221,6 +239,10 @@ export const NOTIFICATION_CHANNELS: Record<NotificationTemplateId, readonly Noti
   COMMITTEE_MEMBER_ADDED: ["IN_APP"],
   ELECTION_APPLICATION_OPENED: ["IN_APP"],
   ELECTION_PROCESSING_UPDATED: ["EMAIL", "IN_APP"],
+  CORE_COMMITTEE_SELECTION_RESULT_PUBLISHED: ["EMAIL", "IN_APP"],
+  CORE_COMMITTEE_SELECTION_SELECTED: ["EMAIL", "IN_APP"],
+  CORE_COMMITTEE_SELECTION_NOT_SELECTED: ["EMAIL", "IN_APP"],
+  CORE_COMMITTEE_SELECTION_MEMBERSHIP_CONFIRMED: ["IN_APP"],
   FORM_SUBMITTED: ["IN_APP"],
   FORM_APPLICATION_REVIEWER_ASSIGNED: ["IN_APP"],
   FORM_APPLICATION_UNDER_REVIEW: ["IN_APP"],
