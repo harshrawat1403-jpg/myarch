@@ -20,6 +20,11 @@ type ElectionResultReview = {
   version: number;
   status: string;
   countedAt: string;
+  verifierAssignment?: { verifierUserId: string; assignedAt: string } | null;
+  verification?: { outcome: "VERIFIED" | "FAILED_VERIFICATION"; finalizedAt: string } | null;
+  certification?: { certifiedAt: string } | null;
+  publication?: { publishedAt: string } | null;
+  appointments?: { id: string }[];
   positions: {
     id: string;
     positionTitle: string;
@@ -56,6 +61,12 @@ export function ElectionAdmin({ id }: { id?: string }) {
   const [candidates, setCandidates] = useState<CandidateRecord[]>([]);
   const [application, setApplication] = useState<FormApplicationDetail | null>(null);
   const [results, setResults] = useState<ElectionResultReview | null>(null);
+  const [verifierUserId, setVerifierUserId] = useState("");
+  const [appointmentPreview, setAppointmentPreview] = useState<{
+    academicYear: string;
+    currentCouncil: { memberships: unknown[] };
+    selected: { position: string; candidateName: string }[];
+  } | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   async function load() {
@@ -69,9 +80,12 @@ export function ElectionAdmin({ id }: { id?: string }) {
       setElection(detail);
       setCandidates(candidateRows);
       setForms(formRows);
-      if (detail.status === "RESULT_REVIEW")
+      if (["RESULT_REVIEW", "VERIFICATION", "CERTIFIED", "PUBLISHED", "MEMBERSHIP_CONFIRMED", "ARCHIVED"].includes(detail.status))
         setResults(await apiClient.get<ElectionResultReview>(`/api/elections/${id}/results`, accessToken));
-      else setResults(null);
+      else {
+        setResults(null);
+        setAppointmentPreview(null);
+      }
     } else setItems(await apiClient.get<ElectionRecord[]>("/api/elections", accessToken));
   }
   useEffect(() => {
@@ -363,7 +377,23 @@ export function ElectionAdmin({ id }: { id?: string }) {
               ))}
             </Card>
             <ElectionProcessingAdmin election={election} accessToken={accessToken!} reload={load} />
-            {results && <ResultReview result={results} />}
+            {results && (
+              <>
+                <ResultWorkflow
+                  election={election}
+                  result={results}
+                  verifierUserId={verifierUserId}
+                  setVerifierUserId={setVerifierUserId}
+                  preview={appointmentPreview}
+                  busy={busy}
+                  act={act}
+                  accessToken={accessToken!}
+                  id={id!}
+                  setPreview={setAppointmentPreview}
+                />
+                <ResultReview result={results} />
+              </>
+            )}
             {application && (
               <Card className="space-y-4">
                 <div className="flex justify-between">
@@ -532,6 +562,84 @@ function ResultReview({ result }: { result: ElectionResultReview }) {
           ))}
         </section>
       ))}
+    </Card>
+  );
+}
+
+
+function ResultWorkflow({
+  election,
+  result,
+  verifierUserId,
+  setVerifierUserId,
+  preview,
+  busy,
+  act,
+  accessToken,
+  id,
+  setPreview,
+}: {
+  election: ElectionRecord;
+  result: ElectionResultReview;
+  verifierUserId: string;
+  setVerifierUserId: (value: string) => void;
+  preview: { academicYear: string; currentCouncil: { memberships: unknown[] }; selected: { position: string; candidateName: string }[] } | null;
+  busy: boolean;
+  act: (operation: () => Promise<unknown>, success?: string) => Promise<void>;
+  accessToken: string;
+  id: string;
+  setPreview: (preview: { academicYear: string; currentCouncil: { memberships: unknown[] }; selected: { position: string; candidateName: string }[] } | null) => void;
+}) {
+  const resolved = result.positions.every((position) => position.status === "WINNER_PENDING_VERIFICATION");
+  return (
+    <Card className="space-y-3">
+      <h2 className="text-lg font-semibold">Council result lifecycle</h2>
+      {!resolved && (
+        <p className="rounded border border-(--color-border) p-3 text-sm">
+          One or more Council positions require a future runoff, rerun, or quorum recovery. This election cannot be verified, certified, published, or appointed.
+        </p>
+      )}
+      {election.status === "RESULT_REVIEW" && resolved && (
+        <div className="flex flex-wrap gap-2">
+          <Input
+            aria-label="Verifier user ID"
+            placeholder="Assigned verifier user ID"
+            value={verifierUserId}
+            onChange={(event) => setVerifierUserId(event.target.value)}
+          />
+          <Button
+            disabled={busy || !verifierUserId}
+            onClick={() => void act(() => apiClient.post(`/api/elections/${id}/verifier`, { verifierUserId }, accessToken), "Verifier assigned")}
+          >
+            Assign independent verifier
+          </Button>
+        </div>
+      )}
+      {election.status === "VERIFICATION" && (
+        <p className="text-sm">{result.verification?.outcome === "VERIFIED" ? "Verification completed. Secretary certification is now available." : "Awaiting the assigned verifier’s immutable decision."}</p>
+      )}
+      {election.status === "VERIFICATION" && result.verification?.outcome === "VERIFIED" && (
+        <Button disabled={busy} onClick={() => void act(() => apiClient.post(`/api/elections/${id}/certify`, {}, accessToken), "Result certified")}>Certify verified result</Button>
+      )}
+      {election.status === "CERTIFIED" && (
+        <Button disabled={busy} onClick={() => void act(() => apiClient.post(`/api/elections/${id}/publish`, {}, accessToken), "Result published")}>Publish Council result</Button>
+      )}
+      {election.status === "PUBLISHED" && (
+        <div className="space-y-3">
+          <Button disabled={busy} onClick={() => void act(async () => setPreview(await apiClient.get(`/api/elections/${id}/appointment-preview`, accessToken)), "Appointment preview loaded")}>Preview Council appointments</Button>
+          {preview && (
+            <div className="rounded border border-(--color-border) p-3 text-sm">
+              <p>Current active Council memberships to close: {preview.currentCouncil.memberships.length}</p>
+              <p>New Council: {preview.selected.map((entry) => `${entry.position}: ${entry.candidateName}`).join(" · ")}</p>
+              <Button className="mt-3" disabled={busy} onClick={() => void act(() => apiClient.post(`/api/elections/${id}/appointments`, {}, accessToken), "Council memberships confirmed")}>Confirm appointments</Button>
+            </div>
+          )}
+        </div>
+      )}
+      {election.status === "MEMBERSHIP_CONFIRMED" && (
+        <Button disabled={busy} onClick={() => void act(() => apiClient.post(`/api/elections/${id}/archive`, {}, accessToken), "Election archived")}>Archive election</Button>
+      )}
+      {election.status === "ARCHIVED" && <p className="text-sm">This election is archived and read-only.</p>}
     </Card>
   );
 }

@@ -5,6 +5,7 @@ import { NotAuthorizedError } from "@/lib/errors";
 import type { ElectionRepository } from "../application/ports/election-repository";
 import {
   assertCouncilSingleSeat,
+  assertElectionWideResolved,
   assertDraft,
   assertTransition,
   assertVotingSchedule,
@@ -111,6 +112,32 @@ export class PrismaElectionRepository implements ElectionRepository {
     if (await tx.electionCandidate.count({ where: { electionId: id } }))
       throw new ElectionError("Applications already exist; configuration cannot change");
     return row;
+  }
+  /** Slice 5 uses serializable state transitions. PostgreSQL may abort a
+   * competing transaction with P2034; retry only that database signal so each
+   * attempt re-reads the authoritative election state under a fresh lock. */
+  private async serializable<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(operation, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+      } catch (error) {
+        const isSerializationConflict =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          (error.code === "P2034" ||
+            // Prisma wraps SQLSTATE 40001 raised by the raw FOR UPDATE lock as
+            // P2010, while ORM-originated serialization failures are P2034.
+            (error.code === "P2010" && error.message.includes("Code: `40001`")));
+        if (!isSerializationConflict) throw error;
+        lastError = error;
+        // A fresh serializable transaction must give the winner time to commit
+        // before it can observe the idempotent terminal state.
+        await new Promise<void>((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
+      }
+    }
+    throw lastError;
   }
   async create(config: ElectionConfig, actorUserId: string) {
     return this.prisma.$transaction(async (tx) => {
@@ -1635,6 +1662,11 @@ export class PrismaElectionRepository implements ElectionRepository {
       where: { electionId },
       orderBy: { version: "desc" },
       include: {
+        verifierAssignment: true,
+        verification: true,
+        certification: true,
+        publication: true,
+        appointments: true,
         positions: {
           orderBy: { position: { displayOrder: "asc" } },
           include: {
@@ -1647,6 +1679,344 @@ export class PrismaElectionRepository implements ElectionRepository {
     if (!result) throw new ElectionError("No counted result is available", "notFound");
     return result;
   }
+  private async resolvedSnapshot(tx: Prisma.TransactionClient, election: Row) {
+    if (!election.voterSnapshotLockedAt || !election.voterSnapshotLockedByUserId)
+      throw new ElectionError("The Council voter snapshot must be locked before result verification", "validation");
+    if (!election.votingCloseAt)
+      throw new ElectionError("The Council voting schedule is incomplete", "validation");
+    const snapshot = await tx.electionResultSnapshot.findFirst({
+      where: { electionId: election.id },
+      orderBy: { version: "desc" },
+      include: {
+        positions: {
+          include: {
+            groups: true,
+            candidates: {
+              where: { isProvisionalWinner: true },
+              include: { candidate: { select: { applicantUserId: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!snapshot) throw new ElectionError("No authoritative Council result snapshot exists", "notFound");
+    if (snapshot.positions.length !== election.positions.length)
+      throw new ElectionError("The authoritative result does not cover every Council position", "validation");
+    assertElectionWideResolved(snapshot.positions);
+    if (snapshot.positions.some((position) => position.candidates.length !== 1))
+      throw new ElectionError("Each resolved Council position must have exactly one provisional winner", "validation");
+    if (snapshot.positions.some((position) => position.groups.length !== 3))
+      throw new ElectionError("The authoritative result is missing voter-group aggregates", "validation");
+    for (const position of election.positions) {
+      const weights = position.weights;
+      if (
+        weights.length !== 3 ||
+        new Set(weights.map((weight) => weight.voterGroup)).size !== 3 ||
+        !weights.reduce((sum, weight) => sum.plus(weight.percentage), new Prisma.Decimal(0)).equals(100)
+      )
+        throw new ElectionError("Council position weights are not internally consistent", "validation");
+    }
+    const [ballots, castParticipation] = await Promise.all([
+      tx.electionBallot.count({ where: { electionId: election.id } }),
+      tx.electionVoterParticipation.count({ where: { electionId: election.id, status: "CAST" } }),
+    ]);
+    if (ballots !== castParticipation)
+      throw new ElectionError("Ballot and participation totals are inconsistent", "validation");
+    return snapshot;
+  }
+  async assignVerifier(input: { electionId: string; verifierUserId: string; actorUserId: string }) {
+    return this.serializable(async (tx) => {
+      const election = await this.locked(tx, input.electionId);
+      if (election.status !== "RESULT_REVIEW")
+        throw new ElectionError("A verifier can only be assigned while the result is under review");
+      const snapshot = await this.resolvedSnapshot(tx, election);
+      const verifier = await tx.user.findUnique({
+        where: { id: input.verifierUserId },
+        select: { id: true, role: true, isActive: true },
+      });
+      if (!verifier || !verifier.isActive || verifier.role === "SECRETARY" || verifier.role === "RECRUITER")
+        throw new ElectionError("Select an active non-Secretary, non-Recruiter verifier", "validation");
+      if (verifier.id === input.actorUserId)
+        throw new ElectionError("The certifying Secretary cannot verify this Council result", "validation");
+      const assignment = await tx.electionResultVerifierAssignment.create({
+        data: {
+          electionId: election.id,
+          snapshotId: snapshot.id,
+          verifierUserId: verifier.id,
+          assignedByUserId: input.actorUserId,
+        },
+      });
+      const state = await tx.election.updateMany({
+        where: { id: election.id, status: "RESULT_REVIEW" },
+        data: { status: "VERIFICATION" },
+      });
+      if (state.count !== 1) throw new ElectionError("Election state changed; refresh and retry");
+      await this.audit(tx, input.actorUserId, AUDIT_ACTIONS.ELECTION_VERIFIER_ASSIGNED, election.id, {
+        verifierUserId: verifier.id,
+        resultVersion: snapshot.version,
+      });
+      return assignment;
+    });
+  }
+  async verificationWorkspace(input: { electionId: string; verifierUserId: string }) {
+    const assignment = await this.prisma.electionResultVerifierAssignment.findUnique({
+      where: { electionId: input.electionId },
+      select: { verifierUserId: true },
+    });
+    if (!assignment || assignment.verifierUserId !== input.verifierUserId)
+      throw new NotAuthorizedError("You are not the assigned verifier for this Council result");
+    const election = await this.prisma.election.findUnique({
+      where: { id: input.electionId },
+      select: { id: true, title: true, academicYear: true, status: true, voterSnapshotLockedAt: true },
+    });
+    if (!election || election.status !== "VERIFICATION")
+      throw new ElectionError("This Council result is not awaiting verification", "notFound");
+    const snapshot = await this.results(input.electionId);
+    return { election, snapshot };
+  }
+  async verifyResult(input: {
+    electionId: string;
+    verifierUserId: string;
+    outcome: "VERIFIED" | "FAILED_VERIFICATION";
+    note?: string;
+  }) {
+    return this.serializable(async (tx) => {
+      const election = await this.locked(tx, input.electionId);
+      if (election.status !== "VERIFICATION")
+        throw new ElectionError("This Council result is not awaiting verification");
+      const assignment = await tx.electionResultVerifierAssignment.findUnique({
+        where: { electionId: election.id },
+      });
+      if (!assignment || assignment.verifierUserId !== input.verifierUserId)
+        throw new NotAuthorizedError("You are not the assigned verifier for this Council result");
+      const snapshot = await this.resolvedSnapshot(tx, election);
+      if (assignment.snapshotId !== snapshot.id)
+        throw new ElectionError("The assigned verifier does not match the authoritative result snapshot", "validation");
+      if (await tx.electionResultVerification.count({ where: { snapshotId: snapshot.id } }))
+        throw new ElectionError("This Council result has already been verified");
+      const verification = await tx.electionResultVerification.create({
+        data: {
+          electionId: election.id,
+          snapshotId: snapshot.id,
+          assignmentId: assignment.id,
+          verifierUserId: input.verifierUserId,
+          outcome: input.outcome,
+          note: input.note,
+        },
+      });
+      if (input.outcome === "FAILED_VERIFICATION") {
+        const state = await tx.election.updateMany({
+          where: { id: election.id, status: "VERIFICATION" },
+          data: { status: "RESULT_REVIEW" },
+        });
+        if (state.count !== 1) throw new ElectionError("Election state changed; refresh and retry");
+      }
+      await this.audit(
+        tx,
+        input.verifierUserId,
+        input.outcome === "VERIFIED"
+          ? AUDIT_ACTIONS.ELECTION_RESULT_VERIFIED
+          : AUDIT_ACTIONS.ELECTION_VERIFICATION_FAILED,
+        election.id,
+        { resultVersion: snapshot.version, verificationId: verification.id },
+      );
+      return verification;
+    });
+  }
+  async certifyResult(input: { electionId: string; actorUserId: string; note?: string }) {
+    return this.serializable(async (tx) => {
+      const election = await this.locked(tx, input.electionId);
+      if (election.status !== "VERIFICATION")
+        throw new ElectionError("A Council result must be successfully verified before certification");
+      const snapshot = await this.resolvedSnapshot(tx, election);
+      const verification = await tx.electionResultVerification.findUnique({ where: { snapshotId: snapshot.id } });
+      if (!verification || verification.outcome !== "VERIFIED")
+        throw new ElectionError("Certification requires a successful independent verification", "validation");
+      const certification = await tx.electionCertification.create({
+        data: { electionId: election.id, snapshotId: snapshot.id, certifiedByUserId: input.actorUserId, note: input.note },
+      });
+      const state = await tx.election.updateMany({ where: { id: election.id, status: "VERIFICATION" }, data: { status: "CERTIFIED" } });
+      if (state.count !== 1) throw new ElectionError("Election state changed; refresh and retry");
+      await this.audit(tx, input.actorUserId, AUDIT_ACTIONS.ELECTION_RESULT_CERTIFIED, election.id, {
+        resultVersion: snapshot.version,
+        certificationId: certification.id,
+      });
+      return certification;
+    });
+  }
+  async publishResult(input: { electionId: string; actorUserId: string }) {
+    return this.serializable(async (tx) => {
+      const election = await this.locked(tx, input.electionId);
+      if (election.status !== "CERTIFIED")
+        throw new ElectionError("Only a certified Council result may be published");
+      const snapshot = await this.resolvedSnapshot(tx, election);
+      if (!(await tx.electionCertification.findUnique({ where: { snapshotId: snapshot.id } })))
+        throw new ElectionError("Publication requires an immutable certification", "validation");
+      const publication = await tx.electionResultPublication.create({
+        data: { electionId: election.id, snapshotId: snapshot.id, publishedByUserId: input.actorUserId },
+      });
+      const state = await tx.election.updateMany({ where: { id: election.id, status: "CERTIFIED" }, data: { status: "PUBLISHED" } });
+      if (state.count !== 1) throw new ElectionError("Election state changed; refresh and retry");
+      await this.audit(tx, input.actorUserId, AUDIT_ACTIONS.ELECTION_RESULT_PUBLISHED, election.id, {
+        resultVersion: snapshot.version,
+        publicationId: publication.id,
+      });
+      return publication;
+    });
+  }
+  async publishedResults(electionId: string) {
+    const election = await this.prisma.election.findUnique({
+      where: { id: electionId },
+      select: { id: true, title: true, academicYear: true, type: true, status: true },
+    });
+    if (!election || election.type !== "COUNCIL" || !["PUBLISHED", "MEMBERSHIP_CONFIRMED", "ARCHIVED"].includes(election.status))
+      throw new ElectionError("Council results are pending publication", "notFound");
+    const publication = await this.prisma.electionResultPublication.findFirst({
+      where: { electionId },
+      include: {
+        snapshot: {
+          include: {
+            positions: {
+              orderBy: { position: { displayOrder: "asc" } },
+              include: { candidates: { where: { isProvisionalWinner: true }, select: { candidateName: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!publication) throw new ElectionError("Council results are pending publication", "notFound");
+    return {
+      title: election.title,
+      academicYear: election.academicYear,
+      publishedAt: publication.publishedAt,
+      positions: publication.snapshot.positions.map((position) => ({
+        positionTitle: position.positionTitle,
+        selectedCandidate: position.candidates[0]?.candidateName ?? null,
+      })),
+    };
+  }
+  private async appointmentPreviewFor(tx: Prisma.TransactionClient, election: Row) {
+    if (election.status !== "PUBLISHED")
+      throw new ElectionError("Council appointments require a published certified result");
+    const snapshot = await this.resolvedSnapshot(tx, election);
+    const [certification, publication] = await Promise.all([
+      tx.electionCertification.findUnique({ where: { snapshotId: snapshot.id } }),
+      tx.electionResultPublication.findUnique({ where: { snapshotId: snapshot.id } }),
+    ]);
+    if (!certification || !publication)
+      throw new ElectionError("Council appointments require certification and publication", "validation");
+    const [committees, memberships] = await Promise.all([
+      tx.committee.findMany({ where: { type: "STUDENT_COUNCIL", status: "ACTIVE" }, orderBy: { createdAt: "asc" } }),
+      tx.committeeMembership.findMany({
+        where: { isActive: true, committee: { type: "STUDENT_COUNCIL", status: "ACTIVE" } },
+        include: { user: { select: { id: true, email: true, studentProfile: { select: { fullName: true } } } }, committee: true },
+      }),
+    ]);
+    return {
+      snapshot,
+      currentCouncil: { committees, memberships },
+      selected: snapshot.positions.map((position) => ({
+        positionResultId: position.id,
+        position: position.positionTitle,
+        userId: position.candidates[0]!.candidate.applicantUserId,
+        candidateName: position.candidates[0]!.candidateName,
+      })),
+    };
+  }
+  async appointmentPreview(electionId: string) {
+    return this.serializable(async (tx) => {
+      const election = await this.locked(tx, electionId);
+      const preview = await this.appointmentPreviewFor(tx, election);
+      return {
+        academicYear: election.academicYear,
+        proposedStartDate: new Date(),
+        currentCouncil: preview.currentCouncil,
+        selected: preview.selected,
+      };
+    });
+  }
+  async confirmAppointments(input: { electionId: string; actorUserId: string }) {
+    return this.serializable(async (tx) => {
+      const election = await this.locked(tx, input.electionId);
+      if (election.status === "MEMBERSHIP_CONFIRMED")
+        return { confirmed: true, idempotent: true };
+      const preview = await this.appointmentPreviewFor(tx, election);
+      if (await tx.electionAppointment.count({ where: { electionId: election.id } }))
+        throw new ElectionError("Council appointments already exist for this election");
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`student-council:${election.academicYear}`}))`;
+      let committee = await tx.committee.findFirst({
+        where: { type: "STUDENT_COUNCIL", academicYear: election.academicYear, status: "ACTIVE" },
+      });
+      if (!committee) {
+        committee = await tx.committee.create({
+          data: {
+            name: `Student Council ${election.academicYear}`,
+            type: "STUDENT_COUNCIL",
+            academicYear: election.academicYear,
+            startDate: new Date(),
+          },
+        });
+      }
+      const now = new Date();
+      const outgoing = await tx.committeeMembership.updateMany({
+        where: { isActive: true, committee: { type: "STUDENT_COUNCIL", status: "ACTIVE" } },
+        data: { isActive: false, endDate: now },
+      });
+      const appointments = [];
+      for (const selected of preview.selected) {
+        const membership = await tx.committeeMembership.create({
+          data: {
+            committeeId: committee.id,
+            userId: selected.userId,
+            position: selected.position,
+            academicYear: election.academicYear,
+            startDate: now,
+            isActive: true,
+          },
+        });
+        appointments.push(
+          await tx.electionAppointment.create({
+            data: {
+              electionId: election.id,
+              snapshotId: preview.snapshot.id,
+              positionResultId: selected.positionResultId,
+              appointedUserId: selected.userId,
+              committeeId: committee.id,
+              membershipId: membership.id,
+              confirmedByUserId: input.actorUserId,
+            },
+          }),
+        );
+      }
+      const state = await tx.election.updateMany({
+        where: { id: election.id, status: "PUBLISHED" },
+        data: { status: "MEMBERSHIP_CONFIRMED" },
+      });
+      if (state.count !== 1) throw new ElectionError("Election state changed; membership changes were rolled back");
+      await this.audit(tx, input.actorUserId, AUDIT_ACTIONS.ELECTION_APPOINTMENTS_CONFIRMED, election.id, {
+        resultVersion: preview.snapshot.version,
+        committeeId: committee.id,
+        outgoingMembershipCount: outgoing.count,
+        appointmentCount: appointments.length,
+      });
+      return { confirmed: true, committeeId: committee.id, appointmentCount: appointments.length };
+    });
+  }
+  async archive(input: { electionId: string; actorUserId: string }) {
+    return this.serializable(async (tx) => {
+      const election = await this.locked(tx, input.electionId);
+      if (election.status !== "MEMBERSHIP_CONFIRMED")
+        throw new ElectionError("A Council election may be archived only after membership confirmation");
+      const state = await tx.election.updateMany({
+        where: { id: election.id, status: "MEMBERSHIP_CONFIRMED" },
+        data: { status: "ARCHIVED" },
+      });
+      if (state.count !== 1) throw new ElectionError("Election state changed; refresh and retry");
+      await this.audit(tx, input.actorUserId, AUDIT_ACTIONS.ELECTION_ARCHIVED, election.id);
+      return record(await this.locked(tx, election.id));
+    });
+  }
+
   async processing(actorUserId: string | undefined, electionId: string, isSecretary: boolean) {
     const candidates = await this.prisma.electionCandidate.findMany({
       where: { electionId, ...(isSecretary ? {} : { applicantUserId: actorUserId }) },

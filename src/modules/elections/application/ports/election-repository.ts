@@ -143,6 +143,20 @@ export interface ElectionRepository {
   closeVoting(input: { electionId: string; actorUserId: string }): Promise<unknown>;
   countResults(input: { electionId: string; actorUserId: string }): Promise<unknown>;
   results(electionId: string): Promise<unknown>;
+  assignVerifier(input: { electionId: string; verifierUserId: string; actorUserId: string }): Promise<unknown>;
+  verificationWorkspace(input: { electionId: string; verifierUserId: string }): Promise<unknown>;
+  verifyResult(input: {
+    electionId: string;
+    verifierUserId: string;
+    outcome: "VERIFIED" | "FAILED_VERIFICATION";
+    note?: string;
+  }): Promise<unknown>;
+  certifyResult(input: { electionId: string; actorUserId: string; note?: string }): Promise<unknown>;
+  publishResult(input: { electionId: string; actorUserId: string }): Promise<unknown>;
+  publishedResults(electionId: string): Promise<unknown>;
+  appointmentPreview(electionId: string): Promise<unknown>;
+  confirmAppointments(input: { electionId: string; actorUserId: string }): Promise<unknown>;
+  archive(input: { electionId: string; actorUserId: string }): Promise<unknown>;
   processing(
     actorUserId: string | undefined,
     electionId: string,

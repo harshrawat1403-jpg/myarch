@@ -11,6 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { FormRenderer } from "@/components/forms/form-renderer";
 import { Textarea } from "@/components/ui/textarea";
 
+type PublishedResult = {
+  title: string;
+  academicYear: string;
+  publishedAt: string;
+  positions: { positionTitle: string; selectedCandidate: string | null }[];
+};
+
 type Ballot = {
   voterGroup: string;
   participation: { status: "CAST" | "ABSTAINED"; submittedAt: string } | null;
@@ -36,6 +43,11 @@ export default function StudentElectionsPage() {
   const [busy, setBusy] = useState(false);
   const [correctionStatement, setCorrectionStatement] = useState("");
   const [ballot, setBallot] = useState<Ballot | null>(null);
+  const [publishedResult, setPublishedResult] = useState<PublishedResult | null>(null);
+  const [verificationWorkspace, setVerificationWorkspace] = useState<{
+    snapshot: { version: number; positions: { positionTitle: string; status: string; candidates: { candidateName: string; finalScore: string | number }[] }[] };
+  } | null>(null);
+  const [verificationNote, setVerificationNote] = useState("");
   const [ballotChoices, setBallotChoices] = useState<Record<string, string>>({});
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -61,6 +73,9 @@ export default function StudentElectionsPage() {
     setAnswers({});
     setPositionIds([]);
     setBallot(null);
+    setPublishedResult(null);
+    setVerificationWorkspace(null);
+    setVerificationNote("");
     setBallotChoices({});
     try {
       const [current, candidates] = await Promise.all([
@@ -71,6 +86,10 @@ export default function StudentElectionsPage() {
       setMine(candidates);
       if (current.status === "VOTING")
         setBallot(await apiClient.get<Ballot>(`/api/elections/${current.id}/ballot`, accessToken));
+      if (["PUBLISHED", "MEMBERSHIP_CONFIRMED", "ARCHIVED"].includes(current.status))
+        setPublishedResult(
+          await apiClient.get<PublishedResult>(`/api/elections/${current.id}/published-results`, accessToken),
+        );
       if (candidates[0])
         setSubmitted(
           await apiClient.get<StudentFormApplicationView>(
@@ -87,6 +106,38 @@ export default function StudentElectionsPage() {
         );
     } catch (error) {
       setMessage(error instanceof ApiError ? error.message : "Unable to load application");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function loadVerificationWorkspace() {
+    if (!accessToken || !selected) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      setVerificationWorkspace(
+        await apiClient.get(`/api/elections/${selected.id}/verification`, accessToken),
+      );
+    } catch (error) {
+      setMessage(error instanceof ApiError ? error.message : "You are not assigned to verify this result");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function submitVerification(outcome: "VERIFIED" | "FAILED_VERIFICATION") {
+    if (!accessToken || !selected) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      await apiClient.post(
+        `/api/elections/${selected.id}/verification`,
+        { outcome, ...(verificationNote.trim() ? { note: verificationNote.trim() } : {}) },
+        accessToken,
+      );
+      await open(selected);
+      setMessage(outcome === "VERIFIED" ? "Result verification submitted." : "Verification failure recorded.");
+    } catch (error) {
+      setMessage(error instanceof ApiError ? error.message : "Unable to submit verification");
     } finally {
       setBusy(false);
     }
@@ -297,10 +348,48 @@ export default function StudentElectionsPage() {
               )}
             </section>
           )}
-          {(selected.status === "COUNTING" || selected.status === "RESULT_REVIEW") && (
+          {(["COUNTING", "RESULT_REVIEW", "VERIFICATION", "CERTIFIED"].includes(selected.status)) && (
             <p className="rounded border border-(--color-border) p-3 text-sm">
               Voting is closed. Results are pending verification and publication.
             </p>
+          )}
+          {selected.status === "VERIFICATION" && (
+            <section className="space-y-3 rounded border border-(--color-border) p-4">
+              <h3 className="font-medium">Assigned verifier workspace</h3>
+              {!verificationWorkspace ? (
+                <Button disabled={busy} onClick={() => void loadVerificationWorkspace()}>
+                  Open assigned verification workspace
+                </Button>
+              ) : (
+                <>
+                  <p className="text-sm">Review the aggregate, immutable result snapshot. Individual ballots are never available here.</p>
+                  {verificationWorkspace.snapshot.positions.map((position) => (
+                    <div key={position.positionTitle} className="text-sm">
+                      <p className="font-medium">{position.positionTitle} · {position.status}</p>
+                      <p>{position.candidates.map((candidate) => `${candidate.candidateName}: ${candidate.finalScore}`).join(" · ")}</p>
+                    </div>
+                  ))}
+                  <Textarea value={verificationNote} onChange={(event) => setVerificationNote(event.target.value)} placeholder="Verification summary or failure reason" maxLength={5000} />
+                  <div className="flex gap-2">
+                    <Button disabled={busy} onClick={() => void submitVerification("VERIFIED")}>Verify result</Button>
+                    <Button disabled={busy} variant="destructive" onClick={() => void submitVerification("FAILED_VERIFICATION")}>Fail verification</Button>
+                  </div>
+                </>
+              )}
+            </section>
+          )}
+          {publishedResult && (
+            <section className="space-y-3 rounded border border-(--color-border) p-4">
+              <div>
+                <h3 className="font-medium">Published Council result</h3>
+                <p className="text-sm">Published {new Date(publishedResult.publishedAt).toLocaleString()}</p>
+              </div>
+              {publishedResult.positions.map((position) => (
+                <p key={position.positionTitle} className="text-sm">
+                  <strong>{position.positionTitle}:</strong> {position.selectedCandidate}
+                </p>
+              ))}
+            </section>
           )}
           {mine.length ? (
             <section className="space-y-4">

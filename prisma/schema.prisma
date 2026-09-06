@@ -314,6 +314,13 @@ model User {
   electionVoterParticipations   ElectionVoterParticipation[]
   lockedElectionVoterSnapshots  Election[]                     @relation("ElectionVoterSnapshotLocker")
   countedElectionResults        ElectionResultSnapshot[]       @relation("ElectionResultCounter")
+  assignedElectionVerifications ElectionResultVerifierAssignment[] @relation("ElectionResultVerifier")
+  assignedElectionVerifiers     ElectionResultVerifierAssignment[] @relation("ElectionResultVerifierAssigner")
+  completedElectionVerifications ElectionResultVerification[]  @relation("ElectionResultVerifier")
+  certifiedElectionResults      ElectionCertification[]        @relation("ElectionResultCertifier")
+  publishedElectionResults      ElectionResultPublication[]    @relation("ElectionResultPublisher")
+  confirmedElectionAppointments ElectionAppointment[]          @relation("ElectionAppointmentConfirmer")
+  appointedThroughElections     ElectionAppointment[]          @relation("ElectionAppointmentUser")
   shortlistedElectionEntries    ElectionShortlistEntry[]       @relation("ElectionShortlistActor")
   id                            String                         @id @default(uuid()) @db.Uuid
   email                         String                         @unique
@@ -1780,6 +1787,7 @@ model Committee {
   meetings                        Meeting[]
   coreCommitteeCouncilReviews     CoreCommitteeCouncilReview[]
   coreCommitteeSelectionDecisions CoreCommitteeSelectionDecision[]
+  electionAppointments            ElectionAppointment[]
 
   @@index([type])
   @@index([status])
@@ -1815,6 +1823,7 @@ model CommitteeMembership {
   endDate      DateTime?
 
   createdAt DateTime @default(now())
+  electionAppointment ElectionAppointment?
 
   @@index([committeeId])
   @@index([userId])
@@ -2146,6 +2155,11 @@ enum ElectionStatus {
   VOTING
   COUNTING
   RESULT_REVIEW
+  VERIFICATION
+  CERTIFIED
+  PUBLISHED
+  MEMBERSHIP_CONFIRMED
+  ARCHIVED
 }
 
 enum ElectionResultStatus {
@@ -2160,6 +2174,11 @@ enum ElectionPositionResultStatus {
   QUORUM_FAILED
   NOTA_WON
   RUNOFF_REQUIRED
+}
+
+enum ElectionVerificationOutcome {
+  VERIFIED
+  FAILED_VERIFICATION
 }
 
 enum ElectionVoterGroup {
@@ -2908,9 +2927,15 @@ model ElectionResultSnapshot {
   countedAt       DateTime                     @default(now())
   countedByUserId String                       @db.Uuid
   countedBy       User                         @relation("ElectionResultCounter", fields: [countedByUserId], references: [id], onDelete: Restrict)
-  positions       ElectionPositionResult[]
+  positions          ElectionPositionResult[]
+  verifierAssignment ElectionResultVerifierAssignment?
+  verification       ElectionResultVerification?
+  certification      ElectionCertification?
+  publication        ElectionResultPublication?
+  appointments       ElectionAppointment[]
 
   @@unique([electionId, version])
+  @@unique([id, electionId])
   @@index([electionId, countedAt])
   @@map("election_result_snapshots")
 }
@@ -2927,8 +2952,10 @@ model ElectionPositionResult {
   notaFinalScore Decimal                      @default(0) @db.Decimal(24, 18)
   groups         ElectionPositionGroupResult[]
   candidates     ElectionCandidateResult[]
+  appointment    ElectionAppointment?
 
   @@unique([snapshotId, positionId])
+  @@unique([id, snapshotId, electionId])
   @@index([electionId, positionId])
   @@map("election_position_results")
 }
@@ -2982,6 +3009,99 @@ model ElectionCandidateGroupResult {
 
   @@unique([candidateResultId, positionGroupResultId])
   @@map("election_candidate_group_results")
+}
+
+
+model ElectionResultVerifierAssignment {
+  id               String                           @id @default(uuid()) @db.Uuid
+  electionId       String                           @db.Uuid
+  snapshotId       String                           @db.Uuid
+  snapshot         ElectionResultSnapshot           @relation(fields: [snapshotId, electionId], references: [id, electionId], onDelete: Restrict)
+  verifierUserId   String                           @db.Uuid
+  verifier         User                             @relation("ElectionResultVerifier", fields: [verifierUserId], references: [id], onDelete: Restrict)
+  assignedByUserId String                           @db.Uuid
+  assignedBy       User                             @relation("ElectionResultVerifierAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+  assignedAt       DateTime                         @default(now())
+  verification     ElectionResultVerification?
+
+  @@unique([electionId])
+  @@unique([snapshotId])
+  @@unique([snapshotId, electionId])
+  @@index([verifierUserId])
+  @@map("election_result_verifier_assignments")
+}
+
+model ElectionResultVerification {
+  id             String                           @id @default(uuid()) @db.Uuid
+  electionId     String                           @db.Uuid
+  snapshotId     String                           @db.Uuid
+  snapshot       ElectionResultSnapshot           @relation(fields: [snapshotId, electionId], references: [id, electionId], onDelete: Restrict)
+  assignmentId   String                           @unique @db.Uuid
+  assignment     ElectionResultVerifierAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  verifierUserId String                           @db.Uuid
+  verifier       User                             @relation("ElectionResultVerifier", fields: [verifierUserId], references: [id], onDelete: Restrict)
+  outcome        ElectionVerificationOutcome
+  note           String?
+  finalizedAt    DateTime                         @default(now())
+
+  @@unique([snapshotId])
+  @@unique([snapshotId, electionId])
+  @@index([electionId, finalizedAt])
+  @@map("election_result_verifications")
+}
+
+model ElectionCertification {
+  id                String                 @id @default(uuid()) @db.Uuid
+  electionId        String                 @db.Uuid
+  snapshotId        String                 @db.Uuid
+  snapshot          ElectionResultSnapshot @relation(fields: [snapshotId, electionId], references: [id, electionId], onDelete: Restrict)
+  certifiedByUserId String                 @db.Uuid
+  certifiedBy       User                   @relation("ElectionResultCertifier", fields: [certifiedByUserId], references: [id], onDelete: Restrict)
+  note              String?
+  certifiedAt       DateTime               @default(now())
+
+  @@unique([snapshotId])
+  @@unique([snapshotId, electionId])
+  @@index([electionId, certifiedAt])
+  @@map("election_certifications")
+}
+
+model ElectionResultPublication {
+  id                String                 @id @default(uuid()) @db.Uuid
+  electionId        String                 @db.Uuid
+  snapshotId        String                 @db.Uuid
+  snapshot          ElectionResultSnapshot @relation(fields: [snapshotId, electionId], references: [id, electionId], onDelete: Restrict)
+  publishedByUserId String                 @db.Uuid
+  publishedBy       User                   @relation("ElectionResultPublisher", fields: [publishedByUserId], references: [id], onDelete: Restrict)
+  publishedAt       DateTime               @default(now())
+
+  @@unique([snapshotId])
+  @@unique([snapshotId, electionId])
+  @@index([electionId, publishedAt])
+  @@map("election_result_publications")
+}
+
+model ElectionAppointment {
+  id                String                 @id @default(uuid()) @db.Uuid
+  electionId        String                 @db.Uuid
+  snapshotId        String                 @db.Uuid
+  snapshot          ElectionResultSnapshot @relation(fields: [snapshotId, electionId], references: [id, electionId], onDelete: Restrict)
+  positionResultId  String                 @unique @db.Uuid
+  positionResult    ElectionPositionResult @relation(fields: [positionResultId, snapshotId, electionId], references: [id, snapshotId, electionId], onDelete: Restrict)
+  appointedUserId   String                 @db.Uuid
+  appointedUser     User                   @relation("ElectionAppointmentUser", fields: [appointedUserId], references: [id], onDelete: Restrict)
+  committeeId       String                 @db.Uuid
+  committee         Committee              @relation(fields: [committeeId], references: [id], onDelete: Restrict)
+  membershipId      String                 @unique @db.Uuid
+  membership        CommitteeMembership    @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  confirmedByUserId String                 @db.Uuid
+  confirmedBy       User                   @relation("ElectionAppointmentConfirmer", fields: [confirmedByUserId], references: [id], onDelete: Restrict)
+  appointedAt       DateTime               @default(now())
+
+  @@unique([electionId, positionResultId])
+  @@unique([positionResultId, snapshotId, electionId])
+  @@index([electionId, snapshotId])
+  @@map("election_appointments")
 }
 
 model ElectionBallotChoice {

@@ -274,3 +274,49 @@ export const electionResultsRouteHandler = route(
   (_req, actor, id) => electionUseCases.results(actor, id),
   true,
 );
+export const assignElectionVerifierRouteHandler = route(
+  async (req, actor, id) => electionUseCases.assignVerifier(actor, id, await body(req)),
+  true,
+  true,
+  201,
+);
+export const electionVerificationWorkspaceRouteHandler = route(
+  (_req, actor, id) => electionUseCases.verificationWorkspace(actor, id),
+  false,
+);
+export const verifyElectionResultRouteHandler = route(
+  async (req, actor, id) => electionUseCases.verifyResult(actor, id, await body(req)),
+  false,
+  true,
+  201,
+);
+export const certifyElectionResultRouteHandler = route(
+  async (req, actor, id) => electionUseCases.certifyResult(actor, id, await body(req)),
+  true,
+  true,
+  201,
+);
+export const publishElectionResultRouteHandler = route(
+  (_req, actor, id) => electionUseCases.publishResult(actor, id),
+  true,
+  true,
+  201,
+);
+export const publishedElectionResultsRouteHandler = route(
+  (_req, actor, id) => electionUseCases.publishedResults(actor, id),
+  false,
+);
+export const electionAppointmentPreviewRouteHandler = route(
+  (_req, actor, id) => electionUseCases.appointmentPreview(actor, id),
+  true,
+);
+export const confirmElectionAppointmentsRouteHandler = route(
+  (_req, actor, id) => electionUseCases.confirmAppointments(actor, id),
+  true,
+  true,
+  201,
+);
+export const archiveElectionRouteHandler = route(
+  (_req, actor, id) => electionUseCases.archive(actor, id),
+  true,
+);

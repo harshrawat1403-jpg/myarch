@@ -26,8 +26,10 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
   const forms = new PrismaFormRepository(prisma);
   const userIds: string[] = [],
     electionIds: string[] = [],
-    formIds: string[] = [];
-  let secretaryId: string, studentId: string, studentProfileId: string, batchId: string;
+    formIds: string[] = [],
+    committeeIds: string[] = [],
+    membershipIds: string[] = [];
+  let secretaryId: string, verifierId: string, studentId: string, studentProfileId: string, batchId: string;
   beforeAll(async () => {
     await prisma.$connect();
     const secretary = await prisma.user.create({
@@ -39,6 +41,11 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
     });
     secretaryId = secretary.id;
     userIds.push(secretaryId);
+    const verifier = await prisma.user.create({
+      data: { email: `phase6-verifier-${randomUUID()}@test.invalid`, passwordHash: "test-only", role: "ALUMNI" },
+    });
+    verifierId = verifier.id;
+    userIds.push(verifierId);
     const batch = await prisma.batch.create({
       data: { name: `Phase 6 test ${randomUUID()}`, year: 2026 },
     });
@@ -61,6 +68,19 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
   afterEach(() => vi.useRealTimers());
   afterAll(async () => {
     // Remove only rows created by this test run, respecting restrictive FKs.
+    // Slice 5 history is immutable in production; test fixtures temporarily
+    // disable only their database triggers for deterministic teardown.
+    for (const table of ["election_appointments", "election_result_publications", "election_certifications", "election_result_verifications"]) {
+      await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" DISABLE TRIGGER ALL`);
+    }
+    await prisma.electionAppointment.deleteMany({ where: { electionId: { in: electionIds } } });
+    await prisma.electionResultPublication.deleteMany({ where: { electionId: { in: electionIds } } });
+    await prisma.electionCertification.deleteMany({ where: { electionId: { in: electionIds } } });
+    await prisma.electionResultVerification.deleteMany({ where: { electionId: { in: electionIds } } });
+    await prisma.electionResultVerifierAssignment.deleteMany({ where: { electionId: { in: electionIds } } });
+    for (const table of ["election_appointments", "election_result_publications", "election_certifications", "election_result_verifications"]) {
+      await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ENABLE TRIGGER ALL`);
+    }
     await prisma.electionCandidateGroupResult.deleteMany({
       where: { candidateResult: { positionResult: { snapshot: { electionId: { in: electionIds } } } } },
     });
@@ -114,6 +134,8 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
     await prisma.electionApplicationForm.deleteMany({ where: { electionId: { in: electionIds } } });
     await prisma.election.deleteMany({ where: { id: { in: electionIds } } });
     await prisma.form.deleteMany({ where: { id: { in: formIds } } });
+    await prisma.committeeMembership.deleteMany({ where: { id: { in: membershipIds } } });
+    await prisma.committee.deleteMany({ where: { id: { in: committeeIds } } });
     await prisma.auditLog.deleteMany({ where: { actorUserId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     if (batchId) await prisma.batch.delete({ where: { id: batchId } });
@@ -600,6 +622,104 @@ describe.skipIf(!databaseUrl)("Phase 6 PostgreSQL integrity and concurrency", ()
     await expect(repository.countResults({ electionId: f.election.id, actorUserId: secretaryId })).rejects.toThrow(
       "Close voting",
     );
+  });
+  async function countedResultFixture() {
+    const f = await votingFixture();
+    await repository.castBallot({
+      electionId: f.election.id,
+      userId: studentId,
+      choices: [{ positionId: f.position.id, candidateId: f.candidate.id }],
+    });
+    vi.setSystemTime(new Date(f.config.votingCloseAt!.getTime() + 1));
+    await repository.closeVoting({ electionId: f.election.id, actorUserId: secretaryId });
+    await repository.countResults({ electionId: f.election.id, actorUserId: secretaryId });
+    return f;
+  }
+  it("requires every Council position to resolve before verification, certification, publication, preview, or appointments", async () => {
+    const f = await votingFixture();
+    await prisma.election.update({ where: { id: f.election.id }, data: { status: "RESULT_REVIEW" } });
+    const snapshot = await prisma.electionResultSnapshot.create({
+      data: { electionId: f.election.id, version: 1, status: "RUNOFF_REQUIRED", countedByUserId: secretaryId },
+    });
+    const positionResult = await prisma.electionPositionResult.create({
+      data: {
+        snapshotId: snapshot.id,
+        electionId: f.election.id,
+        positionId: f.position.id,
+        positionTitle: f.position.title,
+        status: "RUNOFF_REQUIRED",
+        groups: {
+          create: (["STUDENT", "FACULTY", "EX_COUNCIL"] as const).map((voterGroup) => ({
+            voterGroup,
+            eligibleCount: 0,
+            participationCount: 0,
+            abstentionCount: 0,
+            notaVoteCount: 0,
+            scoringDenominator: 0,
+            quorumPercent: 0,
+            quorumMet: true,
+            configuredWeight: voterGroup === "STUDENT" ? 60 : voterGroup === "FACULTY" ? 25 : 15,
+          })),
+        },
+      },
+    });
+    await expect(
+      repository.assignVerifier({ electionId: f.election.id, verifierUserId: verifierId, actorUserId: secretaryId }),
+    ).rejects.toThrow("Every Council position");
+    expect((await prisma.election.findUniqueOrThrow({ where: { id: f.election.id } })).status).toBe("RESULT_REVIEW");
+    expect(await prisma.electionAppointment.count({ where: { electionId: f.election.id } })).toBe(0);
+    expect(positionResult.status).toBe("RUNOFF_REQUIRED");
+  });
+  it("serializes verification, certification, publication and Council appointments while preserving history", async () => {
+    const f = await countedResultFixture();
+    const assignment = await repository.assignVerifier({
+      electionId: f.election.id,
+      verifierUserId: verifierId,
+      actorUserId: secretaryId,
+    });
+    expect(assignment.verifierUserId).toBe(verifierId);
+    const verification = await repository.verificationWorkspace({ electionId: f.election.id, verifierUserId: verifierId });
+    expect(JSON.stringify(verification)).not.toContain(studentId);
+    const verificationResults = await Promise.allSettled([
+      repository.verifyResult({ electionId: f.election.id, verifierUserId: verifierId, outcome: "VERIFIED", note: "Aggregate checks passed" }),
+      repository.verifyResult({ electionId: f.election.id, verifierUserId: verifierId, outcome: "VERIFIED", note: "Duplicate" }),
+    ]);
+    expect(verificationResults.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const certificationResults = await Promise.allSettled([
+      repository.certifyResult({ electionId: f.election.id, actorUserId: secretaryId }),
+      repository.certifyResult({ electionId: f.election.id, actorUserId: secretaryId }),
+    ]);
+    expect(certificationResults.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    await expect(repository.appointmentPreview(f.election.id)).rejects.toThrow("published");
+    const publicationResults = await Promise.allSettled([
+      repository.publishResult({ electionId: f.election.id, actorUserId: secretaryId }),
+      repository.publishResult({ electionId: f.election.id, actorUserId: secretaryId }),
+    ]);
+    expect(publicationResults.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const published = await repository.publishedResults(f.election.id);
+    expect(JSON.stringify(published)).not.toContain("finalScore");
+    expect(JSON.stringify(published)).not.toContain(studentId);
+    const preview = await repository.appointmentPreview(f.election.id);
+    expect(preview.selected).toHaveLength(1);
+    expect(await prisma.committeeMembership.count({ where: { isActive: true, committee: { type: "STUDENT_COUNCIL" } } })).toBe(0);
+    const appointments = await Promise.allSettled([
+      repository.confirmAppointments({ electionId: f.election.id, actorUserId: secretaryId }),
+      repository.confirmAppointments({ electionId: f.election.id, actorUserId: secretaryId }),
+    ]);
+    const rows = await prisma.electionAppointment.findMany({ where: { electionId: f.election.id } });
+    // Register rows before assertions so a failed concurrency assertion cannot
+    // leave local test artifacts behind.
+    committeeIds.push(...rows.map((row) => row.committeeId));
+    membershipIds.push(...rows.map((row) => row.membershipId));
+    expect(appointments.filter((result) => result.status === "fulfilled")).toHaveLength(2);
+    expect(appointments.filter((result) => result.status === "fulfilled").map((result) => result.value)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ idempotent: true })]),
+    );
+    expect(rows).toHaveLength(1);
+    await expect(
+      prisma.electionCertification.update({ where: { snapshotId: (await prisma.electionResultSnapshot.findFirstOrThrow({ where: { electionId: f.election.id } })).id }, data: { note: "changed" } }),
+    ).rejects.toThrow("immutable");
+    await expect(repository.archive({ electionId: f.election.id, actorUserId: secretaryId })).resolves.toMatchObject({ status: "ARCHIVED" });
   });
   it("refuses malformed multi-seat Council positions before voting can close for counting", async () => {
     const f = await votingFixture();

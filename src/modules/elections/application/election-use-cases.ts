@@ -469,4 +469,74 @@ export class ElectionUseCases {
     requireSecretary(actor);
     return this.repository.results(id);
   }
+  async assignVerifier(actor: AuthenticatedActor, id: string, input: unknown) {
+    requireSecretary(actor);
+    const value = z.object({ verifierUserId: z.string().uuid() }).strict().parse(input);
+    const assignment = await this.repository.assignVerifier({
+      electionId: id,
+      verifierUserId: value.verifierUserId,
+      actorUserId: actor.userId,
+    });
+    await this.notifications.notify({
+      recipientUserId: value.verifierUserId,
+      template: "ELECTION_PROCESSING_UPDATED",
+      context: { electionId: id, title: "Council result verification", message: "You have been assigned to verify a Council result." },
+    });
+    return assignment;
+  }
+  async verificationWorkspace(actor: AuthenticatedActor, id: string) {
+    return this.repository.verificationWorkspace({ electionId: id, verifierUserId: actor.userId });
+  }
+  async verifyResult(actor: AuthenticatedActor, id: string, input: unknown) {
+    const value = z
+      .object({
+        outcome: z.enum(["VERIFIED", "FAILED_VERIFICATION"]),
+        note: z.string().trim().min(1).max(5000).optional(),
+      })
+      .strict()
+      .parse(input);
+    return this.repository.verifyResult({ electionId: id, verifierUserId: actor.userId, ...value });
+  }
+  async certifyResult(actor: AuthenticatedActor, id: string, input: unknown) {
+    requireSecretary(actor);
+    const value = z.object({ note: z.string().trim().max(5000).optional() }).strict().parse(input);
+    return this.repository.certifyResult({ electionId: id, actorUserId: actor.userId, ...value });
+  }
+  async publishResult(actor: AuthenticatedActor, id: string) {
+    requireSecretary(actor);
+    const publication = await this.repository.publishResult({ electionId: id, actorUserId: actor.userId });
+    const result = (await this.repository.results(id)) as {
+      positions: { candidates: { candidateId: string; isProvisionalWinner: boolean }[] }[];
+    };
+    await Promise.all(
+      result.positions.flatMap((position) =>
+        position.candidates.map((candidate) =>
+          this.notifyCandidate(
+            id,
+            candidate.candidateId,
+            candidate.isProvisionalWinner
+              ? "The certified Council result has been published. You have been selected for a Council position."
+              : "The certified Council result has been published. You were not selected for a Council position.",
+          ),
+        ),
+      ),
+    );
+    return publication;
+  }
+  async publishedResults(actor: AuthenticatedActor, id: string) {
+    requireReader(actor);
+    return this.repository.publishedResults(id);
+  }
+  async appointmentPreview(actor: AuthenticatedActor, id: string) {
+    requireSecretary(actor);
+    return this.repository.appointmentPreview(id);
+  }
+  async confirmAppointments(actor: AuthenticatedActor, id: string) {
+    requireSecretary(actor);
+    return this.repository.confirmAppointments({ electionId: id, actorUserId: actor.userId });
+  }
+  async archive(actor: AuthenticatedActor, id: string) {
+    requireSecretary(actor);
+    return this.repository.archive({ electionId: id, actorUserId: actor.userId });
+  }
 }

@@ -19,7 +19,12 @@ export type ElectionStatus =
   | "FINAL_CANDIDATES"
   | "VOTING"
   | "COUNTING"
-  | "RESULT_REVIEW";
+  | "RESULT_REVIEW"
+  | "VERIFICATION"
+  | "CERTIFIED"
+  | "PUBLISHED"
+  | "MEMBERSHIP_CONFIRMED"
+  | "ARCHIVED";
 export const voterGroups = ["STUDENT", "FACULTY", "EX_COUNCIL"] as const;
 const percent = z.number().min(0).max(100).multipleOf(0.01);
 const requiredDate = z.union([z.string().min(1), z.date()]).pipe(z.coerce.date());
@@ -109,6 +114,15 @@ export function assertCouncilSingleSeat(positions: readonly { seats: number }[])
   if (positions.some((position) => position.seats !== 1))
     throw new ElectionError("Council election positions must have exactly one seat", "validation");
 }
+export function assertElectionWideResolved(
+  positions: readonly { status: string }[],
+): void {
+  if (!positions.length || positions.some((position) => position.status !== "WINNER_PENDING_VERIFICATION"))
+    throw new ElectionError(
+      "Every Council position must have a normal winner before verification, certification, publication, or appointments",
+      "validation",
+    );
+}
 export function validateWeights(weights: PositionConfig["weights"], locked = false): void {
   if (new Set(weights.map((w) => w.voterGroup)).size !== weights.length)
     throw new ElectionError("Duplicate voter group", "validation");
@@ -139,7 +153,12 @@ export function assertTransition(from: ElectionStatus, to: ElectionStatus): void
     (from === "INTERVIEWS" && to === "FINAL_CANDIDATES") ||
     (from === "FINAL_CANDIDATES" && to === "VOTING") ||
     (from === "VOTING" && to === "COUNTING") ||
-    (from === "COUNTING" && to === "RESULT_REVIEW")
+    (from === "COUNTING" && to === "RESULT_REVIEW") ||
+    (from === "RESULT_REVIEW" && to === "VERIFICATION") ||
+    (from === "VERIFICATION" && to === "CERTIFIED") ||
+    (from === "CERTIFIED" && to === "PUBLISHED") ||
+    (from === "PUBLISHED" && to === "MEMBERSHIP_CONFIRMED") ||
+    (from === "MEMBERSHIP_CONFIRMED" && to === "ARCHIVED")
   ))
     throw new ElectionError(`Invalid election transition: ${from} to ${to}`);
 }
