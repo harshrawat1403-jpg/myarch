@@ -12,6 +12,7 @@ import { PageContainer } from "./page-container";
 const NAV_ITEMS = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About" },
+  { href: "/explore", label: "Explore" },
   { href: "/placements", label: "Placements" },
   { href: "/students", label: "Students" },
   { href: "/recruiters", label: "Recruiters" },

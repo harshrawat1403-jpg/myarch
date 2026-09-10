@@ -21,6 +21,10 @@ export const CreateEventRequestSchema = z.object({
   organizerId: z.string().uuid().optional(),
   budgetAmount: z.string().trim().max(20).optional(),
   budgetNotes: z.string().trim().max(EVENT_BUDGET_NOTES_MAX_LENGTH).optional(),
+  shortDescription: z.string().trim().max(500).optional(),
+  category: z.string().trim().max(80).optional(),
+  isPublic: z.boolean().optional(),
+  featured: z.boolean().optional(),
 });
 
 export const UpdateEventRequestSchema = z
@@ -33,6 +37,11 @@ export const UpdateEventRequestSchema = z
     budgetAmount: z.string().trim().max(20).nullable().optional(),
     budgetNotes: z.string().trim().max(EVENT_BUDGET_NOTES_MAX_LENGTH).nullable().optional(),
     postEventReport: z.string().trim().max(EVENT_REPORT_MAX_LENGTH).nullable().optional(),
+    shortDescription: z.string().trim().max(500).nullable().optional(),
+    category: z.string().trim().max(80).nullable().optional(),
+    isPublic: z.boolean().optional(),
+    featured: z.boolean().optional(),
+    coverImageFileId: z.string().uuid().nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, { message: "At least one field must be provided" });
 

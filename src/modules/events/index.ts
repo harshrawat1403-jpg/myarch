@@ -50,3 +50,4 @@ export { addEventAttachmentRouteHandler } from "./presentation/route-handlers/ad
 export { getEventAttachmentRouteHandler } from "./presentation/route-handlers/get-attachment";
 export { registerForEventRouteHandler } from "./presentation/route-handlers/register";
 export { markEventAttendanceRouteHandler } from "./presentation/route-handlers/mark-attendance";
+export { PrismaPublicEventRepository } from "./infrastructure/prisma-public-event-repository";

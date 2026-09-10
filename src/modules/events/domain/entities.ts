@@ -18,7 +18,13 @@ export type EventAttachmentKind = "DOCUMENT" | "MEDIA";
 export interface EventRecord {
   readonly id: string;
   readonly title: string;
+  readonly slug?: string;
   readonly description: string | null;
+  readonly shortDescription?: string | null;
+  readonly category?: string | null;
+  readonly isPublic?: boolean;
+  readonly featured?: boolean;
+  readonly coverImageFileId?: string | null;
   readonly startAt: Date;
   readonly endAt: Date | null;
   readonly venue: string | null;

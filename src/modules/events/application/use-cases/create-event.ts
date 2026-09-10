@@ -17,6 +17,10 @@ export interface CreateEventInput {
   organizerId?: string;
   budgetAmount?: string | null;
   budgetNotes?: string | null;
+  shortDescription?: string | null;
+  category?: string | null;
+  isPublic?: boolean;
+  featured?: boolean;
 }
 
 /** §4.2 — created DRAFT; only Publish makes it visible beyond the Secretary/organizer/delegated Coordinators (see domain/permissions.ts's canViewEvent). */
@@ -37,6 +41,10 @@ export class CreateEventUseCase {
       organizerId: input.organizerId ?? input.actor.userId,
       budgetAmount: input.budgetAmount ?? null,
       budgetNotes: input.budgetNotes?.trim() ?? null,
+      shortDescription: input.shortDescription?.trim() ?? null,
+      category: input.category?.trim() ?? null,
+      isPublic: input.isPublic ?? false,
+      featured: input.featured ?? false,
     });
 
     await this.deps.auditRecorder.record({

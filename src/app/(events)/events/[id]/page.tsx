@@ -12,7 +12,9 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { CardTitle } from "@/components/ui/typography";
+
 import { useToast } from "@/components/ui/toast";
+import { EventPresentationManager } from "@/components/events/event-presentation-manager";
 
 interface EventDetailDto {
   event: {
@@ -327,6 +329,8 @@ export default function EventDetailPage() {
           <p className="mt-1 text-sm text-(--color-text-secondary)">{detail.registrationCount} registered.</p>
         )}
       </Card>
+
+      {isManager && <EventPresentationManager eventId={eventId} accessToken={accessToken} />}
 
       {isManager && event.status === "COMPLETED" && (
         <Card>

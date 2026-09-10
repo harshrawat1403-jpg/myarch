@@ -119,6 +119,12 @@ enum EventAttachmentKind {
   MEDIA
 }
 
+enum EventFormKind {
+  REGISTRATION
+  VOLUNTEER
+  OTHER
+}
+
 enum MeetingStatus {
   SCHEDULED
   COMPLETED
@@ -401,6 +407,7 @@ model User {
   eventsOrganized       Event[]                 @relation("EventOrganizer")
   eventParticipations   EventParticipant[]      @relation("EventParticipantUser")
   eventRegistrations    EventRegistration[]     @relation("EventRegistrationUser")
+  uploadedEventGalleryItems EventGalleryItem[]  @relation("EventGalleryUploader")
   meetingsOrganized     Meeting[]               @relation("MeetingOrganizer")
   meetingParticipations MeetingParticipant[]    @relation("MeetingParticipantUser")
   announcementsAuthored Announcement[]          @relation("AnnouncementAuthor")
@@ -877,6 +884,8 @@ model FileAsset {
   usedAsMaintenanceAttachmentOf  MaintenanceAttachment[]     @relation("MaintenanceAttachmentFile")
   usedAsRequestAttachmentOf      RequestAttachment[]         @relation("RequestAttachmentFile")
   usedAsEventAttachmentOf        EventAttachment[]           @relation("EventAttachmentFile")
+  usedAsEventCoverImageOf        Event[]                     @relation("EventCoverImage")
+  usedAsEventGalleryImageOf      EventGalleryItem[]          @relation("EventGalleryImage")
   usedAsAnnouncementAttachmentOf AnnouncementAttachment[]    @relation("AnnouncementAttachmentFile")
   usedAsCommitteeAttachmentOf    CommitteeAttachment[]       @relation("CommitteeAttachmentFile")
   usedAsContentOverrideOf        ContentOverride[]           @relation("ContentOverrideFile")
@@ -1137,6 +1146,7 @@ model Form {
 
   fields      FormField[]
   submissions FormSubmission[]
+  eventLinks  EventForm[]
 
   @@index([status])
   @@index([committeeId])
@@ -1553,7 +1563,12 @@ model RequestAttachment {
 model Event {
   id          String      @id @default(uuid()) @db.Uuid
   title       String
+  slug        String      @unique
   description String?
+  shortDescription String?
+  category    String?
+  isPublic    Boolean     @default(false)
+  featured    Boolean     @default(false)
   startAt     DateTime
   endAt       DateTime?
   venue       String?
@@ -1567,6 +1582,9 @@ model Event {
 
   postEventReport String?
 
+  coverImageFileId String?    @db.Uuid
+  coverImage       FileAsset? @relation("EventCoverImage", fields: [coverImageFileId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1574,11 +1592,60 @@ model Event {
   checklist     EventChecklistItem[]
   attachments   EventAttachment[]
   registrations EventRegistration[]
+  gallery       EventGalleryItem[]
+  formLinks     EventForm[]
+  announcementLinks EventAnnouncement[]
 
   @@index([status])
   @@index([startAt])
   @@index([organizerId])
+  @@index([isPublic, startAt])
+  @@index([category])
   @@map("events")
+}
+
+model EventGalleryItem {
+  id              String    @id @default(uuid()) @db.Uuid
+  eventId         String    @db.Uuid
+  event           Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  fileId          String    @db.Uuid
+  file            FileAsset @relation("EventGalleryImage", fields: [fileId], references: [id], onDelete: Restrict)
+  caption         String?
+  displayOrder    Int       @default(0)
+  uploadedByUserId String   @db.Uuid
+  uploadedBy      User      @relation("EventGalleryUploader", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime  @default(now())
+
+  @@unique([eventId, fileId])
+  @@index([eventId, displayOrder])
+  @@map("event_gallery_items")
+}
+
+model EventForm {
+  id        String        @id @default(uuid()) @db.Uuid
+  eventId   String        @db.Uuid
+  event     Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  formId    String        @db.Uuid
+  form      Form          @relation(fields: [formId], references: [id], onDelete: Restrict)
+  kind      EventFormKind @default(OTHER)
+  createdAt DateTime      @default(now())
+
+  @@unique([eventId, formId])
+  @@index([formId])
+  @@map("event_forms")
+}
+
+model EventAnnouncement {
+  id             String       @id @default(uuid()) @db.Uuid
+  eventId        String       @db.Uuid
+  event          Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  announcementId String       @db.Uuid
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Restrict)
+  createdAt      DateTime     @default(now())
+
+  @@unique([eventId, announcementId])
+  @@index([announcementId])
+  @@map("event_announcements")
 }
 
 model EventParticipant {
@@ -1720,6 +1787,7 @@ model Announcement {
 
   attachments AnnouncementAttachment[]
   recipients  AnnouncementRecipient[]
+  eventLinks  EventAnnouncement[]
 
   @@index([publishAt])
   @@index([audienceType])

@@ -1,15 +1,25 @@
 import { Prisma, type PrismaClient, type Event as PrismaEvent } from "@prisma/client";
 import type { EventFilters, EventRecord, EventSort, EventStatus, PaginatedResult, PaginationInput } from "../domain/entities";
 import type { CreateEventData, EventRepository, UpdateEventData } from "../application/ports/event-repository";
+import { slugifyEventTitle } from "../domain/explore";
 
 export class PrismaEventRepository implements EventRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async create(data: CreateEventData): Promise<EventRecord> {
-    const row = await this.prisma.event.create({
+    let row: PrismaEvent | null = null;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const slug = await this.nextSlug(data.title);
+      try {
+        row = await this.prisma.event.create({
       data: {
         title: data.title,
+        slug,
         description: data.description ?? null,
+        shortDescription: data.shortDescription ?? null,
+        category: data.category ?? null,
+        isPublic: data.isPublic ?? false,
+        featured: data.featured ?? false,
         startAt: data.startAt,
         endAt: data.endAt ?? null,
         venue: data.venue ?? null,
@@ -17,7 +27,13 @@ export class PrismaEventRepository implements EventRepository {
         budgetAmount: data.budgetAmount ?? null,
         budgetNotes: data.budgetNotes ?? null,
       },
-    });
+        });
+        break;
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002" || attempt === 4) throw error;
+      }
+    }
+    if (!row) throw new Error("Unable to create event");
     return toDomain(row);
   }
 
@@ -38,6 +54,11 @@ export class PrismaEventRepository implements EventRepository {
         budgetAmount: data.budgetAmount,
         budgetNotes: data.budgetNotes,
         postEventReport: data.postEventReport,
+        shortDescription: data.shortDescription,
+        category: data.category,
+        isPublic: data.isPublic,
+        featured: data.featured,
+        coverImageFileId: data.coverImageFileId,
       },
     });
     return toDomain(row);
@@ -74,13 +95,29 @@ export class PrismaEventRepository implements EventRepository {
 
     return { items: rows.map(toDomain), total, page: pagination.page, pageSize: pagination.pageSize };
   }
+
+  private async nextSlug(title: string): Promise<string> {
+    const base = slugifyEventTitle(title);
+    for (let suffix = 1; suffix < 1000; suffix += 1) {
+      const slug = suffix === 1 ? base : `${base}-${suffix}`;
+      const existing = await this.prisma.event.findUnique({ where: { slug }, select: { id: true } });
+      if (!existing) return slug;
+    }
+    throw new Error("Unable to allocate a unique event slug");
+  }
 }
 
 function toDomain(row: PrismaEvent): EventRecord {
   return {
     id: row.id,
     title: row.title,
+    slug: row.slug,
     description: row.description,
+    shortDescription: row.shortDescription,
+    category: row.category,
+    isPublic: row.isPublic,
+    featured: row.featured,
+    coverImageFileId: row.coverImageFileId,
     startAt: row.startAt,
     endAt: row.endAt,
     venue: row.venue,

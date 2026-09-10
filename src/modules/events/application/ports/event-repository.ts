@@ -16,6 +16,10 @@ export interface CreateEventData {
   organizerId: string;
   budgetAmount?: string | null;
   budgetNotes?: string | null;
+  shortDescription?: string | null;
+  category?: string | null;
+  isPublic?: boolean;
+  featured?: boolean;
 }
 
 export interface UpdateEventData {
@@ -27,6 +31,11 @@ export interface UpdateEventData {
   budgetAmount?: string | null;
   budgetNotes?: string | null;
   postEventReport?: string | null;
+  shortDescription?: string | null;
+  category?: string | null;
+  isPublic?: boolean;
+  featured?: boolean;
+  coverImageFileId?: string | null;
 }
 
 export interface EventRepository {

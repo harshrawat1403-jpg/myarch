@@ -20,6 +20,9 @@ export function CreateEventModal({ isOpen, onClose, accessToken, onCreated }: Cr
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
   const [venue, setVenue] = useState("");
+  const [shortDescription, setShortDescription] = useState("");
+  const [category, setCategory] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -29,6 +32,9 @@ export function CreateEventModal({ isOpen, onClose, accessToken, onCreated }: Cr
     setStartAt("");
     setEndAt("");
     setVenue("");
+    setShortDescription("");
+    setCategory("");
+    setIsPublic(false);
     setError(null);
   }
 
@@ -50,6 +56,9 @@ export function CreateEventModal({ isOpen, onClose, accessToken, onCreated }: Cr
           startAt,
           endAt: endAt || undefined,
           venue: venue || undefined,
+          shortDescription: shortDescription || undefined,
+          category: category || undefined,
+          isPublic,
         },
         accessToken ?? undefined,
       );
@@ -89,6 +98,8 @@ export function CreateEventModal({ isOpen, onClose, accessToken, onCreated }: Cr
           <Label htmlFor="event-venue">Venue (optional)</Label>
           <Input id="event-venue" value={venue} onChange={(e) => setVenue(e.target.value)} />
         </div>
+
+        <label className="flex items-center gap-2 text-sm text-(--color-text-primary)"><input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} /> Show this event on Explore after it is published</label>
 
         <FieldError>{error ?? undefined}</FieldError>
 
