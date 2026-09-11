@@ -22,7 +22,7 @@ export class PrismaAvatarFileRepository implements AvatarFileRepository {
   }
 
   async findById(fileId: string): Promise<AvatarFileRecord | null> {
-    const row = await this.prisma.fileAsset.findUnique({ where: { id: fileId } });
+    const row = await this.prisma.fileAsset.findFirst({ where: { id: fileId, usedAsAvatarOf: { isNot: null } } });
     if (!row || row.classification !== "PUBLIC") return null;
     return { id: row.id, storageKey: row.storageKey, mimeType: row.mimeType, ownerUserId: row.ownerUserId };
   }

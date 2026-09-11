@@ -1,49 +1,68 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import os from "node:os";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
-let tempRoot: string;
-
-vi.mock("@/config/env", () => ({
-  getEnv: () => ({ FILE_STORAGE_ROOT: tempRoot }),
+const send = vi.fn();
+vi.mock("@aws-sdk/client-s3", () => ({
+  S3Client: class { send = send; },
+  PutObjectCommand: class { constructor(readonly input: unknown) {} },
+  GetObjectCommand: class { constructor(readonly input: unknown) {} },
+  DeleteObjectCommand: class { constructor(readonly input: unknown) {} },
+  NoSuchKey: class extends Error {},
 }));
 
-describe("file-storage", () => {
-  beforeEach(async () => {
-    tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "tnparch-file-storage-test-"));
+const original = { ...process.env };
+afterEach(async () => {
+  process.env = { ...original };
+  vi.resetModules();
+  send.mockReset();
+});
+
+function baseEnv(): void {
+  process.env.DATABASE_URL = "postgresql://test";
+  process.env.JWT_ACCESS_SECRET = "a".repeat(32);
+  process.env.JWT_REFRESH_SECRET = "b".repeat(32);
+}
+
+describe("file storage drivers", () => {
+  it("round-trips and safely deletes local files", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "myarch-storage-"));
+    baseEnv();
+    process.env.FILE_STORAGE_DRIVER = "local";
+    process.env.FILE_STORAGE_ROOT = root;
+    const storage = await import("@/lib/file-storage");
+    await storage.saveFile("avatars/student/image.jpg", Buffer.from("image"));
+    await expect(storage.readFile("avatars/student/image.jpg")).resolves.toEqual(Buffer.from("image"));
+    await storage.deleteFile("avatars/student/image.jpg");
+    await expect(storage.readFile("avatars/student/image.jpg")).rejects.toThrow();
+    await fs.rm(root, { recursive: true, force: true });
   });
 
-  afterEach(async () => {
-    await fs.rm(tempRoot, { recursive: true, force: true });
+  it("uses R2 S3 commands and rejects unsafe object keys", async () => {
+    baseEnv();
+    Object.assign(process.env, { FILE_STORAGE_DRIVER: "r2", STORAGE_ENDPOINT: "https://account.r2.cloudflarestorage.com", STORAGE_REGION: "auto", STORAGE_BUCKET: "myarch", STORAGE_ACCESS_KEY_ID: "key", STORAGE_SECRET_ACCESS_KEY: "secret" });
+    send.mockResolvedValueOnce({}).mockResolvedValueOnce({ Body: { transformToByteArray: async () => new Uint8Array([1, 2]) } }).mockResolvedValueOnce({});
+    const storage = await import("@/lib/file-storage");
+    await storage.saveFile("portfolio-images/student/file.png", Buffer.from([1]));
+    await expect(storage.readFile("portfolio-images/student/file.png")).resolves.toEqual(Buffer.from([1, 2]));
+    await storage.deleteFile("portfolio-images/student/file.png");
+    expect(send).toHaveBeenCalledTimes(3);
+    await expect(storage.saveFile("../escape", Buffer.from([]))).rejects.toThrow("Invalid storage key");
   });
 
-  it("round-trips a saved file through readFile", async () => {
-    const { saveFile, readFile } = await import("../../../src/lib/file-storage");
-    await saveFile("avatars/user-1.png", Buffer.from("fake-png-bytes"));
-    const read = await readFile("avatars/user-1.png");
-    expect(read.toString()).toBe("fake-png-bytes");
+  it("maps an R2 missing object to the common storage error", async () => {
+    baseEnv();
+    Object.assign(process.env, { FILE_STORAGE_DRIVER: "r2", STORAGE_ENDPOINT: "https://account.r2.cloudflarestorage.com", STORAGE_REGION: "auto", STORAGE_BUCKET: "myarch", STORAGE_ACCESS_KEY_ID: "key", STORAGE_SECRET_ACCESS_KEY: "secret" });
+    send.mockRejectedValueOnce({ $metadata: { httpStatusCode: 404 } });
+    const storage = await import("@/lib/file-storage");
+    await expect(storage.readFile("portfolio-images/student/missing.png")).rejects.toThrow("Stored file not found");
   });
 
-  it("creates intermediate directories as needed", async () => {
-    const { saveFile } = await import("../../../src/lib/file-storage");
-    await expect(saveFile("a/b/c/deep.txt", Buffer.from("x"))).resolves.not.toThrow();
-  });
-
-  it("deleteFile removes a saved file", async () => {
-    const { saveFile, deleteFile, readFile } = await import("../../../src/lib/file-storage");
-    await saveFile("avatars/user-2.png", Buffer.from("bytes"));
-    await deleteFile("avatars/user-2.png");
-    await expect(readFile("avatars/user-2.png")).rejects.toThrow();
-  });
-
-  it("deleteFile does not throw for a non-existent file", async () => {
-    const { deleteFile } = await import("../../../src/lib/file-storage");
-    await expect(deleteFile("never-existed.txt")).resolves.not.toThrow();
-  });
-
-  it("rejects a storage key that attempts to escape the storage root", async () => {
-    const { saveFile } = await import("../../../src/lib/file-storage");
-    await expect(saveFile("../../../etc/passwd", Buffer.from("x"))).rejects.toThrow(/outside the storage root/);
+  it("rejects incomplete R2 configuration before storage is used", async () => {
+    baseEnv();
+    process.env.FILE_STORAGE_DRIVER = "r2";
+    const { getEnv } = await import("@/config/env");
+    expect(() => getEnv()).toThrow("STORAGE_ENDPOINT is required when FILE_STORAGE_DRIVER=r2");
   });
 });

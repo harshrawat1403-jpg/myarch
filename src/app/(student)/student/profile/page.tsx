@@ -169,6 +169,32 @@ export default function StudentProfilePage() {
     }
   }
 
+  async function uploadProfileFile(kind: "resume" | "portfolio", file: File | undefined) {
+    if (!accessToken || !studentProfileId || !file) return;
+    setError(null);
+    setMessage(null);
+    setIsSaving(true);
+    try {
+      const formData = new FormData();
+      formData.set("file", file);
+      await apiClient.upload(`/api/students/${studentProfileId}/profile/${kind === "resume" ? "resume" : "portfolio-images"}`, formData, accessToken);
+      const refreshed = await apiClient.get<ProfileDraft>(`/api/students/${studentProfileId}/profile/draft`, accessToken);
+      setDraft(refreshed);
+      setMessage(kind === "resume" ? "Resume uploaded. Submit your draft for review to publish it." : "Portfolio image uploaded. Submit your draft for review to publish it.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Unable to upload this file.");
+    } finally { setIsSaving(false); }
+  }
+
+  async function deletePortfolioImage(imageId: string) {
+    if (!accessToken || !studentProfileId) return;
+    setIsSaving(true);
+    try {
+      await apiClient.delete(`/api/students/${studentProfileId}/profile/portfolio-images/${imageId}`, accessToken);
+      setDraft((current) => current ? { ...current, portfolioImages: (current.portfolioImages ?? []).filter((image) => image.id !== imageId) } : current);
+    } catch (err) { setError(err instanceof ApiError ? err.message : "Unable to remove the portfolio image."); } finally { setIsSaving(false); }
+  }
+
   const isLocked = draft?.status === "PENDING_REVIEW";
   const canSubmit = draft?.status === "DRAFT" || draft?.status === "CHANGES_REQUESTED";
 
@@ -214,6 +240,16 @@ export default function StudentProfilePage() {
           <div>
             <DataLabel className="text-(--color-danger)">Reviewer Comment</DataLabel>
             <p className="mt-1 text-sm text-(--color-text-primary)">{draft.reviewComment}</p>
+          </div>
+          <div>
+            <Label htmlFor="resume">Resume (PDF, 3MB maximum)</Label>
+            <Input id="resume" type="file" accept="application/pdf" disabled={isLocked || isSaving} onChange={(event) => void uploadProfileFile("resume", event.target.files?.[0])} />
+            {draft?.resumeFileId && <p className="mt-1 text-xs text-(--color-success)">A resume is attached to this draft.</p>}
+          </div>
+          <div>
+            <Label htmlFor="portfolioImage">Portfolio images (JPEG, PNG, or WebP; 5MB each)</Label>
+            <Input id="portfolioImage" type="file" accept="image/jpeg,image/png,image/webp" disabled={isLocked || isSaving || (draft?.portfolioImages?.length ?? 0) >= 10} onChange={(event) => void uploadProfileFile("portfolio", event.target.files?.[0])} />
+            {(draft?.portfolioImages?.length ?? 0) > 0 && <ul className="mt-2 space-y-1 text-sm text-(--color-text-secondary)">{draft?.portfolioImages?.map((image) => <li key={image.id} className="flex items-center justify-between"><span>{image.title ?? "Portfolio image"}</span><Button type="button" variant="ghost" onClick={() => void deletePortfolioImage(image.id)} disabled={isLocked || isSaving}>Remove</Button></li>)}</ul>}
           </div>
         </div>
       )}

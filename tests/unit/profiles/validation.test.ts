@@ -29,8 +29,8 @@ describe("SaveDraftRequestSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts an explicit null resumeFileId (clearing it)", () => {
-    expect(SaveDraftRequestSchema.safeParse({ resumeFileId: null }).success).toBe(true);
+  it("rejects resumeFileId because resumes use the dedicated protected upload route", () => {
+    expect(SaveDraftRequestSchema.safeParse({ resumeFileId: null }).success).toBe(false);
   });
 
   it("rejects a non-UUID resumeFileId", () => {

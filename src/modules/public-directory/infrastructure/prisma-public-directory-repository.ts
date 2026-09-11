@@ -6,7 +6,7 @@ type PublicProfileRow = Prisma.StudentPublicProfileGetPayload<{
   include: {
     studentProfile: {
       include: { batch: true; user: true; privateProfile: { select: { cgpa: true } } };
-    };
+    }; portfolioImages: true;
   };
 }>;
 
@@ -38,7 +38,7 @@ export class PrismaPublicDirectoryRepository implements PublicDirectoryRepositor
     const rows = await this.prisma.studentPublicProfile.findMany({
       where: { AND: and },
       include: {
-        studentProfile: { include: { batch: true, user: true, privateProfile: { select: { cgpa: true } } } },
+        studentProfile: { include: { batch: true, user: true, privateProfile: { select: { cgpa: true } } } }, portfolioImages: { orderBy: { sortOrder: "asc" } },
       },
     });
 
@@ -65,7 +65,7 @@ export class PrismaPublicDirectoryRepository implements PublicDirectoryRepositor
         studentProfile: { isActive: true, batch: { status: "ACTIVE" } },
       },
       include: {
-        studentProfile: { include: { batch: true, user: true, privateProfile: { select: { cgpa: true } } } },
+        studentProfile: { include: { batch: true, user: true, privateProfile: { select: { cgpa: true } } } }, portfolioImages: { orderBy: { sortOrder: "asc" } },
       },
     });
     return row ? toDTO(row) : null;
@@ -95,6 +95,7 @@ export function toDTO(row: PublicProfileRow): PublicDirectoryProfile {
     software: row.software,
     selectedProjects: row.selectedProjects as unknown as PublicDirectoryProfile["selectedProjects"],
     portfolioLinks: row.portfolioLinks,
+    portfolioImages: (row.portfolioImages ?? []).map((image) => ({ id: image.id, fileId: image.fileId, title: image.title, caption: image.caption, sortOrder: image.sortOrder })),
     certifications: row.certifications as unknown as PublicDirectoryProfile["certifications"],
     internships: row.internships as unknown as PublicDirectoryProfile["internships"],
     hasResume: row.resumeFileId !== null,

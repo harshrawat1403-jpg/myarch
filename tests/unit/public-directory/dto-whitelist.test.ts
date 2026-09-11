@@ -20,6 +20,7 @@ const EXPECTED_DTO_KEYS = [
   "software",
   "selectedProjects",
   "portfolioLinks",
+  "portfolioImages",
   "certifications",
   "internships",
   "hasResume",

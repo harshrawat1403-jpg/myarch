@@ -14,6 +14,14 @@ export interface ProjectEntry {
   readonly semester?: string;
 }
 
+export interface PortfolioImage {
+  readonly id: string;
+  readonly fileId: string;
+  readonly title: string | null;
+  readonly caption: string | null;
+  readonly sortOrder: number;
+}
+
 export interface CertificationEntry {
   readonly title: string;
   readonly issuer?: string;
@@ -42,6 +50,7 @@ export interface PublicDirectoryProfile {
   readonly software: readonly string[];
   readonly selectedProjects: readonly ProjectEntry[];
   readonly portfolioLinks: readonly string[];
+  readonly portfolioImages?: readonly PortfolioImage[];
   readonly certifications: readonly CertificationEntry[];
   readonly internships: readonly InternshipEntry[];
   readonly hasResume: boolean;

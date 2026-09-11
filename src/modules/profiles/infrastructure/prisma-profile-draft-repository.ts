@@ -13,18 +13,20 @@ export class PrismaProfileDraftRepository implements ProfileDraftRepository {
   async findByStudentId(studentProfileId: string): Promise<ProfileDraft | null> {
     const row = await this.prisma.studentPublicProfileDraft.findUnique({
       where: { studentProfileId },
+      include: { portfolioImages: { orderBy: { sortOrder: "asc" } } },
     });
     return row ? toDomain(row) : null;
   }
 
   async findById(draftId: string): Promise<ProfileDraft | null> {
-    const row = await this.prisma.studentPublicProfileDraft.findUnique({ where: { id: draftId } });
+    const row = await this.prisma.studentPublicProfileDraft.findUnique({ where: { id: draftId }, include: { portfolioImages: { orderBy: { sortOrder: "asc" } } } });
     return row ? toDomain(row) : null;
   }
 
   async create(studentProfileId: string): Promise<ProfileDraft> {
     const row = await this.prisma.studentPublicProfileDraft.create({
       data: { studentProfileId },
+      include: { portfolioImages: { orderBy: { sortOrder: "asc" } } },
     });
     return toDomain(row);
   }
@@ -53,6 +55,7 @@ export class PrismaProfileDraftRepository implements ProfileDraftRepository {
           : undefined,
         status,
       },
+      include: { portfolioImages: { orderBy: { sortOrder: "asc" } } },
     });
     return toDomain(row);
   }
@@ -76,6 +79,7 @@ export class PrismaProfileDraftRepository implements ProfileDraftRepository {
         reviewedAt: data.reviewedAt,
         rejectionReason: data.reviewComment,
       },
+      include: { portfolioImages: { orderBy: { sortOrder: "asc" } } },
     });
     return toDomain(row);
   }
@@ -100,7 +104,7 @@ export class PrismaProfileDraftRepository implements ProfileDraftRepository {
   }
 }
 
-function toDomain(row: StudentPublicProfileDraft): ProfileDraft {
+function toDomain(row: StudentPublicProfileDraft & { portfolioImages?: { id: string; fileId: string; title: string | null; caption: string | null; sortOrder: number }[] }): ProfileDraft {
   return {
     id: row.id,
     studentProfileId: row.studentProfileId,
@@ -109,6 +113,7 @@ function toDomain(row: StudentPublicProfileDraft): ProfileDraft {
     software: row.software,
     selectedProjects: row.selectedProjects as unknown as ProfileDraft["selectedProjects"],
     portfolioLinks: row.portfolioLinks,
+    portfolioImages: row.portfolioImages?.map((image) => ({ id: image.id, fileId: image.fileId, title: image.title, caption: image.caption, sortOrder: image.sortOrder })) ?? [],
     resumeFileId: row.resumeFileId,
     certifications: row.certifications as unknown as ProfileDraft["certifications"],
     internships: row.internships as unknown as ProfileDraft["internships"],

@@ -3,6 +3,7 @@ import { withAuth } from "@/modules/auth";
 import { extractRouteParam } from "@/lib/route-params";
 import { forbidden, notFound } from "@/lib/http-errors";
 import { NotAuthorizedError } from "@/lib/errors";
+import { readFile } from "@/lib/file-storage";
 import { getResumeReferenceUseCase } from "../../infrastructure/container";
 import { ApprovedProfileNotFoundError, ResumeNotAvailableError } from "../../domain/errors";
 
@@ -24,7 +25,15 @@ export const getRecruiterResumeRouteHandler = withAuth(
 
     try {
       const reference = await getResumeReferenceUseCase.execute({ actor, studentId });
-      return NextResponse.json({ data: reference });
+      const bytes = await readFile(reference.storageKey).catch(() => null);
+      if (!bytes) return notFound("Resume not found");
+      return new NextResponse(bytes as unknown as BodyInit, {
+        headers: {
+          "Content-Type": reference.mimeType,
+          "Content-Disposition": "attachment; filename=resume.pdf",
+          "Cache-Control": "private, no-store",
+        },
+      });
     } catch (err) {
       if (err instanceof ApprovedProfileNotFoundError) return notFound("Profile not found");
       if (err instanceof ResumeNotAvailableError) return notFound(err.message);

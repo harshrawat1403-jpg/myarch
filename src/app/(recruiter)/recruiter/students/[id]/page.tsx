@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft, Download } from "lucide-react";
 import { useAuth } from "@/modules/auth/client";
 import { apiClient, ApiError } from "@/lib/api-client";
-import type { RecruiterStudentProfileDTO, ResumeReference } from "@/modules/recruiters";
+import type { RecruiterStudentProfileDTO } from "@/modules/recruiters";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -55,11 +55,14 @@ export default function RecruiterStudentProfilePage() {
   async function handleResumeDownload() {
     if (!accessToken) return;
     try {
-      const reference = await apiClient.get<ResumeReference>(`/api/recruiters/students/${id}/resume`, accessToken);
-      // No object storage integration exists yet (see the route handler's
-      // doc comment) — this surfaces the reference rather than streaming
-      // bytes, which don't exist to stream.
-      setResumeNotice(`Resume reference: ${reference.storageKey} (${reference.mimeType})`);
+      const { blob, filename } = await apiClient.download(`/api/recruiters/students/${id}/resume`, accessToken, "resume.pdf");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+      setResumeNotice("Resume downloaded.");
     } catch (err) {
       setResumeNotice(err instanceof ApiError ? err.message : "Unable to retrieve this resume.");
     }

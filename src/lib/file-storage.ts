@@ -1,52 +1,66 @@
+import { DeleteObjectCommand, GetObjectCommand, NoSuchKey, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { getEnv } from "@/config/env";
 
-/**
- * Local-disk storage behind an authenticated API route, per the V3.0
- * Administration Platform's file-storage decision — no object-storage
- * service exists yet in this deployment, and this is a single-instance
- * department app, so a Docker volume plus this thin read/write/delete
- * wrapper is the correct-scale choice. Generic on purpose (not
- * avatar-specific): the future CMS Media Library extends this same module
- * rather than introducing a second storage path.
- */
-
-function storageRoot(): string {
-  const configured = getEnv().FILE_STORAGE_ROOT;
-  // turbopackIgnore: this join's second argument is config-derived, not a
-  // literal — without the hint, Turbopack's static analysis conservatively
-  // traces (and bundles) the entire project on every build. The path itself
-  // is safe: it's the storage root directory, read only at request time,
-  // never a value used to select which source files to include.
-  return path.isAbsolute(configured) ? configured : path.join(/* turbopackIgnore: true */ process.cwd(), configured);
+function assertSafeStorageKey(storageKey: string): void {
+  if (!storageKey || storageKey.startsWith("/") || storageKey.includes("\\") || storageKey.split("/").some((part) => !part || part === "." || part === "..")) {
+    throw new Error("Invalid storage key");
+  }
 }
 
-/**
- * Resolves a storage key to an absolute path, rejecting any key that would
- * escape the storage root (path traversal) — a storage key is always
- * server-generated (never taken verbatim from user input), but this stays
- * defensive regardless.
- */
-function resolveStoragePath(storageKey: string): string {
-  const root = storageRoot();
-  const resolved = path.resolve(root, storageKey);
-  if (resolved !== root && !resolved.startsWith(root + path.sep)) {
-    throw new Error(`Storage key resolves outside the storage root: ${storageKey}`);
-  }
+function localPath(storageKey: string): string {
+  assertSafeStorageKey(storageKey);
+  const root = getEnv().FILE_STORAGE_ROOT!;
+  const absoluteRoot = path.isAbsolute(root) ? root : path.join(process.cwd(), root);
+  const resolved = path.resolve(absoluteRoot, storageKey);
+  if (!resolved.startsWith(`${absoluteRoot}${path.sep}`)) throw new Error("Storage key resolves outside the storage root");
   return resolved;
 }
 
+let r2Client: S3Client | undefined;
+function getR2Client(): S3Client {
+  const env = getEnv();
+  if (!r2Client) r2Client = new S3Client({ region: env.STORAGE_REGION!, endpoint: env.STORAGE_ENDPOINT!, credentials: { accessKeyId: env.STORAGE_ACCESS_KEY_ID!, secretAccessKey: env.STORAGE_SECRET_ACCESS_KEY! } });
+  return r2Client;
+}
+
+function isNotFound(error: unknown): boolean {
+  return error instanceof NoSuchKey || (typeof error === "object" && error !== null && "$metadata" in error && (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404);
+}
+
 export async function saveFile(storageKey: string, data: Buffer): Promise<void> {
-  const filePath = resolveStoragePath(storageKey);
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, data);
+  assertSafeStorageKey(storageKey);
+  const env = getEnv();
+  if (env.FILE_STORAGE_DRIVER === "local") {
+    const filePath = localPath(storageKey);
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, data);
+    return;
+  }
+  await getR2Client().send(new PutObjectCommand({ Bucket: env.STORAGE_BUCKET!, Key: storageKey, Body: data }));
 }
 
 export async function readFile(storageKey: string): Promise<Buffer> {
-  return fs.readFile(resolveStoragePath(storageKey));
+  assertSafeStorageKey(storageKey);
+  const env = getEnv();
+  if (env.FILE_STORAGE_DRIVER === "local") return fs.readFile(localPath(storageKey));
+  try {
+    const body = (await getR2Client().send(new GetObjectCommand({ Bucket: env.STORAGE_BUCKET!, Key: storageKey }))).Body;
+    if (!body) throw new Error("Stored object has no body");
+    return Buffer.from(await body.transformToByteArray());
+  } catch (error) {
+    if (isNotFound(error)) throw new Error("Stored file not found");
+    throw error;
+  }
 }
 
 export async function deleteFile(storageKey: string): Promise<void> {
-  await fs.rm(resolveStoragePath(storageKey), { force: true });
+  assertSafeStorageKey(storageKey);
+  const env = getEnv();
+  if (env.FILE_STORAGE_DRIVER === "local") {
+    await fs.rm(localPath(storageKey), { force: true });
+    return;
+  }
+  await getR2Client().send(new DeleteObjectCommand({ Bucket: env.STORAGE_BUCKET!, Key: storageKey }));
 }

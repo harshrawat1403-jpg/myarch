@@ -77,20 +77,21 @@ describe("Recruiter student profile page — approved public information only", 
     }
   });
 
-  it("requests the resume reference when Download Resume is clicked", async () => {
+  it("downloads the authorized resume without exposing its storage key", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(PROFILE));
     const user = userEvent.setup();
     renderPage();
     await screen.findByRole("heading", { name: "Alice Architect" });
 
-    fetchMock.mockResolvedValueOnce(jsonResponse({ storageKey: "resumes/s1.pdf", mimeType: "application/pdf" }));
+    vi.stubGlobal("URL", { createObjectURL: vi.fn(() => "blob:resume"), revokeObjectURL: vi.fn() });
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, blob: async () => new Blob(["pdf"]), headers: new Headers({ "Content-Disposition": "attachment; filename=resume.pdf" }) });
     await user.click(screen.getByRole("button", { name: /download resume/i }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     const [url, init] = fetchMock.mock.calls[1]!;
     expect(url).toBe("/api/recruiters/students/s1/resume");
     expect(init.headers.Authorization).toBe("Bearer test-access-token");
-    expect(await screen.findByText(/resumes\/s1\.pdf/)).toBeInTheDocument();
+    expect(await screen.findByText("Resume downloaded.")).toBeInTheDocument();
   });
 
   it("disables the resume button when the student has no resume available", async () => {

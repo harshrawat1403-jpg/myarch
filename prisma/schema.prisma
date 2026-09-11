@@ -710,6 +710,7 @@ model StudentProfile {
   privateProfile               StudentPrivateProfile?
   publicProfile                StudentPublicProfile?
   draft                        StudentPublicProfileDraft?
+  portfolioImages              StudentPortfolioImage[]
   registrationRequest          RegistrationRequest?
   recruiterStudentInteractions RecruiterStudentInteraction[]
   recruiterInterestRequests    RecruiterInterestRequest[]
@@ -774,6 +775,7 @@ model StudentPublicProfile {
   publishedAt          DateTime                   @default(now())
   publishedByUserId    String                     @db.Uuid
   publishedBy          User                       @relation("ProfilePublishedBy", fields: [publishedByUserId], references: [id])
+  portfolioImages      StudentPortfolioImage[]    @relation("PublishedPortfolioImages")
 
   @@map("student_public_profiles")
 }
@@ -806,6 +808,7 @@ model StudentPublicProfileDraft {
   updatedAt DateTime @updatedAt
 
   publishedAs StudentPublicProfile? @relation("PublishedFrom")
+  portfolioImages StudentPortfolioImage[] @relation("DraftPortfolioImages")
 
   @@map("student_public_profile_drafts")
 }
@@ -890,9 +893,31 @@ model FileAsset {
   usedAsCommitteeAttachmentOf    CommitteeAttachment[]       @relation("CommitteeAttachmentFile")
   usedAsContentOverrideOf        ContentOverride[]           @relation("ContentOverrideFile")
   usedAsContentOverrideDraftOf   ContentOverride[]           @relation("ContentOverrideDraftFile")
+  usedAsPortfolioImageOf         StudentPortfolioImage?      @relation("PortfolioImageFile")
 
   @@index([ownerUserId])
   @@map("file_assets")
+}
+
+model StudentPortfolioImage {
+  id                 String                     @id @default(uuid()) @db.Uuid
+  studentProfileId   String                     @db.Uuid
+  studentProfile     StudentProfile             @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  fileId             String                     @unique @db.Uuid
+  file               FileAsset                  @relation("PortfolioImageFile", fields: [fileId], references: [id], onDelete: Cascade)
+  draftId            String?                    @db.Uuid
+  draft              StudentPublicProfileDraft? @relation("DraftPortfolioImages", fields: [draftId], references: [id], onDelete: SetNull)
+  publishedProfileId String?                    @db.Uuid
+  publishedProfile   StudentPublicProfile?      @relation("PublishedPortfolioImages", fields: [publishedProfileId], references: [id], onDelete: SetNull)
+  title              String?
+  caption            String?
+  sortOrder          Int                        @default(0)
+  createdAt          DateTime                   @default(now())
+
+  @@index([studentProfileId])
+  @@index([draftId, sortOrder])
+  @@index([publishedProfileId, sortOrder])
+  @@map("student_portfolio_images")
 }
 
 // ---------------------------------------------------------------------------

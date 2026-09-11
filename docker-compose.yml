@@ -45,6 +45,7 @@ services:
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@tnparch.in}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      FILE_STORAGE_DRIVER: local
       FILE_STORAGE_ROOT: /app/storage/uploads
       NODE_ENV: production
     volumes:
@@ -68,6 +69,7 @@ services:
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@tnparch.in}
       JOB_WORKER_POLL_INTERVAL_MS: ${JOB_WORKER_POLL_INTERVAL_MS:-2000}
       JOB_WORKER_BATCH_SIZE: ${JOB_WORKER_BATCH_SIZE:-5}
+      FILE_STORAGE_DRIVER: local
       FILE_STORAGE_ROOT: /app/storage/uploads
       NODE_ENV: production
     volumes:

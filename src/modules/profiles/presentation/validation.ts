@@ -26,7 +26,6 @@ export const SaveDraftRequestSchema = z
     software: z.array(z.string().trim().min(1).max(100)).max(50).optional(),
     selectedProjects: z.array(ProjectEntrySchema).max(50).optional(),
     portfolioLinks: z.array(z.string().trim().url()).max(20).optional(),
-    resumeFileId: z.string().uuid().nullable().optional(),
     certifications: z.array(CertificationEntrySchema).max(50).optional(),
     internships: z.array(InternshipEntrySchema).max(50).optional(),
   })

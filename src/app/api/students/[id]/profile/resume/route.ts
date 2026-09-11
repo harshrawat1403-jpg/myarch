@@ -1,0 +1,1 @@
+export { uploadResumeRouteHandler as POST, deleteResumeRouteHandler as DELETE } from "@/modules/profiles";

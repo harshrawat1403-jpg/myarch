@@ -174,6 +174,19 @@ export default function PublicDirectoryProfilePage() {
               {profile.portfolioLinks.length === 0 && <li className="list-none text-(--color-text-secondary)">—</li>}
             </ul>
           </div>
+          {(profile.portfolioImages?.length ?? 0) > 0 && (
+            <div>
+              <DataLabel>Portfolio Images</DataLabel>
+              <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {profile.portfolioImages?.map((image) => (
+                  <figure key={image.id} className="overflow-hidden rounded border border-(--color-border)">
+                    <Image src={`/api/public/directory/${profile.studentId}/portfolio-images/${image.id}`} alt={image.caption ?? image.title ?? "Portfolio image"} width={320} height={320} unoptimized className="aspect-square w-full object-cover" />
+                    {(image.title || image.caption) && <figcaption className="p-2 text-xs text-(--color-text-secondary)">{image.title ?? image.caption}</figcaption>}
+                  </figure>
+                ))}
+              </div>
+            </div>
+          )}
         </Card>
 
         {profile.hasResume && (

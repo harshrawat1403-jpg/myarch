@@ -12,6 +12,7 @@ export type {
   ProjectEntry,
   CertificationEntry,
   InternshipEntry,
+  PortfolioImage,
 } from "./domain/entities";
 export {
   DraftNotFoundError,
@@ -29,3 +30,7 @@ export { requestChangesRouteHandler } from "./presentation/route-handlers/reques
 export { approvalQueueRouteHandler } from "./presentation/route-handlers/approval-queue";
 export { getPublishedProfileRouteHandler } from "./presentation/route-handlers/get-published-profile";
 export { updateProfileVisibilityRouteHandler } from "./presentation/route-handlers/update-profile-visibility";
+export { uploadPortfolioImageRouteHandler } from "./presentation/route-handlers/upload-portfolio-image";
+export { deletePortfolioImageRouteHandler } from "./presentation/route-handlers/delete-portfolio-image";
+export { uploadResumeRouteHandler } from "./presentation/route-handlers/upload-resume";
+export { deleteResumeRouteHandler } from "./presentation/route-handlers/delete-resume";

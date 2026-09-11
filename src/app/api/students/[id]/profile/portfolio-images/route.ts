@@ -1,0 +1,1 @@
+export { uploadPortfolioImageRouteHandler as POST } from "@/modules/profiles";

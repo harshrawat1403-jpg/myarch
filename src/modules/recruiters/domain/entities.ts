@@ -1,4 +1,4 @@
-import type { CertificationEntry, InternshipEntry, ProjectEntry } from "@/modules/profiles";
+import type { CertificationEntry, InternshipEntry, PortfolioImage, ProjectEntry } from "@/modules/profiles";
 
 /**
  * Recruiter-facing DTO — deliberately NOT the Prisma StudentPublicProfile
@@ -28,6 +28,7 @@ export interface RecruiterStudentProfileDTO {
   readonly software: readonly string[];
   readonly selectedProjects: readonly ProjectEntry[];
   readonly portfolioLinks: readonly string[];
+  readonly portfolioImages?: readonly PortfolioImage[];
   readonly certifications: readonly CertificationEntry[];
   readonly internships: readonly InternshipEntry[];
   readonly hasResume: boolean;

@@ -53,15 +53,27 @@ const envSchema = z
     JOB_WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
     JOB_WORKER_BATCH_SIZE: z.coerce.number().int().positive().default(5),
 
-    // V3.0 Administration Platform: local-disk root for uploaded files
-    // (Account Settings avatar today; the future CMS Media Library extends
-    // the same src/lib/file-storage.ts rather than a second storage path).
-    // Defaults to a gitignored directory under the repo root for local dev.
+    FILE_STORAGE_DRIVER: z.enum(["local", "r2"]).default("local"),
     FILE_STORAGE_ROOT: z.string().default("storage/uploads"),
+    STORAGE_ENDPOINT: z.string().url().optional(),
+    STORAGE_REGION: z.string().min(1).optional(),
+    STORAGE_BUCKET: z.string().min(1).optional(),
+    STORAGE_ACCESS_KEY_ID: z.string().min(1).optional(),
+    STORAGE_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   })
   .refine((value) => value.JWT_ACCESS_SECRET !== value.JWT_REFRESH_SECRET, {
     message: "JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must differ",
     path: ["JWT_REFRESH_SECRET"],
+  })
+  .superRefine((value, ctx) => {
+    if (value.FILE_STORAGE_DRIVER === "local" && !value.FILE_STORAGE_ROOT) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["FILE_STORAGE_ROOT"], message: "FILE_STORAGE_ROOT is required when FILE_STORAGE_DRIVER=local" });
+    }
+    if (value.FILE_STORAGE_DRIVER === "r2") {
+      for (const key of ["STORAGE_ENDPOINT", "STORAGE_REGION", "STORAGE_BUCKET", "STORAGE_ACCESS_KEY_ID", "STORAGE_SECRET_ACCESS_KEY"] as const) {
+        if (!value[key]) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: `${key} is required when FILE_STORAGE_DRIVER=r2` });
+      }
+    }
   });
 
 export type Env = z.infer<typeof envSchema>;

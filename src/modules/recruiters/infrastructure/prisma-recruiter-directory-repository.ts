@@ -8,7 +8,7 @@ import type {
 import type { RecruiterDirectoryRepository } from "../application/ports/recruiter-directory-repository";
 
 type ApprovedProfileRow = Prisma.StudentPublicProfileGetPayload<{
-  include: { studentProfile: { include: { batch: true; user: true } } };
+  include: { studentProfile: { include: { batch: true; user: true } }; portfolioImages: true };
 }>;
 
 /**
@@ -46,7 +46,7 @@ export class PrismaRecruiterDirectoryRepository implements RecruiterDirectoryRep
 
     const rows = await this.prisma.studentPublicProfile.findMany({
       where: { AND: and },
-      include: { studentProfile: { include: { batch: true, user: true } } },
+      include: { studentProfile: { include: { batch: true, user: true } }, portfolioImages: { orderBy: { sortOrder: "asc" } } },
     });
 
     const dtos = rows.map(toDTO).sort((a, b) => a.fullName.localeCompare(b.fullName));
@@ -70,7 +70,7 @@ export class PrismaRecruiterDirectoryRepository implements RecruiterDirectoryRep
         studentProfileId: studentId,
         studentProfile: { isActive: true, batch: { status: "ACTIVE" } },
       },
-      include: { studentProfile: { include: { batch: true, user: true } } },
+      include: { studentProfile: { include: { batch: true, user: true } }, portfolioImages: { orderBy: { sortOrder: "asc" } } },
     });
 
     return row ? toDTO(row) : null;
@@ -83,7 +83,7 @@ export class PrismaRecruiterDirectoryRepository implements RecruiterDirectoryRep
         studentProfileId: { in: [...studentIds] },
         studentProfile: { isActive: true, batch: { status: "ACTIVE" } },
       },
-      include: { studentProfile: { include: { batch: true, user: true } } },
+      include: { studentProfile: { include: { batch: true, user: true } }, portfolioImages: { orderBy: { sortOrder: "asc" } } },
     });
     return rows.map(toDTO).sort((a, b) => a.fullName.localeCompare(b.fullName));
   }
@@ -152,6 +152,7 @@ export function toDTO(row: ApprovedProfileRow): RecruiterStudentProfileDTO {
     software: row.software,
     selectedProjects: row.selectedProjects as unknown as RecruiterStudentProfileDTO["selectedProjects"],
     portfolioLinks: row.portfolioLinks,
+    portfolioImages: (row.portfolioImages ?? []).map((image) => ({ id: image.id, fileId: image.fileId, title: image.title, caption: image.caption, sortOrder: image.sortOrder })),
     certifications: row.certifications as unknown as RecruiterStudentProfileDTO["certifications"],
     internships: row.internships as unknown as RecruiterStudentProfileDTO["internships"],
     hasResume: row.resumeFileId !== null,

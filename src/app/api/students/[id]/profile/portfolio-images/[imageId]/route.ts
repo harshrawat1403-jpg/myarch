@@ -1,0 +1,1 @@
+export { deletePortfolioImageRouteHandler as DELETE } from "@/modules/profiles";
