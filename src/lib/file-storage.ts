@@ -12,7 +12,7 @@ function assertSafeStorageKey(storageKey: string): void {
 function localPath(storageKey: string): string {
   assertSafeStorageKey(storageKey);
   const root = getEnv().FILE_STORAGE_ROOT!;
-  const absoluteRoot = path.isAbsolute(root) ? root : path.join(process.cwd(), root);
+  const absoluteRoot = path.isAbsolute(root) ? root : path.join(/* turbopackIgnore: true */ process.cwd(), root);
   const resolved = path.resolve(absoluteRoot, storageKey);
   if (!resolved.startsWith(`${absoluteRoot}${path.sep}`)) throw new Error("Storage key resolves outside the storage root");
   return resolved;
@@ -34,8 +34,9 @@ export async function saveFile(storageKey: string, data: Buffer): Promise<void> 
   const env = getEnv();
   if (env.FILE_STORAGE_DRIVER === "local") {
     const filePath = localPath(storageKey);
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, data);
+    const directory = path.dirname(filePath);
+    await fs.mkdir(/* turbopackIgnore: true */ directory, { recursive: true });
+    await fs.writeFile(/* turbopackIgnore: true */ filePath, data);
     return;
   }
   await getR2Client().send(new PutObjectCommand({ Bucket: env.STORAGE_BUCKET!, Key: storageKey, Body: data }));
@@ -44,7 +45,10 @@ export async function saveFile(storageKey: string, data: Buffer): Promise<void> 
 export async function readFile(storageKey: string): Promise<Buffer> {
   assertSafeStorageKey(storageKey);
   const env = getEnv();
-  if (env.FILE_STORAGE_DRIVER === "local") return fs.readFile(localPath(storageKey));
+  if (env.FILE_STORAGE_DRIVER === "local") {
+    const filePath = localPath(storageKey);
+    return fs.readFile(/* turbopackIgnore: true */ filePath);
+  }
   try {
     const body = (await getR2Client().send(new GetObjectCommand({ Bucket: env.STORAGE_BUCKET!, Key: storageKey }))).Body;
     if (!body) throw new Error("Stored object has no body");
@@ -59,7 +63,8 @@ export async function deleteFile(storageKey: string): Promise<void> {
   assertSafeStorageKey(storageKey);
   const env = getEnv();
   if (env.FILE_STORAGE_DRIVER === "local") {
-    await fs.rm(localPath(storageKey), { force: true });
+    const filePath = localPath(storageKey);
+    await fs.rm(/* turbopackIgnore: true */ filePath, { force: true });
     return;
   }
   await getR2Client().send(new DeleteObjectCommand({ Bucket: env.STORAGE_BUCKET!, Key: storageKey }));
