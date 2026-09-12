@@ -18,6 +18,7 @@ import { z } from "zod";
 const envSchema = z
   .object({
     DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+    DIRECT_URL: z.string().url().optional(),
 
     JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
     JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
@@ -66,6 +67,9 @@ const envSchema = z
     path: ["JWT_REFRESH_SECRET"],
   })
   .superRefine((value, ctx) => {
+    if (value.NODE_ENV === "production" && !value.DIRECT_URL) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["DIRECT_URL"], message: "DIRECT_URL is required when NODE_ENV=production" });
+    }
     if (value.FILE_STORAGE_DRIVER === "local" && !value.FILE_STORAGE_ROOT) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["FILE_STORAGE_ROOT"], message: "FILE_STORAGE_ROOT is required when FILE_STORAGE_DRIVER=local" });
     }
