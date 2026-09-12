@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isStrongEnoughPassword, PASSWORD_STRENGTH_MESSAGE } from "../domain/password-policy";
 
 /**
  * Server-side floor for any new password (self-service change or the
@@ -7,17 +8,11 @@ import { z } from "zod";
  * (src/lib/password-strength.ts) is client-only feedback; this is the one
  * place that floor is actually enforced.
  */
-function isStrongEnough(password: string): boolean {
-  if (password.length < 10) return false;
-  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^a-zA-Z0-9]/].filter((pattern) => pattern.test(password));
-  return classes.length >= 3;
-}
-
 export const ChangePasswordRequestSchema = z
   .object({
     currentPassword: z.string().min(1),
-    newPassword: z.string().refine(isStrongEnough, {
-      message: "Password must be at least 10 characters and include at least 3 of: lowercase, uppercase, digit, symbol",
+    newPassword: z.string().refine(isStrongEnoughPassword, {
+      message: PASSWORD_STRENGTH_MESSAGE,
     }),
   })
   .refine((value) => value.currentPassword !== value.newPassword, {
@@ -32,14 +27,14 @@ export const ForgotPasswordRequestSchema = z.object({
 
 export const ResetPasswordRequestSchema = z.object({
   token: z.string().min(1),
-  newPassword: z.string().refine(isStrongEnough, {
-    message: "Password must be at least 10 characters and include at least 3 of: lowercase, uppercase, digit, symbol",
+  newPassword: z.string().refine(isStrongEnoughPassword, {
+    message: PASSWORD_STRENGTH_MESSAGE,
   }),
 });
 
 /** MYARCH Phase 1 — signup's own password floor, identical policy, same reuse as ChangePasswordRequestSchema/ResetPasswordRequestSchema above. */
-export const SignupPasswordSchema = z.string().refine(isStrongEnough, {
-  message: "Password must be at least 10 characters and include at least 3 of: lowercase, uppercase, digit, symbol",
+export const SignupPasswordSchema = z.string().refine(isStrongEnoughPassword, {
+  message: PASSWORD_STRENGTH_MESSAGE,
 });
 
 export const VerifyEmailRequestSchema = z.object({
