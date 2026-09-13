@@ -11,6 +11,7 @@ import { ListRegisterableBatchesUseCase } from "../application/use-cases/list-re
 import { SearchRegistrationRequestsUseCase } from "../application/use-cases/search-registration-requests";
 import { GetRegistrationRequestUseCase } from "../application/use-cases/get-registration-request";
 import { MarkRegistrationRequestUseCase } from "../application/use-cases/mark-registration-request";
+import { ResendRegistrationVerificationUseCase } from "../application/use-cases/resend-registration-verification";
 import {
   DecideRegistrationRequestUseCase,
   type ApproveRegistrationTransactionContext,
@@ -56,6 +57,11 @@ export const markRegistrationRequestUseCase = new MarkRegistrationRequestUseCase
   auditRecorder,
   reviewerLookup,
   notificationService,
+});
+export const resendRegistrationVerificationUseCase = new ResendRegistrationVerificationUseCase({
+  registrationRequestRepository,
+  issueEmailVerificationToken: (input) => getIssueEmailVerificationTokenUseCase().execute(input),
+  auditRecorder,
 });
 
 /**

@@ -7,14 +7,14 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, FieldError } from "@/components/ui/input";
 
-type Status = "verifying" | "success" | "error";
+type Status = "verifying" | "success" | "error" | "resend";
 type ResendStatus = "idle" | "loading" | "sent" | "rate-limited" | "error";
 
 /** MYARCH Phase 1 (§2.4) — public, unauthenticated. Auto-submits the ?token= from the emailed verification link on mount. */
 export function VerifyEmailView() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
-  const [status, setStatus] = useState<Status>(token ? "verifying" : "error");
+  const [status, setStatus] = useState<Status>(token ? "verifying" : "resend");
   const [message, setMessage] = useState<string | null>(null);
 
   const [resendEmail, setResendEmail] = useState("");
@@ -117,8 +117,10 @@ export function VerifyEmailView() {
 
   return (
     <div className="mt-6">
-      <p className="text-center text-sm text-(--color-danger)">
-        {message ?? "This verification link is invalid or incomplete."}
+      <p className={`text-center text-sm ${status === "error" ? "text-(--color-danger)" : "text-(--color-text-secondary)"}`}>
+        {status === "resend"
+          ? "Enter your email address to receive a new verification link."
+          : message ?? "This verification link is invalid or has expired."}
       </p>
 
       {resendStatus === "sent" ? (

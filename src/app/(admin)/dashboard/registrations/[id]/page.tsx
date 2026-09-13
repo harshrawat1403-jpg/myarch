@@ -46,6 +46,7 @@ export default function RegistrationDetailPage() {
   const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [isDeciding, setIsDeciding] = useState(false);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
 
   const load = useCallback(async () => {
@@ -101,6 +102,24 @@ export default function RegistrationDetailPage() {
     }
   }
 
+  async function handleResendVerification() {
+    if (!accessToken || !request) return;
+    setIsResendingVerification(true);
+    try {
+      const result = await apiClient.post<{ resent: boolean }>(
+        `/api/registration/${request.id}/verification/resend`,
+        {},
+        accessToken,
+      );
+      toast.success(result.resent ? "Verification email requested." : "This email is already verified.");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to resend the verification email.");
+    } finally {
+      setIsResendingVerification(false);
+    }
+  }
+
   async function handleReject() {
     if (!accessToken || !request || !rejectionReason.trim()) return;
     setIsDeciding(true);
@@ -141,6 +160,7 @@ export default function RegistrationDetailPage() {
 
   const submittedData = request.submittedData;
   const isDecided = DECIDED_STATUSES.has(request.status);
+  const isEmailVerified = request.emailVerifiedAt !== null;
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -197,6 +217,24 @@ export default function RegistrationDetailPage() {
             <p className="mt-1 text-sm text-(--color-text-primary)">{request.rejectionReason}</p>
           </div>
         )}
+
+        <div className="rounded-lg border border-(--color-border) bg-(--color-surface-muted) p-3">
+          <DataLabel>Email status</DataLabel>
+          <p className="mt-1 text-sm text-(--color-text-primary)">
+            {isEmailVerified ? "Verified" : "Not verified"}
+          </p>
+          {!isDecided && canDecide && !isEmailVerified && (
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-3"
+              onClick={handleResendVerification}
+              disabled={isResendingVerification}
+            >
+              {isResendingVerification ? "Requesting verification email…" : "Resend verification email"}
+            </Button>
+          )}
+        </div>
       </Card>
 
       {!isDecided && (
@@ -242,7 +280,12 @@ export default function RegistrationDetailPage() {
             Approving creates a real student account for {request.fullName} and issues a temporary password.
             Rejecting notifies the applicant by email with the reason below — no account is ever created.
           </p>
-          <Button type="button" variant="primary" onClick={() => setIsApproveOpen(true)} disabled={isDeciding}>
+          {!isEmailVerified && (
+            <p className="text-sm text-(--color-danger)">
+              Approval is unavailable until the applicant verifies this email address.
+            </p>
+          )}
+          <Button type="button" variant="primary" onClick={() => setIsApproveOpen(true)} disabled={isDeciding || !isEmailVerified}>
             Approve
           </Button>
 

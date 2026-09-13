@@ -21,10 +21,10 @@ describe("VerifyEmailView — resend verification (MYARCH product-completion pas
     vi.stubGlobal("fetch", fetchMock);
   });
 
-  it("shows the invalid-link message and a resend form when no token is present", () => {
+  it("shows the resend guidance and a resend form when no token is present", () => {
     render(<VerifyEmailView />);
 
-    expect(screen.getByText(/invalid or incomplete/i)).toBeInTheDocument();
+    expect(screen.getByText(/enter your email address to receive a new verification link/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/resend the verification email/i)).toBeInTheDocument();
   });
 

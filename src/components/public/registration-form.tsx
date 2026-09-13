@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label } from "@/components/ui/input";
@@ -113,8 +114,12 @@ export function RegistrationForm() {
       <Card className="p-8 text-center shadow-lg lg:p-12">
         <DataLabel className="text-(--color-accent)">Application Received</DataLabel>
         <p className="mt-3 text-(--color-text-secondary)">
-          Thank you — your application has been submitted for review. The department will contact you at{" "}
-          <span className="font-medium text-(--color-text-primary)">{email}</span> once a decision is made.
+          Check <span className="font-medium text-(--color-text-primary)">{email}</span> for a verification link. You must
+          verify your email before the Secretary can approve your application. If it does not arrive, you can{" "}
+          <Link href="/verify-email" className="font-medium text-(--color-accent) hover:underline">
+            resend the verification email
+          </Link>
+          .
         </p>
       </Card>
     );

@@ -66,6 +66,8 @@ describe("RegistrationForm — public student registration (V4.0 B1)", () => {
       batchId: "batch-1",
     });
     expect(await screen.findByText(/application received/i)).toBeInTheDocument();
+    expect(screen.getByText(/verify your email before the secretary can approve/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /resend the verification email/i })).toHaveAttribute("href", "/verify-email");
   });
 
   it("shows the server's error message on a duplicate/conflict response, without showing the confirmation", async () => {
