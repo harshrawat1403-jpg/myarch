@@ -964,6 +964,10 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
       if (candidateIds.length) await tx.coreCommitteeSelectionCandidatePosition.deleteMany({ where: { candidateId: { in: candidateIds } } });
       await tx.coreCommitteeSelectionCandidate.deleteMany({ where: { selectionId: selection.id } });
       await tx.coreCommitteeSelectionDeadlineExtension.deleteMany({ where: { selectionId: selection.id } });
+      // The database trigger accepts this transaction-local escape hatch only
+      // for the explicitly authorized, confirmed permanent-delete workflow.
+      // PostgreSQL clears it automatically on commit or rollback.
+      await tx.$executeRaw`SELECT set_config('myarch.allow_core_publication_delete', 'on', true)`;
       await tx.coreCommitteeSelectionPublication.deleteMany({ where: { selectionId: selection.id } });
       await tx.coreCommitteeSelectionPosition.deleteMany({ where: { selectionId: selection.id } });
 

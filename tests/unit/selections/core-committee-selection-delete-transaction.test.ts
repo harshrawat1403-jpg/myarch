@@ -4,8 +4,10 @@ import { PrismaCoreCommitteeSelectionRepository } from "../../../src/modules/sel
 describe("Core Committee permanent deletion transaction", () => {
   it("deletes a legacy Draft selection through one bounded transaction client", async () => {
     const deleteMany = vi.fn().mockResolvedValue({ count: 0 });
+    const deletePublication = vi.fn().mockResolvedValue({ count: 0 });
     const tx = {
       $queryRaw: vi.fn().mockResolvedValue([]),
+      $executeRaw: vi.fn().mockResolvedValue(1),
       coreCommitteeSelection: {
         findUnique: vi.fn().mockResolvedValue({
           id: "selection", title: "Legacy Core", status: "DRAFT", positions: [], applicationForm: null,
@@ -22,7 +24,7 @@ describe("Core Committee permanent deletion transaction", () => {
       coreCommitteeSelectionScrutinyReview: { deleteMany },
       coreCommitteeSelectionCandidatePosition: { deleteMany },
       coreCommitteeSelectionDeadlineExtension: { deleteMany },
-      coreCommitteeSelectionPublication: { deleteMany },
+      coreCommitteeSelectionPublication: { deleteMany: deletePublication },
       coreCommitteeSelectionPosition: { deleteMany },
       coreCommitteeSelectionApplicationForm: { deleteMany },
       form: { delete: vi.fn() },
@@ -43,6 +45,11 @@ describe("Core Committee permanent deletion transaction", () => {
       expect.objectContaining({ maxWait: 10_000, timeout: 20_000, isolationLevel: "Serializable" }),
     );
     expect(tx.coreCommitteeSelection.delete).toHaveBeenCalledWith({ where: { id: "selection" } });
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(String(tx.$executeRaw.mock.calls[0]?.[0])).toContain("allow_core_publication_delete");
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      deletePublication.mock.invocationCallOrder[0]!,
+    );
     expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ targetEntityId: "selection" }),
     }));
@@ -51,8 +58,10 @@ describe("Core Committee permanent deletion transaction", () => {
 
   it("keeps a populated deletion and its audit record on the transaction client", async () => {
     const deleteMany = vi.fn().mockResolvedValue({ count: 1 });
+    const deletePublication = vi.fn().mockResolvedValue({ count: 1 });
     const tx = {
       $queryRaw: vi.fn().mockResolvedValue([]),
+      $executeRaw: vi.fn().mockResolvedValue(1),
       coreCommitteeSelection: {
         findUnique: vi.fn().mockResolvedValue({
           id: "selection", title: "Populated Core", status: "APPLICATION_OPEN", positions: [],
@@ -74,7 +83,7 @@ describe("Core Committee permanent deletion transaction", () => {
       coreCommitteeSelectionScrutinyReview: { deleteMany },
       coreCommitteeSelectionCandidatePosition: { deleteMany },
       coreCommitteeSelectionDeadlineExtension: { deleteMany },
-      coreCommitteeSelectionPublication: { deleteMany },
+      coreCommitteeSelectionPublication: { deleteMany: deletePublication },
       coreCommitteeSelectionPosition: { deleteMany },
       coreCommitteeSelectionApplicationForm: { deleteMany },
       form: { delete: vi.fn().mockResolvedValue({ id: "managed-form" }) },
@@ -98,6 +107,10 @@ describe("Core Committee permanent deletion transaction", () => {
       where: { candidateId: { in: ["candidate"] } },
     });
     expect(tx.form.delete).toHaveBeenCalledWith({ where: { id: "managed-form" } });
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      deletePublication.mock.invocationCallOrder[0]!,
+    );
     expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         targetEntityId: "selection",

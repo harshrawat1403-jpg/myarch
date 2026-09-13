@@ -102,6 +102,12 @@ describe.skipIf(!databaseUrl)("Core Committee selection PostgreSQL integrity", (
     await prisma.coreCommitteeSelectionCandidate.deleteMany({
       where: { selectionId: { in: selectionIds } },
     });
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('myarch.allow_core_publication_delete', 'on', true)`;
+      await tx.coreCommitteeSelectionPublication.deleteMany({
+        where: { selectionId: { in: selectionIds } },
+      });
+    });
     await prisma.coreCommitteeSelectionApplicationForm.deleteMany({
       where: { selectionId: { in: selectionIds } },
     });
@@ -135,6 +141,7 @@ describe.skipIf(!databaseUrl)("Core Committee selection PostgreSQL integrity", (
       secretaryId,
     );
     selectionIds.push(selection.id);
+    formIds.push(selection.applicationForm!.formId);
     const positioned = await repository.savePosition(
       selection.id,
       null,
@@ -157,6 +164,26 @@ describe.skipIf(!databaseUrl)("Core Committee selection PostgreSQL integrity", (
       await repository.transition(selection.id, "APPLICATION_OPEN", secretaryId);
     }
     return { selection, form, position: positioned.positions[0]! };
+  }
+  async function publishedFixture(title: string) {
+    const lockedAt = new Date();
+    const selection = await prisma.coreCommitteeSelection.create({
+      data: {
+        title,
+        academicYear: "2026-2027",
+        status: "PUBLISHED",
+        applicationOpenAt: new Date(Date.now() - 60000),
+        applicationCloseAt: new Date(Date.now() + 3600000),
+        configurationLockedAt: lockedAt,
+        configurationLockedByUserId: secretaryId,
+        createdByUserId: secretaryId,
+      },
+    });
+    selectionIds.push(selection.id);
+    const publication = await prisma.coreCommitteeSelectionPublication.create({
+      data: { selectionId: selection.id, publishedByUserId: secretaryId },
+    });
+    return { selection, publication };
   }
   it("creates a candidate only for an explicitly associated form and preserves generic applications", async () => {
     const generic = await fixture(false);
@@ -317,4 +344,85 @@ describe.skipIf(!databaseUrl)("Core Committee selection PostgreSQL integrity", (
       }),
     ).rejects.toThrow("immutable");
   });
+  it("keeps published Core publication records immutable except inside the permanent-delete transaction", async () => {
+    const direct = await publishedFixture("Direct publication guard");
+    await expect(
+      prisma.coreCommitteeSelectionPublication.delete({ where: { id: direct.publication.id } }),
+    ).rejects.toThrow("immutable");
+    await expect(
+      prisma.coreCommitteeSelectionPublication.update({
+        where: { id: direct.publication.id },
+        data: { publishedAt: new Date() },
+      }),
+    ).rejects.toThrow("immutable");
+
+    await expect(
+      prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT set_config('myarch.allow_core_publication_delete', 'on', true)`;
+        await tx.coreCommitteeSelectionPublication.delete({ where: { id: direct.publication.id } });
+        throw new Error("force rollback");
+      }),
+    ).rejects.toThrow("force rollback");
+    expect(
+      await prisma.coreCommitteeSelectionPublication.findUnique({ where: { id: direct.publication.id } }),
+    ).not.toBeNull();
+    await expect(
+      prisma.coreCommitteeSelectionPublication.delete({ where: { id: direct.publication.id } }),
+    ).rejects.toThrow("immutable");
+
+    const deletable = await publishedFixture("Published selection delete");
+    const unrelated = await publishedFixture("Unrelated publication");
+    await expect(repository.delete({
+      selectionId: deletable.selection.id,
+      actorUserId: secretaryId,
+      confirmation: "DELETE CORE SELECTION",
+    })).resolves.toEqual({ applications: 0, shortlisted: 0, interviews: 0 });
+    expect(
+      await prisma.coreCommitteeSelection.findUnique({ where: { id: deletable.selection.id } }),
+    ).toBeNull();
+    expect(
+      await prisma.coreCommitteeSelectionPublication.findUnique({ where: { id: unrelated.publication.id } }),
+    ).not.toBeNull();
+    await expect(
+      prisma.coreCommitteeSelectionPublication.delete({ where: { id: unrelated.publication.id } }),
+    ).rejects.toThrow("immutable");
+
+    const replacement = await repository.create({
+      title: "Replacement Core selection",
+      brief: "Replacement after mistaken publication deletion",
+      academicYear: "2026-2027",
+      applicationOpenAt: new Date(Date.now() + 60000),
+      applicationCloseAt: new Date(Date.now() + 3600000),
+      correctionOpenAt: null,
+      correctionCloseAt: null,
+      maxPositionsPerCandidate: 1,
+    }, secretaryId);
+    selectionIds.push(replacement.id);
+    formIds.push(replacement.applicationForm!.formId);
+    expect(replacement.id).not.toBe(deletable.selection.id);
+  });
+  it.each(["MEMBERSHIP_CONFIRMED", "ARCHIVED"] as const)(
+    "does not permanently delete %s Core selections",
+    async (status) => {
+      const lockedAt = new Date();
+      const selection = await prisma.coreCommitteeSelection.create({
+        data: {
+          title: `${status} Core selection`,
+          academicYear: "2026-2027",
+          status,
+          applicationOpenAt: new Date(Date.now() - 60000),
+          applicationCloseAt: new Date(Date.now() + 3600000),
+          configurationLockedAt: lockedAt,
+          configurationLockedByUserId: secretaryId,
+          createdByUserId: secretaryId,
+        },
+      });
+      selectionIds.push(selection.id);
+      await expect(repository.delete({
+        selectionId: selection.id,
+        actorUserId: secretaryId,
+        confirmation: "DELETE CORE SELECTION",
+      })).rejects.toThrow("cannot be permanently deleted");
+    },
+  );
 });

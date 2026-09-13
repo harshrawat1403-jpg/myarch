@@ -114,6 +114,18 @@ describe("Core Committee selection authority", () => {
     ).rejects.toBeInstanceOf(NotAuthorizedError);
     expect(repository.recordCouncilReview).not.toHaveBeenCalled();
   });
+  it("reserves permanent Core selection deletion for the Secretary", async () => {
+    const { useCases, repository } = setup();
+    await useCases.delete(secretary, "selection", { confirmation: "DELETE CORE SELECTION" });
+    expect(repository.delete).toHaveBeenCalledWith({
+      selectionId: "selection",
+      actorUserId: "secretary",
+      confirmation: "DELETE CORE SELECTION",
+    });
+    await expect(
+      useCases.delete(councilMember, "selection", { confirmation: "DELETE CORE SELECTION" }),
+    ).rejects.toBeInstanceOf(NotAuthorizedError);
+  });
   it("uses the internal projection only for the Secretary and the safe projection for current Council", async () => {
     const { useCases, repository } = setup();
     repository.internalProcessing.mockResolvedValue({ candidates: [{ decisions: [{ internalNote: "internal" }] }] });
