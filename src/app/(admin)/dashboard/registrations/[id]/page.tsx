@@ -280,12 +280,7 @@ export default function RegistrationDetailPage() {
             Approving creates a real student account for {request.fullName} and issues a temporary password.
             Rejecting notifies the applicant by email with the reason below — no account is ever created.
           </p>
-          {!isEmailVerified && (
-            <p className="text-sm text-(--color-danger)">
-              Approval is unavailable until the applicant verifies this email address.
-            </p>
-          )}
-          <Button type="button" variant="primary" onClick={() => setIsApproveOpen(true)} disabled={isDeciding || !isEmailVerified}>
+          <Button type="button" variant="primary" onClick={() => setIsApproveOpen(true)} disabled={isDeciding}>
             Approve
           </Button>
 
@@ -317,7 +312,7 @@ export default function RegistrationDetailPage() {
           setIsApproveOpen(false);
           setTempPassword(null);
         }}
-        pendingTitle="Approve this application?"
+        pendingTitle={isEmailVerified ? "Approve this application?" : "Email not verified"}
         revealedTitle="Student account created"
         tempPassword={tempPassword}
         description={
@@ -325,10 +320,17 @@ export default function RegistrationDetailPage() {
         }
       >
         <div className="space-y-4">
-          <p className="text-sm text-(--color-text-secondary)">
-            This creates a real student account for {request.fullName} in the selected batch and issues a temporary
-            password.
-          </p>
+          {isEmailVerified ? (
+            <p className="text-sm text-(--color-text-secondary)">
+              This creates a real student account for {request.fullName} in the selected batch and issues a temporary
+              password.
+            </p>
+          ) : (
+            <p className="text-sm text-(--color-danger)">
+              This applicant has not verified their email address. You are manually approving this registration and
+              creating the Student account anyway.
+            </p>
+          )}
           <div className="flex justify-end gap-3 border-t border-(--color-border) pt-4">
             <Button type="button" variant="ghost" onClick={() => setIsApproveOpen(false)} disabled={isDeciding}>
               Cancel

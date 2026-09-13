@@ -19,7 +19,6 @@ import {
   DuplicateRegistrationEmailError,
   DuplicateRegistrationRollNumberError,
   InvalidRegistrationTransitionError,
-  RegistrationEmailNotVerifiedError,
   RegistrationRequestNotFoundError,
 } from "../../domain/errors";
 import type { RegistrationRequestRepository } from "../ports/registration-request-repository";
@@ -157,13 +156,6 @@ export class DecideRegistrationRequestUseCase {
       return { request: updated };
     }
 
-    // MYARCH Phase 1 (§2.4) — a real account (and userId) is about to be
-    // created for this email; it must be verified first. Only gates
-    // APPROVE — REJECT above never creates an account, so it's unaffected.
-    if (!existing.emailVerifiedAt) {
-      throw new RegistrationEmailNotVerifiedError();
-    }
-
     // Create the student account, reset its password, and mark the request
     // decided — atomically. If any step fails (including a duplicate-email/
     // roll-number collision), Prisma rolls back everything above, so we
@@ -209,7 +201,10 @@ export class DecideRegistrationRequestUseCase {
         action: AUDIT_ACTIONS.REGISTRATION_REQUEST_APPROVED,
         targetEntityType: "RegistrationRequest",
         targetEntityId: existing.id,
-        metadata: { resultingStudentProfileId: txStudent.id },
+        metadata: {
+          resultingStudentProfileId: txStudent.id,
+          emailVerifiedAtApproval: existing.emailVerifiedAt !== null,
+        },
       });
 
       return { student: txStudent, tempPassword: txTempPassword, updated: txUpdated };

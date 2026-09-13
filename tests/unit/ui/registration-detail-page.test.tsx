@@ -52,14 +52,17 @@ describe("RegistrationDetailPage email verification", () => {
     mocks.post.mockReset();
   });
 
-  it("shows an unverified status, offers a resend action, and disables approval", async () => {
+  it("shows an unverified status, keeps approval available, and displays the manual-approval warning", async () => {
     mocks.get.mockResolvedValue(request(null));
+    const user = userEvent.setup();
     renderPage();
 
     expect(await screen.findByText("Not verified")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /resend verification email/i })).toBeEnabled();
-    expect(screen.getByRole("button", { name: /^approve$/i })).toBeDisabled();
-    expect(screen.getByText(/approval is unavailable until/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^approve$/i }));
+    expect(await screen.findByText("Email not verified")).toBeInTheDocument();
+    expect(screen.getByText(/manually approving this registration/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /approve & create account/i })).toBeEnabled();
   });
 
   it("requests a registration-bound resend for an unverified applicant", async () => {
