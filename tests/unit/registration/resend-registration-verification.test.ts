@@ -40,7 +40,7 @@ function registration(overrides: Partial<RegistrationRequestRecord> = {}): Regis
 function setup() {
   const registrationRequestRepository = new InMemoryRegistrationRequestRepository();
   const auditRecorder = new FakeAuditRecorder();
-  const issueEmailVerificationToken = vi.fn().mockResolvedValue(undefined);
+  const issueEmailVerificationToken = vi.fn().mockResolvedValue({ emailSent: true });
   const useCase = new ResendRegistrationVerificationUseCase({
     registrationRequestRepository,
     issueEmailVerificationToken,
@@ -59,7 +59,10 @@ describe("ResendRegistrationVerificationUseCase", () => {
   it("recovers a legacy unverified request even when no earlier token exists", async () => {
     ctx.registrationRequestRepository.seed(registration());
 
-    await expect(ctx.useCase.execute({ actor: SECRETARY, requestId: "legacy-request-1" })).resolves.toEqual({ resent: true });
+    await expect(ctx.useCase.execute({ actor: SECRETARY, requestId: "legacy-request-1" })).resolves.toEqual({
+      resent: true,
+      emailSent: true,
+    });
 
     expect(ctx.issueEmailVerificationToken).toHaveBeenCalledWith({
       email: "legacy.applicant@example.edu",
@@ -73,6 +76,17 @@ describe("ResendRegistrationVerificationUseCase", () => {
       targetEntityId: "legacy-request-1",
     }));
     expect(JSON.stringify(ctx.auditRecorder.entries)).not.toContain("token");
+  });
+
+  it("reports a transport failure without marking the request verified", async () => {
+    ctx.registrationRequestRepository.seed(registration());
+    ctx.issueEmailVerificationToken.mockResolvedValueOnce({ emailSent: false });
+
+    await expect(ctx.useCase.execute({ actor: SECRETARY, requestId: "legacy-request-1" })).resolves.toEqual({
+      resent: true,
+      emailSent: false,
+    });
+    expect((await ctx.registrationRequestRepository.findById("legacy-request-1"))?.emailVerifiedAt).toBeNull();
   });
 
   it("does not issue another token for an already verified request", async () => {

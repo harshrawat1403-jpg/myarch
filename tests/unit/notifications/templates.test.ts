@@ -79,6 +79,26 @@ describe("renderEmailTemplate — ACCOUNT_CREDENTIALS_ISSUED", () => {
   });
 });
 
+describe("renderEmailTemplate — ACCOUNT_CREDENTIALS_DELIVERY", () => {
+  it("renders the direct-only account-created email with the new temporary password", () => {
+    const message = renderEmailTemplate(
+      "ACCOUNT_CREDENTIALS_DELIVERY",
+      {
+        recipientName: "Priya New Student",
+        loginUrl: "https://myarch.example.edu/login",
+        loginEmail: "priya@example.edu",
+        temporaryPassword: "NewTemp123!",
+      },
+      "priya@example.edu",
+    );
+
+    expect(message.subject).toBe("Your MYARCH account has been created");
+    expect(message.text).toContain("NewTemp123!");
+    expect(message.text).toContain("https://myarch.example.edu/login");
+    expect(message.html).toContain("priya@example.edu");
+  });
+});
+
 describe("shared email layout — branding and footer applied uniformly", () => {
   it("every template's html includes the TNPArch brand name and the automated-message footer", () => {
     const approved = renderEmailTemplate("PROFILE_APPROVED", { studentName: "Alice" }, "a@vnit.ac.in");

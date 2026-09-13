@@ -1,4 +1,8 @@
-import type { AuthenticatedActor, IssueEmailVerificationTokenInput } from "@/modules/auth";
+import type {
+  AuthenticatedActor,
+  EmailVerificationDeliveryResult,
+  IssueEmailVerificationTokenInput,
+} from "@/modules/auth";
 import { canDecideRegistrationRequest } from "@/modules/auth";
 import { NotAuthorizedError } from "@/lib/errors";
 import { AUDIT_ACTIONS } from "@/lib/audit-actions";
@@ -31,11 +35,11 @@ export interface ResendRegistrationVerificationInput {
 export class ResendRegistrationVerificationUseCase {
   constructor(private readonly deps: {
     registrationRequestRepository: RegistrationRequestRepository;
-    issueEmailVerificationToken: (input: IssueEmailVerificationTokenInput) => Promise<void>;
+    issueEmailVerificationToken: (input: IssueEmailVerificationTokenInput) => Promise<EmailVerificationDeliveryResult>;
     auditRecorder: AuditRecorder;
   }) {}
 
-  async execute(input: ResendRegistrationVerificationInput): Promise<{ resent: boolean }> {
+  async execute(input: ResendRegistrationVerificationInput): Promise<{ resent: boolean; emailSent?: boolean }> {
     if (!canDecideRegistrationRequest(input.actor)) {
       throw new NotAuthorizedError("Not authorized to resend registration verification emails");
     }
@@ -47,7 +51,7 @@ export class ResendRegistrationVerificationUseCase {
     }
     if (request.emailVerifiedAt) return { resent: false };
 
-    await this.deps.issueEmailVerificationToken({
+    const delivery = await this.deps.issueEmailVerificationToken({
       email: request.email,
       recipientName: request.fullName,
       registrationRequestId: request.id,
@@ -58,8 +62,9 @@ export class ResendRegistrationVerificationUseCase {
       action: AUDIT_ACTIONS.REGISTRATION_VERIFICATION_RESENT,
       targetEntityType: "RegistrationRequest",
       targetEntityId: request.id,
+      metadata: { emailSent: delivery.emailSent },
     });
 
-    return { resent: true };
+    return { resent: true, emailSent: delivery.emailSent };
   }
 }

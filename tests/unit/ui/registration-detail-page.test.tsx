@@ -80,6 +80,17 @@ describe("RegistrationDetailPage email verification", () => {
     ));
   });
 
+  it("shows a safe delivery-failure message when verification transport rejects the resend", async () => {
+    mocks.get.mockResolvedValue(request(null));
+    mocks.post.mockResolvedValue({ resent: true, emailSent: false });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: /resend verification email/i }));
+
+    expect(await screen.findByText(/verification link could not be sent/i)).toBeInTheDocument();
+  });
+
   it("shows verified status and enables approval", async () => {
     mocks.get.mockResolvedValue(request("2026-09-13T00:00:00.000Z"));
     renderPage();
@@ -87,5 +98,32 @@ describe("RegistrationDetailPage email verification", () => {
     expect(await screen.findByText("Verified")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /resend verification email/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^approve$/i })).toBeEnabled();
+  });
+
+  it("shows credential-delivery status and a confirmed credentials reset after approval", async () => {
+    mocks.get.mockResolvedValue(request("2026-09-13T00:00:00.000Z"));
+    mocks.post
+      .mockResolvedValueOnce({
+        request: { ...request("2026-09-13T00:00:00.000Z"), status: "APPROVED", resultingStudentProfileId: "student-1" },
+        tempPassword: "InitialTemp123!",
+        credentialsEmailSent: false,
+      })
+      .mockResolvedValueOnce({ tempPassword: "NewTemp123!", credentialsEmailSent: true });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: /^approve$/i }));
+    await user.click(screen.getByRole("button", { name: /approve & create account/i }));
+
+    expect(await screen.findByText(/account created, but credentials email could not be sent/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /resend account credentials/i }));
+    expect(await screen.findByText(/resending credentials will generate a new temporary password/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /generate & send credentials/i }));
+
+    await waitFor(() => expect(mocks.post).toHaveBeenCalledWith(
+      "/api/registration/request-1/credentials/resend",
+      {},
+      "secretary-token",
+    ));
   });
 });

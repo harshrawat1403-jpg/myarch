@@ -64,6 +64,7 @@ function buildContext() {
   });
   const resetPassword = vi.fn().mockResolvedValue({ tempPassword: "Temp1234!" });
   const sendRejectionEmail = vi.fn().mockResolvedValue(undefined);
+  const sendAccountCredentialsEmail = vi.fn().mockResolvedValue(true);
   const notificationService = new FakeNotificationService();
 
   // Fake stand-in for the real prisma.$transaction-backed implementation
@@ -84,6 +85,7 @@ function buildContext() {
       return { result, deferredNotifications: [] };
     },
     sendRejectionEmail,
+    sendAccountCredentialsEmail,
     auditRecorder,
     notificationService,
   });
@@ -94,6 +96,7 @@ function buildContext() {
     createStudent,
     resetPassword,
     sendRejectionEmail,
+    sendAccountCredentialsEmail,
     notificationService,
     useCase,
   };
@@ -182,6 +185,26 @@ describe("DecideRegistrationRequestUseCase", () => {
         }),
       );
       expect(result.tempPassword).toBe("Temp1234!");
+    });
+
+    it("sends the new credential only after approval succeeds, without putting it in an audit payload", async () => {
+      const result = await ctx.useCase.execute({ actor: SECRETARY, requestId: "req-1", decision: "APPROVE" });
+
+      expect(ctx.sendAccountCredentialsEmail).toHaveBeenCalledWith({
+        recipientName: "Priya New Student",
+        recipientEmail: "prospective@example.com",
+        temporaryPassword: "Temp1234!",
+      });
+      expect(result.credentialsEmailSent).toBe(true);
+      expect(JSON.stringify(ctx.auditRecorder.entries)).not.toContain("Temp1234!");
+    });
+
+    it("keeps the committed account approval when credential delivery fails", async () => {
+      ctx.sendAccountCredentialsEmail.mockResolvedValueOnce(false);
+      const result = await ctx.useCase.execute({ actor: SECRETARY, requestId: "req-1", decision: "APPROVE" });
+
+      expect(result.request.status).toBe("APPROVED");
+      expect(result.credentialsEmailSent).toBe(false);
     });
 
     it("marks the request APPROVED with the resulting studentProfileId", async () => {

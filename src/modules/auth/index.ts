@@ -90,6 +90,7 @@ export {
   getVerifyEmailUseCase,
 } from "./infrastructure/container";
 export type {
+  EmailVerificationDeliveryResult,
   IssueEmailVerificationTokenInput,
 } from "./application/use-cases/issue-email-verification";
 export type { VerifyEmailResult } from "./application/use-cases/verify-email";

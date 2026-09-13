@@ -60,8 +60,8 @@ export class ResendEmailVerificationUseCase {
     // Best-effort, matching IssueEmailVerificationTokenUseCase — logged
     // (never the token/URL) so a misconfigured/failing provider is visible
     // in server logs instead of silently vanishing.
-    await this.deps.sendEmail(rendered).catch((err: unknown) => {
-      console.error("[auth] failed to send email-verification email", err);
+    await this.deps.sendEmail(rendered).catch(() => {
+      console.error("[auth] email-verification delivery failed");
     });
   }
 }

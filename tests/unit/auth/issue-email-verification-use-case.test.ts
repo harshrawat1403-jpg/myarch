@@ -54,7 +54,7 @@ describe("IssueEmailVerificationTokenUseCase", () => {
     expect(ctx.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: "a@x.com" }));
   });
 
-  it("never throws when the email send itself fails (best-effort)", async () => {
+  it("returns a safe delivery failure after persisting the verification token", async () => {
     const emailVerificationTokenRepository = new InMemoryEmailVerificationTokenRepository();
     const sendEmail = vi.fn().mockRejectedValue(new Error("smtp down"));
     const useCase = new IssueEmailVerificationTokenUseCase({
@@ -66,8 +66,15 @@ describe("IssueEmailVerificationTokenUseCase", () => {
 
     await expect(
       useCase.execute({ email: "a@x.com", recipientName: "A", userId: "user-1" }),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ emailSent: false });
     expect(emailVerificationTokenRepository.all()).toHaveLength(1);
+  });
+
+  it("returns a successful delivery result when transport accepts the email", async () => {
+    const ctx = buildUseCase();
+    await expect(
+      ctx.useCase.execute({ email: "a@x.com", recipientName: "A", userId: "user-1" }),
+    ).resolves.toEqual({ emailSent: true });
   });
 
   it("sets an expiry roughly 24 hours out", async () => {

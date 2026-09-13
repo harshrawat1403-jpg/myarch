@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import type { PrismaTransactionClient } from "@/lib/prisma";
+import { getEnv } from "@/config/env";
 import { PrismaBatchLookup } from "@/lib/batch-lookup";
 import { PrismaAuditRecorder } from "@/lib/audit";
 import { buildAdminResetPasswordUseCase, getIssueEmailVerificationTokenUseCase } from "@/modules/auth";
 import { buildCreateStudentUseCase } from "@/modules/students";
-import { sendDirectEmail, notificationService } from "@/modules/notifications";
+import { renderEmailTemplate, sendDirectEmail, notificationService } from "@/modules/notifications";
 import type { NotificationRequest, NotificationService } from "@/modules/notifications";
 import { SubmitRegistrationRequestUseCase } from "../application/use-cases/submit-registration-request";
 import { ListRegisterableBatchesUseCase } from "../application/use-cases/list-registerable-batches";
@@ -12,6 +13,10 @@ import { SearchRegistrationRequestsUseCase } from "../application/use-cases/sear
 import { GetRegistrationRequestUseCase } from "../application/use-cases/get-registration-request";
 import { MarkRegistrationRequestUseCase } from "../application/use-cases/mark-registration-request";
 import { ResendRegistrationVerificationUseCase } from "../application/use-cases/resend-registration-verification";
+import {
+  ResendRegistrationCredentialsUseCase,
+  type RegistrationCredentialsTransactionContext,
+} from "../application/use-cases/resend-registration-credentials";
 import {
   DecideRegistrationRequestUseCase,
   type ApproveRegistrationTransactionContext,
@@ -65,6 +70,35 @@ export const resendRegistrationVerificationUseCase = new ResendRegistrationVerif
 });
 
 /**
+ * Renders and sends a password-bearing message only after a database
+ * transaction has committed. This deliberately bypasses NotificationService
+ * because its payload and job records persist their context.
+ */
+async function sendAccountCredentialsEmail(input: {
+  recipientName: string;
+  recipientEmail: string;
+  temporaryPassword: string;
+}): Promise<boolean> {
+  const rendered = renderEmailTemplate(
+    "ACCOUNT_CREDENTIALS_DELIVERY",
+    {
+      recipientName: input.recipientName,
+      loginUrl: `${getEnv().APP_BASE_URL}/login`,
+      loginEmail: input.recipientEmail,
+      temporaryPassword: input.temporaryPassword,
+    },
+    input.recipientEmail,
+  );
+  try {
+    await sendDirectEmail(rendered);
+    return true;
+  } catch {
+    console.error("[registration] account-credentials delivery failed");
+    return false;
+  }
+}
+
+/**
  * Runs the APPROVE path's create-student + reset-password + decide writes
  * (plus the approval audit entry) as one atomic Prisma transaction — see
  * DecideRegistrationRequestUseCaseDeps.runApproveTransaction's own doc
@@ -96,10 +130,36 @@ async function runApproveTransaction<T>(
   });
 }
 
+async function runCredentialsResetTransaction<T>(
+  fn: (ctx: RegistrationCredentialsTransactionContext) => Promise<T>,
+): Promise<{ result: T; deferredNotifications: NotificationRequest[] }> {
+  return prisma.$transaction(async (tx) => {
+    const deferredNotifications: NotificationRequest[] = [];
+    const deferredNotifier: NotificationService = {
+      notify: async (request) => {
+        deferredNotifications.push(request);
+      },
+    };
+    const result = await fn({
+      resetPassword: (input) => buildAdminResetPasswordUseCase(tx, deferredNotifier).execute(input),
+      auditRecorder: new PrismaAuditRecorder(tx),
+    });
+    return { result, deferredNotifications };
+  });
+}
+
 export const decideRegistrationRequestUseCase = new DecideRegistrationRequestUseCase({
   registrationRequestRepository,
   runApproveTransaction,
   sendRejectionEmail: (message) => sendDirectEmail(message),
+  sendAccountCredentialsEmail,
   auditRecorder,
+  notificationService,
+});
+
+export const resendRegistrationCredentialsUseCase = new ResendRegistrationCredentialsUseCase({
+  registrationRequestRepository,
+  runCredentialsResetTransaction,
+  sendAccountCredentialsEmail,
   notificationService,
 });

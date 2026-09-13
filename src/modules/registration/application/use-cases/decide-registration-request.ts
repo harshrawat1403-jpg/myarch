@@ -41,6 +41,8 @@ export interface DecideRegistrationRequestResult {
   request: RegistrationRequestRecord;
   /** Plaintext — reveal-once. Only present on APPROVE. */
   tempPassword?: string;
+  /** Only present on APPROVE. Account creation succeeds even if delivery fails. */
+  credentialsEmailSent?: boolean;
 }
 
 /**
@@ -84,6 +86,12 @@ export interface DecideRegistrationRequestUseCaseDeps {
     text: string;
     html: string;
   }) => Promise<void>;
+  /** Direct-only, secret-bearing mail sent after the approval transaction commits. */
+  sendAccountCredentialsEmail: (input: {
+    recipientName: string;
+    recipientEmail: string;
+    temporaryPassword: string;
+  }) => Promise<boolean>;
   auditRecorder: AuditRecorder;
   /** V4.0 E2 — REGISTRATION_DECIDED on APPROVE, where a real account (and userId) now exists. */
   notificationService: NotificationService;
@@ -226,6 +234,17 @@ export class DecideRegistrationRequestUseCase {
       context: { applicantName: student.fullName, decision: "APPROVED" },
     });
 
-    return { request: updated, tempPassword };
+    // The database transaction has committed. A provider outage must not
+    // undo the account, password reset, approval audit, or notification
+    // history that is already durable.
+    const credentialsEmailSent = await this.deps
+      .sendAccountCredentialsEmail({
+        recipientName: student.fullName,
+        recipientEmail: existing.email,
+        temporaryPassword: tempPassword,
+      })
+      .catch(() => false);
+
+    return { request: updated, tempPassword, credentialsEmailSent };
   }
 }

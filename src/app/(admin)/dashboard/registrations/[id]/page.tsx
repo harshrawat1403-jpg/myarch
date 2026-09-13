@@ -15,6 +15,7 @@ import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { DataLabel } from "@/components/ui/typography";
 import { useToast } from "@/components/ui/toast";
 import { RevealPasswordModal } from "@/components/ui/reveal-password-modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 function statusBadgeVariant(status: RegistrationRequestRecord["status"]): BadgeVariant {
   if (status === "APPROVED") return "approved";
@@ -45,8 +46,12 @@ export default function RegistrationDetailPage() {
 
   const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [credentialsEmailSent, setCredentialsEmailSent] = useState<boolean | null>(null);
   const [isDeciding, setIsDeciding] = useState(false);
   const [isResendingVerification, setIsResendingVerification] = useState(false);
+  const [isResendingCredentials, setIsResendingCredentials] = useState(false);
+  const [isCredentialsResendOpen, setIsCredentialsResendOpen] = useState(false);
+  const [resentTempPassword, setResentTempPassword] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
 
   const load = useCallback(async () => {
@@ -87,12 +92,17 @@ export default function RegistrationDetailPage() {
     if (!accessToken || !request) return;
     setIsDeciding(true);
     try {
-      const result = await apiClient.post<{ request: RegistrationRequestRecord; tempPassword?: string }>(
+      const result = await apiClient.post<{
+        request: RegistrationRequestRecord;
+        tempPassword?: string;
+        credentialsEmailSent?: boolean;
+      }>(
         `/api/registration/${request.id}/decide`,
         { decision: "APPROVE" },
         accessToken,
       );
       setTempPassword(result.tempPassword ?? null);
+      setCredentialsEmailSent(result.credentialsEmailSent ?? false);
       setRequest(result.request);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Unable to approve this application.");
@@ -106,17 +116,47 @@ export default function RegistrationDetailPage() {
     if (!accessToken || !request) return;
     setIsResendingVerification(true);
     try {
-      const result = await apiClient.post<{ resent: boolean }>(
+      const result = await apiClient.post<{ resent: boolean; emailSent?: boolean }>(
         `/api/registration/${request.id}/verification/resend`,
         {},
         accessToken,
       );
-      toast.success(result.resent ? "Verification email requested." : "This email is already verified.");
+      if (!result.resent) {
+        toast.success("This email is already verified.");
+      } else if (result.emailSent) {
+        toast.success("Verification email sent.");
+      } else {
+        toast.error("Verification link could not be sent. Check email configuration or try again.");
+      }
       await load();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Unable to resend the verification email.");
     } finally {
       setIsResendingVerification(false);
+    }
+  }
+
+  async function handleResendCredentials() {
+    if (!accessToken || !request) return;
+    setIsResendingCredentials(true);
+    try {
+      const result = await apiClient.post<{ tempPassword: string; credentialsEmailSent: boolean }>(
+        `/api/registration/${request.id}/credentials/resend`,
+        {},
+        accessToken,
+      );
+      setResentTempPassword(result.tempPassword);
+      setCredentialsEmailSent(result.credentialsEmailSent);
+      if (result.credentialsEmailSent) {
+        toast.success("New account credentials were emailed.");
+      } else {
+        toast.error("A new account password was created, but the credentials email could not be sent.");
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Unable to resend account credentials.");
+      setIsCredentialsResendOpen(false);
+    } finally {
+      setIsResendingCredentials(false);
     }
   }
 
@@ -234,6 +274,36 @@ export default function RegistrationDetailPage() {
               {isResendingVerification ? "Requesting verification email…" : "Resend verification email"}
             </Button>
           )}
+          {request.status === "APPROVED" && canDecide && (
+            <div className="mt-3 border-t border-(--color-border) pt-3">
+              <DataLabel>Account</DataLabel>
+              <p className="mt-1 text-sm text-(--color-text-primary)">Created</p>
+              <DataLabel className="mt-3">Login email</DataLabel>
+              <p className="mt-1 text-sm text-(--color-text-primary)">{request.email}</p>
+              <DataLabel className="mt-3">Credential email</DataLabel>
+              <p className="mt-1 text-sm text-(--color-text-primary)">
+                {credentialsEmailSent === true
+                  ? "Sent"
+                  : credentialsEmailSent === false
+                    ? "Delivery failed"
+                    : "Not sent"}
+              </p>
+              {credentialsEmailSent === false && (
+                <p className="mt-1 text-sm text-(--color-danger)">
+                  Account created, but credentials email could not be sent.
+                </p>
+              )}
+              <Button
+                type="button"
+                variant="secondary"
+                className="mt-3"
+                onClick={() => setIsCredentialsResendOpen(true)}
+                disabled={isResendingCredentials}
+              >
+                Resend Account Credentials
+              </Button>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -340,6 +410,32 @@ export default function RegistrationDetailPage() {
             </Button>
           </div>
         </div>
+      </RevealPasswordModal>
+
+      <ConfirmDialog
+        isOpen={isCredentialsResendOpen && resentTempPassword === null}
+        onClose={() => setIsCredentialsResendOpen(false)}
+        onConfirm={handleResendCredentials}
+        title="Resend account credentials?"
+        description="Resending credentials will generate a new temporary password and invalidate the previous temporary password."
+        confirmLabel="Generate & Send Credentials"
+        isConfirming={isResendingCredentials}
+      />
+
+      <RevealPasswordModal
+        isOpen={isCredentialsResendOpen && resentTempPassword !== null}
+        onClose={() => {
+          setIsCredentialsResendOpen(false);
+          setResentTempPassword(null);
+        }}
+        pendingTitle="Resend account credentials?"
+        revealedTitle="New student credentials created"
+        tempPassword={resentTempPassword}
+        description={
+          <>This new temporary password replaces the prior password and must be changed after the student signs in.</>
+        }
+      >
+        <span />
       </RevealPasswordModal>
     </div>
   );

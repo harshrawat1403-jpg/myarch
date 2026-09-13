@@ -8,6 +8,7 @@ import type {
   CreateRegistrationRequestData,
   DecideRegistrationRequestData,
   MarkRegistrationRequestData,
+  RegistrationCredentialsTarget,
   RegistrationRequestRepository,
 } from "../application/ports/registration-request-repository";
 
@@ -94,6 +95,26 @@ export class PrismaRegistrationRequestRepository implements RegistrationRequestR
       },
     });
     return toDomain(row);
+  }
+
+  async findCredentialsTarget(id: string): Promise<RegistrationCredentialsTarget | null> {
+    const row = await this.prisma.registrationRequest.findUnique({
+      where: { id },
+      select: {
+        status: true,
+        email: true,
+        resultingStudentProfile: {
+          select: { userId: true, batchId: true, fullName: true },
+        },
+      },
+    });
+    if (row?.status !== "APPROVED" || !row.resultingStudentProfile) return null;
+    return {
+      userId: row.resultingStudentProfile.userId,
+      batchId: row.resultingStudentProfile.batchId,
+      fullName: row.resultingStudentProfile.fullName,
+      email: row.email,
+    };
   }
 
   async markEmailVerified(id: string): Promise<void> {

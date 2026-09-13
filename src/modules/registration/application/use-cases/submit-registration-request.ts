@@ -1,6 +1,6 @@
 import type { BatchLookup } from "@/lib/batch-lookup";
 import type { NotificationService } from "@/modules/notifications";
-import type { IssueEmailVerificationTokenInput } from "@/modules/auth";
+import type { EmailVerificationDeliveryResult, IssueEmailVerificationTokenInput } from "@/modules/auth";
 import type { RegistrationRequestRecord, RegistrationSubmittedData } from "../../domain/entities";
 import {
   DuplicateRegistrationEmailError,
@@ -27,7 +27,7 @@ export interface SubmitRegistrationRequestUseCaseDeps {
   reviewerLookup: RegistrationReviewerLookup;
   notificationService: NotificationService;
   /** MYARCH Phase 1 (§2.4) — injected rather than importing auth's use case directly, matching this module's existing dependency-injection convention for every other cross-module primitive (runApproveTransaction, sendRejectionEmail, ...). */
-  issueEmailVerificationToken: (input: IssueEmailVerificationTokenInput) => Promise<void>;
+  issueEmailVerificationToken: (input: IssueEmailVerificationTokenInput) => Promise<EmailVerificationDeliveryResult>;
 }
 
 /**

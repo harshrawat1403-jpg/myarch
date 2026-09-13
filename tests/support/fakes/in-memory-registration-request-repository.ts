@@ -4,6 +4,7 @@ import type {
   CreateRegistrationRequestData,
   DecideRegistrationRequestData,
   MarkRegistrationRequestData,
+  RegistrationCredentialsTarget,
   RegistrationRequestRepository,
 } from "../../../src/modules/registration/application/ports/registration-request-repository";
 
@@ -95,6 +96,17 @@ export class InMemoryRegistrationRequestRepository implements RegistrationReques
     };
     this.byId.set(id, updated);
     return updated;
+  }
+
+  async findCredentialsTarget(id: string): Promise<RegistrationCredentialsTarget | null> {
+    const request = this.byId.get(id);
+    if (!request || request.status !== "APPROVED" || !request.resultingStudentProfileId) return null;
+    return {
+      userId: `user-${request.resultingStudentProfileId}`,
+      batchId: request.batchId,
+      fullName: request.fullName,
+      email: request.email,
+    };
   }
 
   async markEmailVerified(id: string): Promise<void> {

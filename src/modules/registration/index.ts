@@ -26,6 +26,7 @@ export { getRegistrationRequestRouteHandler } from "./presentation/route-handler
 export { markRegistrationRequestRouteHandler } from "./presentation/route-handlers/mark";
 export { decideRegistrationRequestRouteHandler } from "./presentation/route-handlers/decide";
 export { resendRegistrationVerificationRouteHandler } from "./presentation/route-handlers/resend-verification";
+export { resendRegistrationCredentialsRouteHandler } from "./presentation/route-handlers/resend-credentials";
 
 // MYARCH Phase 1 (§2.4) — consumed only by /api/auth/verify-email/route.ts
 // (never by the auth module itself — see that route's own doc comment for

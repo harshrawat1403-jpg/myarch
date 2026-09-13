@@ -1,4 +1,4 @@
-import type { IssueEmailVerificationTokenInput } from "@/modules/auth";
+import type { EmailVerificationDeliveryResult, IssueEmailVerificationTokenInput } from "@/modules/auth";
 import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import type { AuditRecorder } from "@/lib/audit";
 import type { NotificationService } from "@/modules/notifications";
@@ -25,7 +25,7 @@ export interface SignupAlumniUseCaseDeps {
   /** Injected — see auth's hashPassword export for why this isn't PasswordHasher/BcryptPasswordHasher imported directly. */
   hashPassword: (plaintext: string) => Promise<string>;
   /** Injected, matching SignupRecruiterUseCase's identical dependency. */
-  issueEmailVerificationToken: (input: IssueEmailVerificationTokenInput) => Promise<void>;
+  issueEmailVerificationToken: (input: IssueEmailVerificationTokenInput) => Promise<EmailVerificationDeliveryResult>;
 }
 
 /**

@@ -1,7 +1,15 @@
 import type { NotificationTemplateId } from "../../domain/entities";
 import type { RenderedEmailMessage } from "../ports/email-provider";
 import { EMAIL_TEMPLATE_REGISTRY, IN_APP_TEMPLATE_REGISTRY } from "./registry";
+import { accountCredentialsDeliveryTemplate } from "./definitions/account-credentials-delivery";
 import { wrapHtml, wrapText } from "./layout";
+
+/**
+ * Direct-only templates may contain one-time secrets. They intentionally do
+ * not belong to NotificationTemplateId, preventing NotificationService from
+ * accepting and persisting their context in Notification/Job payloads.
+ */
+export type DirectEmailTemplateId = NotificationTemplateId | "ACCOUNT_CREDENTIALS_DELIVERY";
 
 /**
  * Pure, synchronous, no I/O — this is why template rendering isn't behind a
@@ -10,11 +18,14 @@ import { wrapHtml, wrapText } from "./layout";
  * compose. NotificationService calls this directly.
  */
 export function renderEmailTemplate(
-  templateId: NotificationTemplateId,
+  templateId: DirectEmailTemplateId,
   context: Record<string, unknown>,
   recipientEmail: string,
 ): RenderedEmailMessage {
-  const definition = EMAIL_TEMPLATE_REGISTRY[templateId];
+  const definition =
+    templateId === "ACCOUNT_CREDENTIALS_DELIVERY"
+      ? accountCredentialsDeliveryTemplate
+      : EMAIL_TEMPLATE_REGISTRY[templateId];
   return {
     to: recipientEmail,
     subject: definition.subject(context),

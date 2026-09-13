@@ -25,6 +25,14 @@ export interface DecideRegistrationRequestData {
   resultingStudentProfileId?: string;
 }
 
+/** Account identity needed only to issue a fresh registration credential. */
+export interface RegistrationCredentialsTarget {
+  readonly userId: string;
+  readonly batchId: string;
+  readonly fullName: string;
+  readonly email: string;
+}
+
 export interface RegistrationRequestRepository {
   create(data: CreateRegistrationRequestData): Promise<RegistrationRequestRecord>;
   findById(id: string): Promise<RegistrationRequestRecord | null>;
@@ -34,6 +42,8 @@ export interface RegistrationRequestRepository {
   search(filters: RegistrationRequestSearchFilters): Promise<RegistrationRequestRecord[]>;
   mark(id: string, data: MarkRegistrationRequestData): Promise<RegistrationRequestRecord>;
   decide(id: string, data: DecideRegistrationRequestData): Promise<RegistrationRequestRecord>;
+  /** Null unless an APPROVED request is linked to its resulting Student account. */
+  findCredentialsTarget(id: string): Promise<RegistrationCredentialsTarget | null>;
 
   /** MYARCH Phase 1 — called only from /api/auth/verify-email/route.ts once VerifyEmailUseCase confirms the token, never from within the auth module itself (see that route's own doc comment). */
   markEmailVerified(id: string): Promise<void>;

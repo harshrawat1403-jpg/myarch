@@ -15,6 +15,11 @@ export interface IssueEmailVerificationTokenInput {
   readonly registrationRequestId?: string;
 }
 
+/** The token is persisted even if the direct email provider is temporarily unavailable. */
+export interface EmailVerificationDeliveryResult {
+  readonly emailSent: boolean;
+}
+
 export interface IssueEmailVerificationTokenUseCaseDeps {
   emailVerificationTokenRepository: EmailVerificationTokenRepository;
   /**
@@ -47,7 +52,7 @@ export interface IssueEmailVerificationTokenUseCaseDeps {
 export class IssueEmailVerificationTokenUseCase {
   constructor(private readonly deps: IssueEmailVerificationTokenUseCaseDeps) {}
 
-  async execute(input: IssueEmailVerificationTokenInput): Promise<void> {
+  async execute(input: IssueEmailVerificationTokenInput): Promise<EmailVerificationDeliveryResult> {
     const rawToken = generateOpaqueToken();
     const tokenHash = hashOpaqueToken(rawToken, this.deps.hashSecret);
     const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
@@ -66,7 +71,10 @@ export class IssueEmailVerificationTokenUseCase {
       { recipientName: input.recipientName, verifyUrl },
       input.email,
     );
-    await this.deps.sendEmail(rendered).catch((err: unknown) => {
+    try {
+      await this.deps.sendEmail(rendered);
+      return { emailSent: true };
+    } catch {
       // Best-effort — matching every other notification dispatch in this
       // codebase (e.g. AdminResetPasswordUseCase's notify().catch()): a
       // delivery failure must never block the signup/registration itself,
@@ -74,7 +82,8 @@ export class IssueEmailVerificationTokenUseCase {
       // exists precisely so the applicant can recover from this. Logged
       // (never the token/URL) so a misconfigured/failing provider is
       // visible in server logs instead of silently vanishing.
-      console.error("[auth] failed to send email-verification email", err);
-    });
+      console.error("[auth] email-verification delivery failed");
+      return { emailSent: false };
+    }
   }
 }
