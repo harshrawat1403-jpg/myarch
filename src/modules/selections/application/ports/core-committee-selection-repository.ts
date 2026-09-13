@@ -39,11 +39,17 @@ export interface CoreCommitteeSelectionCouncilProcessingDTO {
     id: string;
     applicantUserId: string;
     candidateName: string;
+    rollNumber: string | null;
+    applicationId: string;
+    submittedAt: Date;
+    answers: unknown;
+    applicationStatus: string;
     status: string;
     positions: Array<{ positionId: string; title: string }>;
     scrutiny: Array<{ decision: string; createdAt: Date }>;
     shortlist: Array<{ positionId: string; createdAt: Date }>;
     interviews: Array<{
+      id: string;
       positionId: string;
       scheduledAt: Date | null;
       durationMinutes: number | null;
@@ -51,6 +57,7 @@ export interface CoreCommitteeSelectionCouncilProcessingDTO {
       location: string | null;
       candidateAttended: boolean | null;
       completedAt: Date | null;
+      status: string;
     }>;
     decisions: Array<{
       positionId: string;
@@ -75,6 +82,11 @@ export interface CoreCommitteeSelectionRepository {
     config: CoreCommitteeSelectionConfig,
     actorUserId: string,
   ): Promise<CoreCommitteeSelectionRecord>;
+  extendDeadline(input: {
+    selectionId: string;
+    newClosingDate: Date;
+    actorUserId: string;
+  }): Promise<CoreCommitteeSelectionRecord>;
   savePosition(
     selectionId: string,
     positionId: string | null,
@@ -119,17 +131,36 @@ export interface CoreCommitteeSelectionRepository {
     candidateId: string;
     positionIds: string[];
     actorUserId: string;
-  }): Promise<unknown>;
+  }): Promise<{ candidateId: string; candidateUserId: string; selectionTitle: string }>;
   createInterview(input: {
     selectionId: string;
     candidateId: string;
     positionId: string;
-    scheduledAt?: Date;
+    scheduledAt: Date;
     durationMinutes?: number;
     mode?: string;
     location?: string;
+    candidateInstructions?: string;
+    internalNotes?: string;
     actorUserId: string;
-  }): Promise<unknown>;
+  }): Promise<{ interviewId: string; candidateUserId: string; selectionTitle: string }>;
+  rescheduleInterview(input: {
+    selectionId: string;
+    interviewId: string;
+    scheduledAt: Date;
+    durationMinutes?: number;
+    mode?: string;
+    location?: string;
+    candidateInstructions?: string;
+    internalNotes?: string;
+    actorUserId: string;
+  }): Promise<{ interviewId: string; candidateUserId: string; selectionTitle: string }>;
+  cancelInterview(input: {
+    selectionId: string;
+    interviewId: string;
+    reason?: string;
+    actorUserId: string;
+  }): Promise<{ interviewId: string; candidateUserId: string; selectionTitle: string }>;
   completeInterview(input: {
     selectionId: string;
     interviewId: string;
@@ -172,4 +203,9 @@ export interface CoreCommitteeSelectionRepository {
     actorUserId: string;
   }): Promise<CoreCommitteeSelectionAppointmentResult>;
   archive(input: { selectionId: string; actorUserId: string }): Promise<unknown>;
+  delete(input: {
+    selectionId: string;
+    actorUserId: string;
+    confirmation: string | undefined;
+  }): Promise<{ applications: number; shortlisted: number; interviews: number }>;
 }

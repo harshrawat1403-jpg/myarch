@@ -7,6 +7,7 @@ const councilMember = { role: "STUDENT" as const, userId: "council-member" };
 const selection = {
   id: "selection",
   title: "Core",
+  brief: "Core Committee recruitment",
   academicYear: "2026-2027",
   status: "COUNCIL_REVIEW" as const,
   applicationOpenAt: new Date("2026-09-01"),
@@ -26,9 +27,15 @@ function setup(currentCouncil: string | null = "council") {
     create: vi.fn(),
     update: vi.fn(),
     savePosition: vi.fn(),
+    extendDeadline: vi.fn(),
     linkForm: vi.fn(),
     transition: vi.fn(),
     candidates: vi.fn(),
+    shortlist: vi.fn(),
+    createInterview: vi.fn(),
+    rescheduleInterview: vi.fn(),
+    cancelInterview: vi.fn(),
+    completeInterview: vi.fn(),
     currentCouncilCommittee: vi.fn().mockResolvedValue(currentCouncil),
     recordCouncilReview: vi.fn(),
     recordDecision: vi.fn(),
@@ -40,6 +47,7 @@ function setup(currentCouncil: string | null = "council") {
     appointmentPreview: vi.fn(),
     confirmAppointments: vi.fn(),
     archive: vi.fn(),
+    delete: vi.fn(),
   };
   const notifications = { notify: vi.fn().mockResolvedValue(undefined) };
   return {
@@ -56,6 +64,7 @@ describe("Core Committee selection authority", () => {
     const { useCases, repository } = setup();
     await useCases.create(secretary, {
       title: "Core",
+      brief: "Core Committee recruitment",
       academicYear: "2026-2027",
       applicationOpenAt: "2026-09-01",
       applicationCloseAt: "2026-09-10",
@@ -159,5 +168,24 @@ describe("Core Committee selection authority", () => {
     repository.publish.mockResolvedValue({ published: true, idempotent: true });
     await useCases.publish(secretary, "selection");
     expect(notifications.notify).toHaveBeenCalledTimes(5);
+  });
+  it("notifies candidates about shortlist and interview changes without confidential notes", async () => {
+    const { useCases, repository, notifications } = setup();
+    repository.shortlist.mockResolvedValue({ candidateId: "candidate", candidateUserId: "student", selectionTitle: "Core" });
+    repository.createInterview.mockResolvedValue({ interviewId: "interview", candidateUserId: "student", selectionTitle: "Core" });
+    repository.rescheduleInterview.mockResolvedValue({ interviewId: "interview", candidateUserId: "student", selectionTitle: "Core" });
+    repository.cancelInterview.mockResolvedValue({ interviewId: "interview", candidateUserId: "student", selectionTitle: "Core" });
+    const candidateId = "00000000-0000-4000-8000-000000000002";
+    const positionId = "00000000-0000-4000-8000-000000000003";
+    const interviewId = "00000000-0000-4000-8000-000000000004";
+    await useCases.shortlist(councilMember, "selection", { candidateId, positionIds: [positionId] });
+    await useCases.interview(councilMember, "selection", { candidateId, positionId, scheduledAt: "2026-09-12T10:00:00.000Z", internalNotes: "private" });
+    await useCases.rescheduleInterview(councilMember, "selection", interviewId, { scheduledAt: "2026-09-12T11:00:00.000Z", internalNotes: "private" });
+    await useCases.cancelInterview(councilMember, "selection", interviewId, { reason: "Venue changed" });
+    expect(notifications.notify).toHaveBeenCalledWith(expect.objectContaining({ template: "CORE_COMMITTEE_SELECTION_SHORTLISTED" }));
+    expect(notifications.notify).toHaveBeenCalledWith(expect.objectContaining({ template: "CORE_COMMITTEE_SELECTION_INTERVIEW_SCHEDULED" }));
+    expect(notifications.notify).toHaveBeenCalledWith(expect.objectContaining({ template: "CORE_COMMITTEE_SELECTION_INTERVIEW_RESCHEDULED" }));
+    expect(notifications.notify).toHaveBeenCalledWith(expect.objectContaining({ template: "CORE_COMMITTEE_SELECTION_INTERVIEW_CANCELLED" }));
+    for (const call of notifications.notify.mock.calls) expect(JSON.stringify(call[0])).not.toContain("private");
   });
 });

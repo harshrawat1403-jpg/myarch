@@ -43,6 +43,11 @@ export class CoreCommitteeSelectionUseCases {
     validateSelectionSchedule(value);
     return this.repository.update(id, value, actor.userId);
   }
+  async extendDeadline(actor: AuthenticatedActor, selectionId: string, input: unknown) {
+    requireSelectionSecretary(actor);
+    const newClosingDate = z.union([z.string().datetime(), z.date()]).pipe(z.coerce.date()).parse(input);
+    return this.repository.extendDeadline({ selectionId, newClosingDate, actorUserId: actor.userId });
+  }
   async savePosition(
     actor: AuthenticatedActor,
     selectionId: string,
@@ -155,7 +160,7 @@ export class CoreCommitteeSelectionUseCases {
     });
   }
   async shortlist(actor: AuthenticatedActor, selectionId: string, input: unknown) {
-    requireSelectionSecretary(actor);
+    await this.councilOrSecretary(actor, selectionId);
     const value = z
       .object({
         candidateId: z.string().uuid(),
@@ -163,25 +168,37 @@ export class CoreCommitteeSelectionUseCases {
       })
       .strict()
       .parse(input);
-    return this.repository.shortlist({ selectionId, ...value, actorUserId: actor.userId });
+    const result = await this.repository.shortlist({ selectionId, ...value, actorUserId: actor.userId });
+    await this.notifyUnique([result.candidateUserId], "CORE_COMMITTEE_SELECTION_SHORTLISTED", {
+      selectionId,
+      selectionTitle: result.selectionTitle,
+    });
+    return result;
   }
   async interview(actor: AuthenticatedActor, selectionId: string, input: unknown) {
-    requireSelectionSecretary(actor);
+    await this.councilOrSecretary(actor, selectionId);
     const value = z
       .object({
         candidateId: z.string().uuid(),
         positionId: z.string().uuid(),
         scheduledAt: z
           .union([z.string().datetime(), z.date()])
-          .optional()
-          .transform((value) => (value ? new Date(value) : undefined)),
+          .transform((value) => new Date(value)),
         durationMinutes: z.number().int().positive().max(1440).optional(),
         mode: z.string().trim().max(100).optional(),
         location: z.string().trim().max(2000).optional(),
+        candidateInstructions: z.string().trim().max(5000).optional(),
+        internalNotes: z.string().trim().max(10000).optional(),
       })
       .strict()
       .parse(input);
-    return this.repository.createInterview({ selectionId, ...value, actorUserId: actor.userId });
+    const result = await this.repository.createInterview({ selectionId, ...value, actorUserId: actor.userId });
+    await this.notifyUnique([result.candidateUserId], "CORE_COMMITTEE_SELECTION_INTERVIEW_SCHEDULED", {
+      selectionId,
+      selectionTitle: result.selectionTitle,
+      scheduledAt: value.scheduledAt.toISOString(),
+    });
+    return result;
   }
   async completeInterview(
     actor: AuthenticatedActor,
@@ -189,7 +206,7 @@ export class CoreCommitteeSelectionUseCases {
     interviewId: string,
     input: unknown,
   ) {
-    requireSelectionSecretary(actor);
+    await this.councilOrSecretary(actor, selectionId);
     const value = z.object({ candidateAttended: z.boolean() }).strict().parse(input);
     return this.repository.completeInterview({
       selectionId,
@@ -197,6 +214,41 @@ export class CoreCommitteeSelectionUseCases {
       ...value,
       actorUserId: actor.userId,
     });
+  }
+  async rescheduleInterview(
+    actor: AuthenticatedActor,
+    selectionId: string,
+    interviewId: string,
+    input: unknown,
+  ) {
+    await this.councilOrSecretary(actor, selectionId);
+    const value = z.object({
+      scheduledAt: z.union([z.string().datetime(), z.date()]).transform((date) => new Date(date)),
+      durationMinutes: z.number().int().positive().max(1440).optional(),
+      mode: z.string().trim().max(100).optional(),
+      location: z.string().trim().max(2000).optional(),
+      candidateInstructions: z.string().trim().max(5000).optional(),
+      internalNotes: z.string().trim().max(10000).optional(),
+    }).strict().parse(input);
+    const result = await this.repository.rescheduleInterview({ selectionId, interviewId, ...value, actorUserId: actor.userId });
+    await this.notifyUnique([result.candidateUserId], "CORE_COMMITTEE_SELECTION_INTERVIEW_RESCHEDULED", {
+      selectionId, selectionTitle: result.selectionTitle, scheduledAt: value.scheduledAt.toISOString(),
+    });
+    return result;
+  }
+  async cancelInterview(
+    actor: AuthenticatedActor,
+    selectionId: string,
+    interviewId: string,
+    input: unknown,
+  ) {
+    await this.councilOrSecretary(actor, selectionId);
+    const value = z.object({ reason: z.string().trim().max(5000).optional() }).strict().parse(input);
+    const result = await this.repository.cancelInterview({ selectionId, interviewId, ...value, actorUserId: actor.userId });
+    await this.notifyUnique([result.candidateUserId], "CORE_COMMITTEE_SELECTION_INTERVIEW_CANCELLED", {
+      selectionId, selectionTitle: result.selectionTitle,
+    });
+    return result;
   }
   private async council(actor: AuthenticatedActor, selectionId: string) {
     if (actor.role !== "STUDENT")
@@ -212,6 +264,10 @@ export class CoreCommitteeSelectionUseCases {
         "Only active current Council members may record Core Committee review or decisions",
       );
     return councilCommitteeId;
+  }
+  private async councilOrSecretary(actor: AuthenticatedActor, selectionId: string) {
+    if (actor.role === "SECRETARY") return;
+    return this.council(actor, selectionId);
   }
   async review(actor: AuthenticatedActor, selectionId: string, input: unknown) {
     const councilCommitteeId = await this.council(actor, selectionId);
@@ -257,7 +313,7 @@ export class CoreCommitteeSelectionUseCases {
     return this.repository.publishedResults(selectionId);
   }
   async publish(actor: AuthenticatedActor, selectionId: string) {
-    requireSelectionSecretary(actor);
+    await this.councilOrSecretary(actor, selectionId);
     const result = await this.repository.publish({ selectionId, actorUserId: actor.userId });
     if (!result.idempotent && result.notificationRecipients) {
       const recipients = result.notificationRecipients;
@@ -298,13 +354,22 @@ export class CoreCommitteeSelectionUseCases {
     requireSelectionSecretary(actor);
     return this.repository.archive({ selectionId, actorUserId: actor.userId });
   }
+  async delete(actor: AuthenticatedActor, selectionId: string, input: unknown) {
+    requireSelectionSecretary(actor);
+    const confirmation = z.object({ confirmation: z.string().optional() }).strict().parse(input).confirmation;
+    return this.repository.delete({ selectionId, actorUserId: actor.userId, confirmation });
+  }
   private async notifyUnique(
     recipientUserIds: readonly string[],
     template:
       | "CORE_COMMITTEE_SELECTION_RESULT_PUBLISHED"
       | "CORE_COMMITTEE_SELECTION_SELECTED"
       | "CORE_COMMITTEE_SELECTION_NOT_SELECTED"
-      | "CORE_COMMITTEE_SELECTION_MEMBERSHIP_CONFIRMED",
+      | "CORE_COMMITTEE_SELECTION_MEMBERSHIP_CONFIRMED"
+      | "CORE_COMMITTEE_SELECTION_SHORTLISTED"
+      | "CORE_COMMITTEE_SELECTION_INTERVIEW_SCHEDULED"
+      | "CORE_COMMITTEE_SELECTION_INTERVIEW_RESCHEDULED"
+      | "CORE_COMMITTEE_SELECTION_INTERVIEW_CANCELLED",
     context: Record<string, unknown>,
   ) {
     await Promise.all(

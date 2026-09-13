@@ -29,6 +29,7 @@ describe("Core Committee selection lifecycle", () => {
   it("accepts selection configuration without voter groups, quorum, ballots, or weights", () => {
     const result = coreCommitteeSelectionConfigSchema.safeParse({
       title: "Core Committee 2026",
+      brief: "A Council-led recruitment workflow.",
       academicYear: "2026-2027",
       applicationOpenAt: "2026-09-10T00:00:00Z",
       applicationCloseAt: "2026-09-20T00:00:00Z",

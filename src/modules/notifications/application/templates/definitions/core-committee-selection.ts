@@ -55,3 +55,42 @@ export const coreCommitteeSelectionMembershipConfirmedInAppTemplate: InAppTempla
   title: () => "Core Committee membership confirmed",
   message: (context) => selectionTitle(context),
 };
+
+const interviewDate = (context: Record<string, unknown>) =>
+  typeof context.scheduledAt === "string" ? ` for ${context.scheduledAt}` : "";
+
+export const coreCommitteeSelectionShortlistedTemplate: EmailTemplateDefinition = {
+  subject: (context) => `Shortlisted for Core Committee: ${selectionTitle(context)}`,
+  bodyText: (context) => `You have been shortlisted for ${selectionTitle(context)}. Further interview details will follow.`,
+  bodyHtml: (context) => `<p>You have been shortlisted for <strong>${escapeHtml(selectionTitle(context))}</strong>.</p><p>Further interview details will follow.</p>`,
+};
+export const coreCommitteeSelectionShortlistedInAppTemplate: InAppTemplateDefinition = {
+  title: () => "Shortlisted for Core Committee", message: (context) => selectionTitle(context),
+};
+
+export const coreCommitteeSelectionInterviewScheduledTemplate: EmailTemplateDefinition = {
+  subject: (context) => `Core Committee interview scheduled: ${selectionTitle(context)}`,
+  bodyText: (context) => `Your Core Committee interview${interviewDate(context)} has been scheduled. Check the department portal for details.`,
+  bodyHtml: (context) => `<p>Your Core Committee interview${escapeHtml(interviewDate(context))} has been scheduled.</p><p>Check the department portal for details.</p>`,
+};
+export const coreCommitteeSelectionInterviewScheduledInAppTemplate: InAppTemplateDefinition = {
+  title: () => "Core Committee interview scheduled", message: (context) => selectionTitle(context),
+};
+
+export const coreCommitteeSelectionInterviewRescheduledTemplate: EmailTemplateDefinition = {
+  subject: (context) => `Core Committee interview updated: ${selectionTitle(context)}`,
+  bodyText: (context) => `Your Core Committee interview${interviewDate(context)} has been rescheduled. Check the department portal for details.`,
+  bodyHtml: (context) => `<p>Your Core Committee interview${escapeHtml(interviewDate(context))} has been rescheduled.</p><p>Check the department portal for details.</p>`,
+};
+export const coreCommitteeSelectionInterviewRescheduledInAppTemplate: InAppTemplateDefinition = {
+  title: () => "Core Committee interview updated", message: (context) => selectionTitle(context),
+};
+
+export const coreCommitteeSelectionInterviewCancelledTemplate: EmailTemplateDefinition = {
+  subject: (context) => `Core Committee interview cancelled: ${selectionTitle(context)}`,
+  bodyText: (context) => `Your Core Committee interview for ${selectionTitle(context)} has been cancelled. The Department will share any next steps separately.`,
+  bodyHtml: (context) => `<p>Your Core Committee interview for <strong>${escapeHtml(selectionTitle(context))}</strong> has been cancelled.</p><p>The Department will share any next steps separately.</p>`,
+};
+export const coreCommitteeSelectionInterviewCancelledInAppTemplate: InAppTemplateDefinition = {
+  title: () => "Core Committee interview cancelled", message: (context) => selectionTitle(context),
+};

@@ -124,6 +124,7 @@ describe.skipIf(!databaseUrl)("Core Committee selection PostgreSQL integrity", (
     const selection = await repository.create(
       {
         title: "Core selection",
+        brief: "Core Committee recruitment",
         academicYear: "2026-2027",
         applicationOpenAt: new Date(Date.now() - 60000),
         applicationCloseAt: new Date(Date.now() + 3600000),

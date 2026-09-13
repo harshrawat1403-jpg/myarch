@@ -435,12 +435,15 @@ model User {
   coreCommitteeSelectionCorrectionSubmissions CoreCommitteeSelectionCorrectionRequest[] @relation("CoreCommitteeSelectionCorrectionSubmitter")
   coreCommitteeSelectionShortlistEntries      CoreCommitteeSelectionShortlistEntry[]    @relation("CoreCommitteeSelectionShortlistedBy")
   coreCommitteeSelectionInterviews            CoreCommitteeSelectionInterview[]         @relation("CoreCommitteeSelectionInterviewScheduler")
+  coreCommitteeSelectionCancelledInterviews   CoreCommitteeSelectionInterview[]         @relation("CoreCommitteeSelectionInterviewCanceller")
   coreCommitteeCouncilReviews                 CoreCommitteeCouncilReview[]              @relation("CoreCommitteeCouncilReviewMember")
   coreCommitteeSelectionDecisionsRecorded     CoreCommitteeSelectionDecision[]          @relation("CoreCommitteeSelectionDecisionRecorder")
   coreCommitteeSelectionDecisionsFinalized    CoreCommitteeSelectionDecision[]          @relation("CoreCommitteeSelectionDecisionFinalizer")
   coreCommitteeSelectionPublications          CoreCommitteeSelectionPublication[]       @relation("CoreCommitteeSelectionPublisher")
   coreCommitteeSelectionAppointmentsConfirmed CoreCommitteeSelectionAppointment[]       @relation("CoreCommitteeSelectionAppointmentConfirmer")
   coreCommitteeSelectionAppointmentsReceived  CoreCommitteeSelectionAppointment[]       @relation("CoreCommitteeSelectionAppointedUser")
+  coreCommitteeSelectionDeadlineExtensions    CoreCommitteeSelectionDeadlineExtension[] @relation("CoreCommitteeSelectionDeadlineExtender")
+  coreCommitteeSelectionInterviewHistory      CoreCommitteeSelectionInterviewHistory[]  @relation("CoreCommitteeSelectionInterviewHistoryActor")
 
   // MYARCH Edit Mode — inline content overrides for existing public pages.
   updatedContentOverrides ContentOverride[] @relation("ContentOverrideUpdatedBy")
@@ -2380,6 +2383,7 @@ enum CoreCommitteeSelectionDecisionState {
 model CoreCommitteeSelection {
   id                          String                                    @id @default(uuid()) @db.Uuid
   title                       String
+  brief                       String                                    @default("")
   academicYear                String
   status                      CoreCommitteeSelectionStatus              @default(DRAFT)
   applicationOpenAt           DateTime
@@ -2398,11 +2402,13 @@ model CoreCommitteeSelection {
   updatedAt                   DateTime                                  @updatedAt
   positions                   CoreCommitteeSelectionPosition[]
   applicationForm             CoreCommitteeSelectionApplicationForm?
+  deadlineExtensions          CoreCommitteeSelectionDeadlineExtension[]
   candidates                  CoreCommitteeSelectionCandidate[]
   scrutinyReviews             CoreCommitteeSelectionScrutinyReview[]
   correctionRequests          CoreCommitteeSelectionCorrectionRequest[]
   shortlistEntries            CoreCommitteeSelectionShortlistEntry[]
   interviews                  CoreCommitteeSelectionInterview[]
+  interviewHistory            CoreCommitteeSelectionInterviewHistory[]
   councilReviews              CoreCommitteeCouncilReview[]
   decisions                   CoreCommitteeSelectionDecision[]
   publication                 CoreCommitteeSelectionPublication?
@@ -2444,6 +2450,10 @@ model CoreCommitteeSelectionApplicationForm {
   formId      String                 @unique @db.Uuid
   form        Form                   @relation(fields: [formId], references: [id], onDelete: Restrict)
   createdAt   DateTime               @default(now())
+  // True only for the private, selection-owned form created by the Core
+  // workflow. Legacy links remain false and are never deleted by selection
+  // cleanup because they can belong to the independent Forms module.
+  managedForm Boolean                @default(false)
 
   @@map("core_committee_selection_application_forms")
 }
@@ -2556,16 +2566,62 @@ model CoreCommitteeSelectionInterview {
   durationMinutes   Int?
   mode              String?
   location          String?
+  candidateInstructions String?
+  internalNotes     String?
   candidateAttended Boolean?
   completedAt       DateTime?
+  cancelledAt       DateTime?
+  cancelledByUserId String?                               @db.Uuid
+  cancelledBy       User?                                 @relation("CoreCommitteeSelectionInterviewCanceller", fields: [cancelledByUserId], references: [id], onDelete: Restrict)
+  cancellationReason String?
   scheduledByUserId String                                @db.Uuid
   scheduledBy       User                                  @relation("CoreCommitteeSelectionInterviewScheduler", fields: [scheduledByUserId], references: [id], onDelete: Restrict)
   createdAt         DateTime                              @default(now())
   updatedAt         DateTime                              @updatedAt
+  history           CoreCommitteeSelectionInterviewHistory[]
 
   @@unique([candidateId, positionId])
   @@index([selectionId, status, scheduledAt])
   @@map("core_committee_selection_interviews")
+}
+
+model CoreCommitteeSelectionDeadlineExtension {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  selectionId        String                 @db.Uuid
+  selection          CoreCommitteeSelection @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  previousClosingDate DateTime
+  newClosingDate     DateTime
+  extendedAt         DateTime               @default(now())
+  extendedByUserId   String                 @db.Uuid
+  extendedBy         User                   @relation("CoreCommitteeSelectionDeadlineExtender", fields: [extendedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([selectionId, extendedAt])
+  @@map("core_committee_selection_deadline_extensions")
+}
+
+model CoreCommitteeSelectionInterviewHistory {
+  id                 String                                @id @default(uuid()) @db.Uuid
+  interviewId        String                                @db.Uuid
+  interview          CoreCommitteeSelectionInterview       @relation(fields: [interviewId], references: [id], onDelete: Restrict)
+  selectionId        String                                @db.Uuid
+  selection          CoreCommitteeSelection                @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  previousScheduledAt DateTime?
+  newScheduledAt     DateTime?
+  previousDurationMinutes Int?
+  newDurationMinutes Int?
+  previousMode       String?
+  newMode            String?
+  previousLocation   String?
+  newLocation        String?
+  previousStatus     CoreCommitteeSelectionInterviewStatus
+  newStatus          CoreCommitteeSelectionInterviewStatus
+  changedByUserId    String                                @db.Uuid
+  changedBy          User                                  @relation("CoreCommitteeSelectionInterviewHistoryActor", fields: [changedByUserId], references: [id], onDelete: Restrict)
+  changedAt          DateTime                              @default(now())
+
+  @@index([selectionId, changedAt])
+  @@index([interviewId, changedAt])
+  @@map("core_committee_selection_interview_history")
 }
 
 model CoreCommitteeCouncilReview {

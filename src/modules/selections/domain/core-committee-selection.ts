@@ -28,6 +28,7 @@ const optionalDate = requiredDate.nullable().default(null);
 export const coreCommitteeSelectionConfigSchema = z
   .object({
     title: z.string().trim().min(1).max(200),
+    brief: z.string().trim().min(1).max(20_000),
     academicYear: z
       .string()
       .regex(/^\d{4}-\d{4}$/)
@@ -37,9 +38,12 @@ export const coreCommitteeSelectionConfigSchema = z
       ),
     applicationOpenAt: requiredDate,
     applicationCloseAt: requiredDate,
+    // Retained only so historical API clients and records continue to load.
+    // The simplified setup never exposes correction windows.
     correctionOpenAt: optionalDate,
     correctionCloseAt: optionalDate,
-    maxPositionsPerCandidate: z.number().int().min(1).max(100).default(1),
+    // Legacy input is accepted but cannot change the fixed one-domain rule.
+    maxPositionsPerCandidate: z.number().int().min(1).max(100).optional().transform(() => 1),
   })
   .strict();
 export type CoreCommitteeSelectionConfig = z.infer<typeof coreCommitteeSelectionConfigSchema>;
@@ -57,21 +61,6 @@ export type CoreCommitteeSelectionPositionConfig = z.infer<
 export function validateSelectionSchedule(config: CoreCommitteeSelectionConfig): void {
   if (config.applicationOpenAt >= config.applicationCloseAt)
     throw new CoreCommitteeSelectionError("Application opening must precede closing", "validation");
-  if (Boolean(config.correctionOpenAt) !== Boolean(config.correctionCloseAt))
-    throw new CoreCommitteeSelectionError(
-      "Correction dates require both opening and closing times",
-      "validation",
-    );
-  if (
-    config.correctionOpenAt &&
-    config.correctionCloseAt &&
-    (config.correctionOpenAt < config.applicationCloseAt ||
-      config.correctionOpenAt >= config.correctionCloseAt)
-  )
-    throw new CoreCommitteeSelectionError(
-      "Correction dates must follow applications and open before closing",
-      "validation",
-    );
 }
 export function assertSelectionDraft(status: CoreCommitteeSelectionStatus): void {
   if (status !== "DRAFT")

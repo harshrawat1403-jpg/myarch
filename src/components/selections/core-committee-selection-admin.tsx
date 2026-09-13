@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/modules/auth/client";
 import type { CoreCommitteeSelectionRecord } from "@/modules/selections";
-import type { FormRecord } from "@/modules/forms";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -37,28 +36,32 @@ function Config({
 }) {
   return (
     <form
-      className="grid gap-3 sm:grid-cols-2"
+      className="grid gap-4 sm:grid-cols-2"
       onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
         void save({
           title: data.get("title"),
+          brief: data.get("brief"),
           academicYear: data.get("academicYear"),
           applicationOpenAt: new Date(String(data.get("applicationOpenAt"))).toISOString(),
           applicationCloseAt: new Date(String(data.get("applicationCloseAt"))).toISOString(),
-          correctionOpenAt: data.get("correctionOpenAt")
-            ? new Date(String(data.get("correctionOpenAt"))).toISOString()
-            : null,
-          correctionCloseAt: data.get("correctionCloseAt")
-            ? new Date(String(data.get("correctionCloseAt"))).toISOString()
-            : null,
-          maxPositionsPerCandidate: Number(data.get("maxPositionsPerCandidate")),
         });
       }}
     >
       <div>
-        <Label htmlFor="selection-title">Selection title</Label>
+        <Label htmlFor="selection-title">Application form title</Label>
         <Input id="selection-title" name="title" required defaultValue={selection?.title} />
+      </div>
+      <div className="sm:col-span-2">
+        <Label htmlFor="selection-brief">Application brief</Label>
+        <textarea
+          id="selection-brief"
+          name="brief"
+          required
+          defaultValue={selection?.brief}
+          className="min-h-32 w-full rounded border border-(--color-border) bg-(--color-background) p-3"
+        />
       </div>
       <div>
         <Label htmlFor="selection-year">Academic year</Label>
@@ -91,35 +94,6 @@ function Config({
           defaultValue={local(selection?.applicationCloseAt)}
         />
       </div>
-      <div>
-        <Label htmlFor="selection-correction-open">Corrections open</Label>
-        <Input
-          id="selection-correction-open"
-          name="correctionOpenAt"
-          type="datetime-local"
-          defaultValue={local(selection?.correctionOpenAt)}
-        />
-      </div>
-      <div>
-        <Label htmlFor="selection-correction-close">Corrections close</Label>
-        <Input
-          id="selection-correction-close"
-          name="correctionCloseAt"
-          type="datetime-local"
-          defaultValue={local(selection?.correctionCloseAt)}
-        />
-      </div>
-      <div>
-        <Label htmlFor="selection-limit">Maximum positions per candidate</Label>
-        <Input
-          id="selection-limit"
-          name="maxPositionsPerCandidate"
-          type="number"
-          min={1}
-          max={100}
-          defaultValue={selection?.maxPositionsPerCandidate ?? 1}
-        />
-      </div>
       {(!selection || selection.status === "DRAFT") && (
         <Button className="self-end" disabled={busy} type="submit">
           {selection ? "Save configuration" : "Create Core Committee selection"}
@@ -133,22 +107,17 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
   const router = useRouter();
   const [items, setItems] = useState<CoreCommitteeSelectionRecord[]>([]);
   const [selection, setSelection] = useState<CoreCommitteeSelectionRecord | null>(null);
-  const [forms, setForms] = useState<FormRecord[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [appointmentPreview, setAppointmentPreview] = useState<{ currentCoreCommittee: { memberships: unknown[] }; selected: { position: string }[] } | null>(null);
   const load = async () => {
     if (!accessToken || role !== "SECRETARY") return;
     if (id) {
-      const [detail, formRows] = await Promise.all([
-        apiClient.get<CoreCommitteeSelectionRecord>(
+      const detail = await apiClient.get<CoreCommitteeSelectionRecord>(
           `/api/core-committee-selections/${id}`,
           accessToken,
-        ),
-        apiClient.get<FormRecord[]>("/api/forms", accessToken),
-      ]);
+        );
       setSelection(detail);
-      setForms(formRows);
     } else
       setItems(
         await apiClient.get<CoreCommitteeSelectionRecord[]>(
@@ -302,6 +271,13 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                 This workflow records Council-led selection. It has no voter groups, ballots,
                 quorum, or vote counting.
               </p>
+              <div className="flex flex-wrap gap-3 text-sm">
+                <Link className="underline" href={`/dashboard/core-committee-selections/${id}/dashboard`}>Core dashboard</Link>
+                <Link className="underline" href={`/dashboard/core-committee-selections/${id}/applications`}>Applications</Link>
+                <Link className="underline" href={`/dashboard/core-committee-selections/${id}/shortlist`}>Shortlist</Link>
+                <Link className="underline" href={`/dashboard/core-committee-selections/${id}/interviews`}>Interviews</Link>
+                <Link className="underline" href={`/dashboard/core-committee-selections/${id}/results`}>Results</Link>
+              </div>
               <Config
                 selection={selection}
                 busy={busy}
@@ -311,52 +287,38 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                   )
                 }
               />
-            </Card>
-            <Card className="space-y-3">
-              <h2 className="text-lg font-semibold">Application form</h2>
-              <p>
-                {selection.applicationForm
-                  ? `${selection.applicationForm.title} (${selection.applicationForm.status})`
-                  : "No form associated"}
-              </p>
-              {selection.status === "DRAFT" && (
-                <select
-                  className="w-full rounded border border-(--color-border) bg-(--color-background) p-2"
-                  defaultValue={selection.applicationForm?.formId ?? ""}
-                  onChange={(event) =>
-                    event.target.value &&
+              {selection.status === "APPLICATION_OPEN" && (
+                <form
+                  className="flex flex-wrap items-end gap-3 border-t border-(--color-border) pt-4"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const value = new FormData(event.currentTarget).get("newClosingDate");
+                    if (!value) return;
                     void act(
-                      () =>
-                        apiClient.put(
-                          `/api/core-committee-selections/${id}/application-form`,
-                          { formId: event.target.value },
-                          accessToken!,
-                        ),
-                      "Application form associated",
-                    )
-                  }
+                      () => apiClient.post(`/api/core-committee-selections/${id}/deadline-extension`, { newClosingDate: new Date(String(value)).toISOString() }, accessToken!),
+                      "Closing date extended",
+                    );
+                  }}
                 >
-                  <option value="">Choose a generic form</option>
-                  {forms
-                    .filter((form) => ["DRAFT", "PUBLISHED"].includes(form.status))
-                    .map((form) => (
-                      <option key={form.id} value={form.id}>
-                        {form.title}
-                      </option>
-                    ))}
-                </select>
+                  <div>
+                    <Label htmlFor="new-close">Extend closing date</Label>
+                    <Input id="new-close" name="newClosingDate" required type="datetime-local" min={local(selection.applicationCloseAt)} />
+                  </div>
+                  <Button disabled={busy}>Extend closing date</Button>
+                </form>
               )}
             </Card>
             <Card className="space-y-3">
-              <h2 className="text-lg font-semibold">Positions</h2>
+              <h2 className="text-lg font-semibold">Domains / positions</h2>
               {selection.positions.map((position) => (
-                <p key={position.id}>
-                  {position.title} Â· {position.seats} seat{position.seats === 1 ? "" : "s"}
-                </p>
+                <div key={position.id} className="rounded border border-(--color-border) p-3">
+                  <p className="font-medium">{position.title} · {position.seats} position{position.seats === 1 ? "" : "s"}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-(--color-text-secondary)">{position.description}</p>
+                </div>
               ))}
               {selection.status === "DRAFT" && (
                 <form
-                  className="flex gap-2"
+                  className="space-y-3 rounded border border-(--color-border) p-4"
                   onSubmit={(event) => {
                     event.preventDefault();
                     const data = new FormData(event.currentTarget);
@@ -366,7 +328,7 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                           `/api/core-committee-selections/${id}/positions`,
                           {
                             title: data.get("title"),
-                            description: "",
+                            description: data.get("description"),
                             seats: Number(data.get("seats")),
                             displayOrder: selection.positions.length,
                           },
@@ -376,10 +338,38 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                     );
                   }}
                 >
-                  <Input name="title" required placeholder="Position title" />
-                  <Input name="seats" required type="number" min={1} defaultValue={1} />
-                  <Button disabled={busy}>Add position</Button>
+                  <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
+                    <Input name="title" required placeholder="Domain title" />
+                    <Input name="seats" required type="number" min={1} defaultValue={1} />
+                  </div>
+                  <textarea name="description" required placeholder="Long domain brief" className="min-h-32 w-full rounded border border-(--color-border) bg-(--color-background) p-3" />
+                  <Button disabled={busy}>+ Add domain</Button>
                 </form>
+              )}
+            </Card>
+            <Card className="space-y-3 border-(--color-danger)">
+              <div>
+                <h2 className="text-lg font-semibold">Danger zone</h2>
+                <p className="text-sm text-(--color-text-secondary)">Permanently remove this Core Committee recruitment and its selection-owned data.</p>
+              </div>
+              <Button
+                disabled={busy || ["MEMBERSHIP_CONFIRMED", "ARCHIVED"].includes(selection.status)}
+                variant="destructive"
+                onClick={() => {
+                  const confirmation = selection.status === "DRAFT"
+                    ? window.confirm("Delete this Core Committee application form?") ? "DELETE CORE SELECTION" : ""
+                    : window.prompt("Type DELETE CORE SELECTION to permanently delete this application and its responses.") ?? "";
+                  if (!confirmation) return;
+                  void act(async () => {
+                    await apiClient.post(`/api/core-committee-selections/${id}/delete`, { confirmation }, accessToken!);
+                    router.push("/dashboard/core-committee-selections");
+                  }, "Core Committee application deleted");
+                }}
+              >
+                Delete application form
+              </Button>
+              {["MEMBERSHIP_CONFIRMED", "ARCHIVED"].includes(selection.status) && (
+                <p className="text-sm text-(--color-text-secondary)">Membership-confirmed selections remain preserved as governance history.</p>
               )}
             </Card>
           </>

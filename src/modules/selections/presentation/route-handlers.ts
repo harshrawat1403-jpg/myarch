@@ -82,6 +82,15 @@ export const updateCoreCommitteeSelectionRouteHandler = route(
   async (req, actor, id) => coreCommitteeSelectionUseCases.update(actor, id, await body(req)),
   true,
 );
+export const extendCoreCommitteeSelectionDeadlineRouteHandler = route(
+  async (req, actor, id) =>
+    coreCommitteeSelectionUseCases.extendDeadline(
+      actor,
+      id,
+      z.object({ newClosingDate: z.union([z.string().datetime(), z.date()]) }).strict().parse(await body(req)).newClosingDate,
+    ),
+  true,
+);
 export const saveCoreCommitteeSelectionPositionRouteHandler = route(
   async (req, actor, id, context) =>
     coreCommitteeSelectionUseCases.savePosition(
@@ -134,7 +143,7 @@ export const coreCommitteeSelectionProcessingRouteHandler = route(
 export const scrutinyCoreCommitteeSelectionCandidateRouteHandler = route(
   async (req, actor, id, context) =>
     coreCommitteeSelectionUseCases.scrutiny(actor, id, await candidateId(context), await body(req)),
-  true,
+  false,
 );
 export const correctionCoreCommitteeSelectionCandidateRouteHandler = route(
   async (req, actor, id, context) =>
@@ -148,11 +157,11 @@ export const correctionCoreCommitteeSelectionCandidateRouteHandler = route(
 );
 export const shortlistCoreCommitteeSelectionRouteHandler = route(
   async (req, actor, id) => coreCommitteeSelectionUseCases.shortlist(actor, id, await body(req)),
-  true,
+  false,
 );
 export const createCoreCommitteeSelectionInterviewRouteHandler = route(
   async (req, actor, id) => coreCommitteeSelectionUseCases.interview(actor, id, await body(req)),
-  true,
+  false,
   true,
   201,
 );
@@ -194,6 +203,25 @@ export const confirmCoreCommitteeSelectionAppointmentsRouteHandler = route(
 export const archiveCoreCommitteeSelectionRouteHandler = route(
   (_req, actor, id) => coreCommitteeSelectionUseCases.archive(actor, id),
   true,
+);
+export const deleteCoreCommitteeSelectionRouteHandler = route(
+  async (req, actor, id) => coreCommitteeSelectionUseCases.delete(actor, id, await body(req)),
+  false,
+);
+export const rescheduleCoreCommitteeSelectionInterviewRouteHandler = route(
+  async (req, actor, id, context) =>
+    coreCommitteeSelectionUseCases.rescheduleInterview(
+      actor,
+      id,
+      await interviewId(context),
+      await body(req),
+    ),
+  false,
+);
+export const cancelCoreCommitteeSelectionInterviewRouteHandler = route(
+  async (req, actor, id, context) =>
+    coreCommitteeSelectionUseCases.cancelInterview(actor, id, await interviewId(context), await body(req)),
+  false,
 );
 
 export const publishedCoreCommitteeSelectionResultsRouteHandler = route(
