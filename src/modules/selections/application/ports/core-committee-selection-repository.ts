@@ -6,6 +6,8 @@ import type {
 import type {
   CoreCommitteeSelectionCandidateRecord,
   CoreCommitteeSelectionRecord,
+  StudentCoreCommitteeSelectionDetail,
+  StudentCoreCommitteeSelectionSummary,
 } from "../../domain/entities";
 
 export interface CoreCommitteeSelectionLifecycleNotificationRecipients {
@@ -73,6 +75,12 @@ export interface CoreCommitteeSelectionCouncilProcessingDTO {
 export interface CoreCommitteeSelectionRepository {
   list(includeDrafts: boolean): Promise<CoreCommitteeSelectionRecord[]>;
   get(id: string): Promise<CoreCommitteeSelectionRecord | null>;
+  listForStudent(studentUserId: string): Promise<StudentCoreCommitteeSelectionSummary[]>;
+  getForStudent(
+    id: string,
+    studentUserId: string,
+  ): Promise<StudentCoreCommitteeSelectionDetail | null>;
+  getStudentApplicationFormId(selectionId: string): Promise<string | null>;
   create(
     config: CoreCommitteeSelectionConfig,
     actorUserId: string,

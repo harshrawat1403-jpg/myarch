@@ -1,4 +1,4 @@
-import { Prisma, type PrismaClient, type Prisma as PrismaTypes } from "@prisma/client";
+import { Prisma, type FormField as PrismaFormField, type PrismaClient, type Prisma as PrismaTypes } from "@prisma/client";
 import { PrismaAuditRecorder } from "@/lib/audit";
 import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import {
@@ -14,6 +14,9 @@ import type {
 import type {
   CoreCommitteeSelectionCandidateRecord,
   CoreCommitteeSelectionRecord,
+  StudentCoreCommitteeSelectionDetail,
+  StudentCoreCommitteeApplicationField,
+  StudentCoreCommitteeSelectionSummary,
 } from "../domain/entities";
 import type {
   CoreCommitteeSelectionCouncilProcessingDTO,
@@ -63,6 +66,80 @@ function toRecord(row: SelectionRow): CoreCommitteeSelectionRecord {
       : null,
   };
 }
+
+type StudentCandidateRow = {
+  status: CoreCommitteeSelectionCandidateRecord["status"];
+  positions: Array<{ position: { id: string; title: string } }>;
+  application: { submission: { submittedAt: Date; answers: PrismaTypes.JsonValue } };
+};
+type StudentSummaryRow = {
+  id: string;
+  title: string;
+  brief: string;
+  status: CoreCommitteeSelectionStatus;
+  applicationOpenAt: Date;
+  applicationCloseAt: Date;
+  candidates: StudentCandidateRow[];
+};
+
+function candidateDomain(candidate: StudentCandidateRow) {
+  const domain = candidate.positions[0]?.position;
+  if (!domain) throw new CoreCommitteeSelectionError("Core Committee application is missing its selected domain");
+  return { id: domain.id, title: domain.title };
+}
+
+function toStudentSummary(row: StudentSummaryRow): StudentCoreCommitteeSelectionSummary {
+  const candidate = row.candidates[0] ?? null;
+  return {
+    id: row.id,
+    title: row.title,
+    brief: row.brief,
+    status: row.status,
+    applicationOpenAt: row.applicationOpenAt,
+    applicationCloseAt: row.applicationCloseAt,
+    application: candidate
+      ? {
+          status: candidate.status,
+          submittedAt: candidate.application.submission.submittedAt,
+          domain: candidateDomain(candidate),
+        }
+      : null,
+  };
+}
+
+function toStudentField(field: PrismaFormField): StudentCoreCommitteeApplicationField {
+  return {
+    id: field.id,
+    key: field.key,
+    label: field.label,
+    type: field.type,
+    description: field.description,
+    required: field.required,
+    options: Array.isArray(field.options)
+      ? field.options.filter((value): value is string => typeof value === "string")
+      : [],
+    validation: toFieldValidation(field.validation),
+    displayOrder: field.displayOrder,
+  };
+}
+
+function toFieldValidation(value: PrismaTypes.JsonValue | null): StudentCoreCommitteeApplicationField["validation"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (
+    (record.min !== undefined && typeof record.min !== "number") ||
+    (record.max !== undefined && typeof record.max !== "number")
+  )
+    return null;
+  return { ...(typeof record.min === "number" ? { min: record.min } : {}), ...(typeof record.max === "number" ? { max: record.max } : {}) };
+}
+
+function toAnswers(value: PrismaTypes.JsonValue): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? { ...(value as Record<string, unknown>) }
+    : {};
+}
+
 async function lockSelection(tx: PrismaTypes.TransactionClient, id: string) {
   await tx.$queryRaw`SELECT "id" FROM "core_committee_selections" WHERE "id" = ${id}::uuid FOR UPDATE`;
   const row = await tx.coreCommitteeSelection.findUnique({
@@ -88,6 +165,64 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
       include: selectionInclude,
     });
     return row ? toRecord(row) : null;
+  }
+  async listForStudent(studentUserId: string): Promise<StudentCoreCommitteeSelectionSummary[]> {
+    const rows = await this.prisma.coreCommitteeSelection.findMany({
+      where: { status: { not: "DRAFT" } },
+      include: {
+        candidates: {
+          where: { applicantUserId: studentUserId },
+          include: { positions: { include: { position: true } }, application: { include: { submission: true } } },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((row) => toStudentSummary(row));
+  }
+  async getForStudent(
+    id: string,
+    studentUserId: string,
+  ): Promise<StudentCoreCommitteeSelectionDetail | null> {
+    const row = await this.prisma.coreCommitteeSelection.findFirst({
+      where: { id, status: { not: "DRAFT" } },
+      include: {
+        positions: { orderBy: { displayOrder: "asc" } },
+        applicationForm: { include: { form: { include: { fields: { orderBy: { displayOrder: "asc" } } } } } },
+        candidates: {
+          where: { applicantUserId: studentUserId },
+          include: { positions: { include: { position: true } }, application: { include: { submission: true } } },
+        },
+      },
+    });
+    if (!row) return null;
+    const candidate = row.candidates[0] ?? null;
+    const base = toStudentSummary(row);
+    return {
+      ...base,
+      positions: row.positions.map((position) => ({
+        id: position.id,
+        title: position.title,
+        description: position.description,
+        seats: position.seats,
+        displayOrder: position.displayOrder,
+      })),
+      fields: row.applicationForm?.form.fields.map(toStudentField) ?? [],
+      application: candidate
+        ? {
+            status: candidate.status,
+            submittedAt: candidate.application.submission.submittedAt,
+            domain: candidateDomain(candidate),
+            answers: toAnswers(candidate.application.submission.answers),
+          }
+        : null,
+    };
+  }
+  async getStudentApplicationFormId(selectionId: string): Promise<string | null> {
+    const selection = await this.prisma.coreCommitteeSelection.findFirst({
+      where: { id: selectionId, status: { not: "DRAFT" } },
+      select: { applicationForm: { select: { formId: true } } },
+    });
+    return selection?.applicationForm?.formId ?? null;
   }
   async create(config: CoreCommitteeSelectionConfig, actorUserId: string) {
     const row = await this.prisma.coreCommitteeSelection.create({

@@ -22,10 +22,17 @@ export class SubmitFormUseCase {
     notificationService: NotificationService;
   }) {}
 
-  async execute(input: { actor: AuthenticatedActor; formId: string; answers: Record<string, unknown>; electionPositionIds?: readonly string[]; coreCommitteeSelectionPositionIds?: readonly string[] }): Promise<FormApplicationRecord> {
+  async execute(input: { actor: AuthenticatedActor; formId: string; answers: Record<string, unknown>; electionPositionIds?: readonly string[]; coreCommitteeSelectionPositionIds?: readonly string[]; allowCoreCommitteeSelectionForm?: boolean }): Promise<FormApplicationRecord> {
     if (!canSubmitFormApplication(input.actor)) throw new NotAuthorizedError("Only students may submit forms");
     const form = await this.deps.formRepository.findById(input.formId);
     if (!form || !isFormAvailable(form)) throw new FormNotAvailableError();
+    if (
+      !input.allowCoreCommitteeSelectionForm &&
+      await this.deps.formRepository.isCoreCommitteeSelectionForm(form.id)
+    )
+      throw new FormNotAvailableError(
+        "Core Committee applications must be submitted through the Core Committee application page",
+      );
     const applicant = await this.deps.applicantLookup.findByUserId(input.actor.userId);
     if (!applicant) throw new NotAuthorizedError("Student profile not found");
     validateFormAnswers(form.fields, input.answers);

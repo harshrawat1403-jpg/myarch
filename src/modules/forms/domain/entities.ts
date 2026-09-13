@@ -67,6 +67,8 @@ export interface UpdateFormData {
 export interface FormFilters {
   readonly status?: FormStatus;
   readonly search?: string;
+  /** Keeps governance-owned Core Committee intake forms out of the student generic Forms catalogue. */
+  readonly excludeCoreCommitteeSelectionForms?: boolean;
 }
 
 export const FORM_TITLE_MAX_LENGTH = 200;
@@ -79,4 +81,3 @@ export const FORM_MAX_FIELDS = 100;
 export const FORM_MAX_OPTIONS = 100;
 export const FORM_APPLICATION_REVIEW_NOTES_MAX_LENGTH = 5000;
 export const FORM_APPLICATION_DECISION_REASON_MAX_LENGTH = 2000;
-

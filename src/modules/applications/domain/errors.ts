@@ -13,8 +13,8 @@ export class DuplicateFormApplicationError extends Error {
 }
 
 export class FormNotAvailableError extends Error {
-  constructor() {
-    super("This form is not available for submissions");
+  constructor(message = "This form is not available for submissions") {
+    super(message);
     this.name = "FormNotAvailableError";
   }
 }
@@ -60,4 +60,3 @@ export class ApplicationAlreadyDecidedError extends Error {
     this.name = "ApplicationAlreadyDecidedError";
   }
 }
-

@@ -6,5 +6,5 @@ export interface FormRepository {
   update(id: string, data: UpdateFormData): Promise<FormRecord>;
   setStatus(id: string, status: FormStatus, at: Date): Promise<FormRecord>;
   search(filters: FormFilters): Promise<readonly FormRecord[]>;
+  isCoreCommitteeSelectionForm(id: string): Promise<boolean>;
 }
-

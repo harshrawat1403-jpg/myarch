@@ -6,7 +6,8 @@ import { extractRouteParam } from "@/lib/route-params";
 import { badRequest, conflict, forbidden, notFound } from "@/lib/http-errors";
 import { NotAuthorizedError } from "@/lib/errors";
 import { CoreCommitteeSelectionError } from "../domain/core-committee-selection";
-import { coreCommitteeSelectionUseCases } from "../infrastructure/container";
+import { DuplicateFormApplicationError, FormNotAvailableError, InvalidFormAnswerError } from "../../applications/domain/errors";
+import { coreCommitteeSelectionUseCases, studentCoreCommitteeSelectionUseCases } from "../infrastructure/container";
 type Operation = (
   req: NextRequest,
   actor: AuthenticatedActor,
@@ -48,6 +49,37 @@ function route(operation: Operation, admin: boolean, withId = true, status = 200
   );
 }
 const body = (req: NextRequest) => req.json().catch(() => null);
+function studentRoute(
+  operation: (req: NextRequest, actor: AuthenticatedActor, id: string) => Promise<unknown>,
+  withId = true,
+  status = 200,
+) {
+  return withAuth(
+    async (req, { actor }, context) => {
+      try {
+        const id = withId
+          ? z.string().uuid().parse(await extractRouteParam(context, "id"))
+          : "";
+        return NextResponse.json({ data: await operation(req, actor, id) }, { status });
+      } catch (error) {
+        if (error instanceof NotAuthorizedError) return forbidden(error.message);
+        if (error instanceof z.ZodError)
+          return badRequest("Invalid Core Committee application data", error.flatten().fieldErrors);
+        if (error instanceof CoreCommitteeSelectionError)
+          return error.kind === "notFound"
+            ? notFound(error.message)
+            : error.kind === "validation"
+              ? badRequest(error.message)
+              : conflict(error.message);
+        if (error instanceof DuplicateFormApplicationError || error instanceof FormNotAvailableError)
+          return conflict(error.message);
+        if (error instanceof InvalidFormAnswerError) return badRequest(error.message);
+        throw error;
+      }
+    },
+    { roles: ["STUDENT"] },
+  );
+}
 const candidateId = async (context: unknown) =>
   z
     .string()
@@ -81,6 +113,31 @@ export const getCoreCommitteeSelectionRouteHandler = route(
 export const updateCoreCommitteeSelectionRouteHandler = route(
   async (req, actor, id) => coreCommitteeSelectionUseCases.update(actor, id, await body(req)),
   true,
+);
+export const listStudentCoreCommitteeSelectionsRouteHandler = studentRoute(
+  (_req, actor) => studentCoreCommitteeSelectionUseCases.list(actor),
+  false,
+);
+export const getStudentCoreCommitteeSelectionRouteHandler = studentRoute(
+  (_req, actor, id) => studentCoreCommitteeSelectionUseCases.get(actor, id),
+);
+export const submitStudentCoreCommitteeSelectionApplicationRouteHandler = studentRoute(
+  async (req, actor, id) => {
+    const value = z
+      .object({
+        positionId: z.string().uuid(),
+        answers: z.record(z.string(), z.unknown()),
+      })
+      .strict()
+      .parse(await body(req));
+    return studentCoreCommitteeSelectionUseCases.submit({
+      actor,
+      selectionId: id,
+      ...value,
+    });
+  },
+  true,
+  201,
 );
 export const extendCoreCommitteeSelectionDeadlineRouteHandler = route(
   async (req, actor, id) =>

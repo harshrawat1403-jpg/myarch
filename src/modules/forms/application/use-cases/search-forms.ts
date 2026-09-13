@@ -10,7 +10,14 @@ export class SearchFormsUseCase {
 
   async execute(input: { actor: AuthenticatedActor; filters: FormFilters; availableOnly?: boolean }): Promise<readonly FormRecord[]> {
     if (!canViewForms(input.actor)) throw new NotAuthorizedError("Not authorized to view forms");
-    const forms = await this.deps.formRepository.search(input.filters);
+    const forms = await this.deps.formRepository.search({
+      ...input.filters,
+      // Core Committee owns its selection flow and its linked form is an
+      // implementation detail. Administrative lists deliberately retain it.
+      ...(input.availableOnly && input.actor.role === "STUDENT"
+        ? { excludeCoreCommitteeSelectionForms: true }
+        : {}),
+    });
     return input.availableOnly ? forms.filter((form) => isAvailableForStudent(form, input.actor.role)) : forms;
   }
 }

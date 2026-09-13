@@ -80,11 +80,23 @@ export class PrismaFormRepository implements FormRepository {
       where: {
         status: filters.status,
         title: filters.search ? { contains: filters.search, mode: "insensitive" } : undefined,
+        ...(filters.excludeCoreCommitteeSelectionForms
+          ? { coreCommitteeSelectionApplicationForm: null }
+          : {}),
       },
       include: { fields: true, electionApplicationForm: true, coreCommitteeSelectionApplicationForm: true },
       orderBy: { createdAt: "desc" },
     });
     return rows.map(toDomain);
+  }
+
+  async isCoreCommitteeSelectionForm(id: string): Promise<boolean> {
+    return Boolean(
+      await this.prisma.coreCommitteeSelectionApplicationForm.findUnique({
+        where: { formId: id },
+        select: { id: true },
+      }),
+    );
   }
 }
 
