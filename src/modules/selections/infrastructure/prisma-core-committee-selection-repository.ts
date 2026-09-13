@@ -803,11 +803,17 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
       return { decisionId: input.decisionId };
     });
   }
-  private async serializable<T>(work: (tx: PrismaTypes.TransactionClient) => Promise<T>) {
+  private async serializable<T>(
+    work: (tx: PrismaTypes.TransactionClient) => Promise<T>,
+    options?: { maxWait?: number; timeout?: number },
+  ) {
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        return await this.prisma.$transaction(work, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        return await this.prisma.$transaction(work, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          ...options,
+        });
       } catch (error) {
         const retryable = error instanceof Prisma.PrismaClientKnownRequestError &&
           (error.code === "P2034" || (error.code === "P2010" && error.message.includes("Code: `40001`")));
@@ -975,6 +981,14 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
         metadata: { title: selection.title, lifecycleState: selection.status, applications, interviews },
       });
       return { applications, shortlisted, interviews };
+    }, {
+      // A populated Core selection performs a bounded, database-only cascade
+      // of explicit Restrict-FK deletes. Neon/Vercel pool acquisition and that
+      // sequence can exceed Prisma's 2s/5s interactive defaults; keep the
+      // exception local to destructive cleanup rather than relaxing every
+      // governance transaction.
+      maxWait: 10_000,
+      timeout: 20_000,
     });
   }
   async internalProcessing(selectionId: string) {
