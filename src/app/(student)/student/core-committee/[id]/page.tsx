@@ -197,12 +197,12 @@ export default function StudentCoreCommitteeDetailPage() {
                   : "You were not selected for the final position."}
               </p>
             )}
-            {selection.application.shortlistOutcome === "SHORTLISTED" && (
+            {!selection.application.result && selection.application.shortlistOutcome === "SHORTLISTED" && (
               <p className="rounded border border-(--color-border) p-3 text-sm">
                 You have been shortlisted for the next stage.
               </p>
             )}
-            {selection.application.shortlistOutcome === "NOT_SHORTLISTED" && (
+            {!selection.application.result && selection.application.shortlistOutcome === "NOT_SHORTLISTED" && (
               <p className="rounded border border-(--color-border) p-3 text-sm">
                 Your application was not shortlisted for the next stage.
               </p>

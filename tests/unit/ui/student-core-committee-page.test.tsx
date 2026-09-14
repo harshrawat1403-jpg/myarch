@@ -110,4 +110,27 @@ describe("student Core Committee application UI", () => {
     expect(await screen.findByText(/Applications closed on/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Review application" })).not.toBeInTheDocument();
   });
+
+  it("hides the shortlist outcome after final results are published", async () => {
+    state.fetch.mockImplementation((path: string) => {
+      if (path === "/api/student/core-committee-selections/selection-1")
+        return response({
+          ...selection,
+          application: {
+            status: "SHORTLISTED",
+            submittedAt: new Date().toISOString(),
+            domain: { id: "domain-1", title: "Technical Coordinator" },
+            answers: {},
+            interviews: [],
+            shortlistOutcome: "SHORTLISTED",
+            result: { outcome: "SELECTED", publishedAt: new Date().toISOString() },
+          },
+        });
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    render(<StudentCoreCommitteeDetailPage />);
+
+    expect(await screen.findByText("SELECTED")).toBeInTheDocument();
+    expect(screen.queryByText("You have been shortlisted for the next stage.")).not.toBeInTheDocument();
+  });
 });
