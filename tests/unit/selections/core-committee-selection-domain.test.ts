@@ -7,26 +7,14 @@ import {
 } from "../../../src/modules/selections/domain/core-committee-selection";
 
 describe("Core Committee selection lifecycle", () => {
-  it("uses the Council-led selection lifecycle and has no voting stage", () => {
-    const path = [
-      "APPLICATION_OPEN",
-      "APPLICATION_CLOSED",
-      "SCRUTINY",
-      "CORRECTIONS",
-      "SHORTLIST",
-      "INTERVIEWS",
-      "COUNCIL_REVIEW",
-      "SELECTION_DECIDED",
-      "PUBLISHED",
-      "MEMBERSHIP_CONFIRMED",
-      "ARCHIVED",
-    ] as const;
+  it("limits lifecycle transitions to the application period", () => {
+    const path = ["APPLICATION_OPEN", "APPLICATION_CLOSED"] as const;
     let current: Parameters<typeof assertSelectionTransition>[0] = "DRAFT";
     for (const next of path) {
       expect(() => assertSelectionTransition(current, next)).not.toThrow();
       current = next;
     }
-    expect(() => assertSelectionTransition("COUNCIL_REVIEW", "VOTING" as never)).toThrow();
+    expect(() => assertSelectionTransition("APPLICATION_CLOSED", "SHORTLIST")).toThrow();
   });
   it("accepts selection configuration without voter groups, quorum, ballots, or weights", () => {
     const result = coreCommitteeSelectionConfigSchema.safeParse({

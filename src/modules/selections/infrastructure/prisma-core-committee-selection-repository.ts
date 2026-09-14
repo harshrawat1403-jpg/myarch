@@ -577,48 +577,6 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
             "validation",
           );
       }
-      if (status === "SELECTION_DECIDED") {
-        const decisions = await tx.coreCommitteeSelectionDecision.findMany({
-          where: { selectionId },
-          include: { position: true, candidate: { include: { positions: true } } },
-        });
-        if (!decisions.length || decisions.some((decision) => decision.state !== "FINALIZED"))
-          throw new CoreCommitteeSelectionError(
-            "Finalize all recorded Council decisions before deciding the selection",
-            "validation",
-          );
-        for (const position of selection.positions) {
-          if (
-            decisions.filter(
-              (decision) => decision.outcome === "SELECTED" && decision.positionId === position.id,
-            ).length > position.seats
-          )
-            throw new CoreCommitteeSelectionError(
-              `Selected candidates exceed available seats for ${position.title}`,
-              "validation",
-            );
-        }
-        if (
-          decisions.some(
-            (decision) =>
-              decision.outcome === "SELECTED" &&
-              ((decision.candidate.status !== "ELIGIBLE" &&
-                decision.candidate.status !== "SHORTLISTED") ||
-                !decision.candidate.positions.some(
-                  (item) => item.positionId === decision.positionId,
-                )),
-          )
-        )
-          throw new CoreCommitteeSelectionError(
-            "Selected decisions must reference eligible candidates for their position",
-            "validation",
-          );
-      }
-      if (status === "INTERVIEWS" && !selection.shortlistPublishedAt)
-        throw new CoreCommitteeSelectionError(
-          "Publish the shortlist before opening interviews",
-          "validation",
-        );
       const data: PrismaTypes.CoreCommitteeSelectionUpdateInput = { status };
       if (status === "APPLICATION_OPEN")
         Object.assign(data, {
@@ -682,16 +640,6 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
       })),
     }));
   }
-  private async requireStage(
-    tx: PrismaTypes.TransactionClient,
-    selectionId: string,
-    stage: CoreCommitteeSelectionStatus,
-  ) {
-    const selection = await lockSelection(tx, selectionId);
-    if (selection.status !== stage)
-      throw new CoreCommitteeSelectionError(`Operation requires ${stage.replaceAll("_", " ")}`);
-    return selection;
-  }
   async recordScrutiny(input: {
     selectionId: string;
     candidateId: string;
@@ -700,7 +648,6 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     actorUserId: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      await this.requireStage(tx, input.selectionId, "SCRUTINY");
       const updated = await tx.coreCommitteeSelectionCandidate.updateMany({
         where: {
           id: input.candidateId,
@@ -736,9 +683,6 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     actorUserId: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      const selection = await lockSelection(tx, input.selectionId);
-      if (selection.status !== "SCRUTINY" && selection.status !== "CORRECTIONS")
-        throw new CoreCommitteeSelectionError("Corrections are not open");
       const candidate = await tx.coreCommitteeSelectionCandidate.updateMany({
         where: {
           id: input.candidateId,
@@ -769,7 +713,6 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     actorUserId: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      await this.requireStage(tx, input.selectionId, "CORRECTIONS");
       const candidate = await tx.coreCommitteeSelectionCandidate.findFirst({
         where: {
           id: input.candidateId,
@@ -847,13 +790,18 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
   }
   async publishShortlist(input: { selectionId: string; actorUserId: string }) {
     return this.prisma.$transaction(async (tx) => {
-      const selection = await this.requireStage(tx, input.selectionId, "SHORTLIST");
+      const selection = await lockSelection(tx, input.selectionId);
       if (selection.shortlistPublishedAt)
         return { published: true as const, idempotent: true };
       const candidates = await tx.coreCommitteeSelectionCandidate.findMany({
         where: { selectionId: selection.id, status: { in: ["SHORTLISTED", "INELIGIBLE"] } },
         select: { applicantUserId: true, status: true },
       });
+      if (!candidates.length)
+        throw new CoreCommitteeSelectionError(
+          "Record at least one shortlist decision before publishing",
+          "validation",
+        );
       await tx.coreCommitteeSelection.update({
         where: { id: selection.id },
         data: { shortlistPublishedAt: new Date() },
@@ -967,7 +915,6 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     actorUserId: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      const selection = await lockSelection(tx, input.selectionId);
       const existing = await tx.coreCommitteeSelectionInterview.findFirst({
         where: { id: input.interviewId, selectionId: input.selectionId, status: "SCHEDULED" },
         include: {
@@ -1022,7 +969,6 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     actorUserId: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      await this.requireStage(tx, input.selectionId, "INTERVIEWS");
       const existing = await tx.coreCommitteeSelectionInterview.findFirst({
         where: {
           id: input.interviewId,
@@ -1079,7 +1025,6 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     actorUserId: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      await this.requireStage(tx, input.selectionId, "INTERVIEWS");
       const updated = await tx.coreCommitteeSelectionInterview.updateMany({
         where: {
           id: input.interviewId,
@@ -1130,7 +1075,6 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     note: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      await this.requireStage(tx, input.selectionId, "COUNCIL_REVIEW");
       const current = await this.currentCouncilCommittee(
         input.selectionId,
         input.councilMemberUserId,
@@ -1169,11 +1113,6 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
   }) {
     return this.serializable(async (tx) => {
       const lockedSelection = await lockSelection(tx, input.selectionId);
-      if (lockedSelection.status !== "COUNCIL_REVIEW")
-        throw new CoreCommitteeSelectionError(
-          "Core Committee selection is not in Council review",
-          "validation",
-        );
       const current = await this.currentCouncilCommittee(
         input.selectionId,
         input.councilMemberUserId,
@@ -1265,7 +1204,7 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
         where: {
           id: input.candidateId,
           selectionId: input.selectionId,
-          status: { not: "WITHDRAWN" },
+          status: "SHORTLISTED",
           positions: { some: { positionId: input.positionId } },
           shortlistEntries: { some: { positionId: input.positionId, selectionId: input.selectionId } },
         },
@@ -1314,11 +1253,6 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
   }
   async finalizeDecision(input: { selectionId: string; decisionId: string; actorUserId: string }) {
     return this.prisma.$transaction(async (tx) => {
-      const selection = await lockSelection(tx, input.selectionId);
-      if (selection.status !== "COUNCIL_REVIEW" && selection.status !== "SELECTION_DECIDED")
-        throw new CoreCommitteeSelectionError(
-          "Decisions can only be finalized during Council review or selection decision",
-        );
       const updated = await tx.coreCommitteeSelectionDecision.updateMany({
         where: { id: input.decisionId, selectionId: input.selectionId, state: "RECORDED" },
         data: { state: "FINALIZED", finalizedByUserId: input.actorUserId, finalizedAt: new Date() },
@@ -1363,12 +1297,12 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
   private async finalizedSelection(tx: PrismaTypes.TransactionClient, selectionId: string) {
     const selection = await lockSelection(tx, selectionId);
     const decisions = await tx.coreCommitteeSelectionDecision.findMany({
-      where: { selectionId },
+      where: { selectionId, state: "FINALIZED" },
       include: { position: true, candidate: { include: { positions: true } } },
     });
-    if (!decisions.length || decisions.some((decision) => decision.state !== "FINALIZED"))
+    if (!decisions.length)
       throw new CoreCommitteeSelectionError(
-        "All recorded Core Committee decisions must be finalized",
+        "Record at least one final Core Committee decision before publishing",
         "validation",
       );
     const selected = decisions.filter((decision) => decision.outcome === "SELECTED");
@@ -1432,11 +1366,6 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
         selection.status === "ARCHIVED"
       )
         return { published: true as const, idempotent: true };
-      if (selection.status !== "SELECTION_DECIDED")
-        throw new CoreCommitteeSelectionError(
-          "Core Committee results may be published only after selection decisions",
-          "validation",
-        );
       const { decisions, selected } = await this.finalizedSelection(tx, selection.id);
       const candidates = await tx.coreCommitteeSelectionCandidate.findMany({
         where: { selectionId: selection.id },

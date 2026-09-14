@@ -72,15 +72,6 @@ export class CoreCommitteeSelectionUseCases {
       .enum([
         "APPLICATION_OPEN",
         "APPLICATION_CLOSED",
-        "SCRUTINY",
-        "CORRECTIONS",
-        "SHORTLIST",
-        "INTERVIEWS",
-        "COUNCIL_REVIEW",
-        "SELECTION_DECIDED",
-        "PUBLISHED",
-        "MEMBERSHIP_CONFIRMED",
-        "ARCHIVED",
       ])
       .parse(input);
     return this.repository.transition(selectionId, status, actor.userId);

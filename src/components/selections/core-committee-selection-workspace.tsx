@@ -162,11 +162,10 @@ export function CoreCommitteeSelectionWorkspace({ id, view }: { id: string; view
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm text-(--color-text-secondary)">
-            Core Committee · Council-led selection
+            Secretary-managed selection
           </p>
           <h1 className="text-2xl font-semibold">{selection.title}</h1>
         </div>
-        <Badge variant="neutral">{selection.status}</Badge>
       </div>
       <nav className="flex flex-wrap gap-2 text-sm" aria-label="Core Committee workflow">
         {(
@@ -189,8 +188,7 @@ export function CoreCommitteeSelectionWorkspace({ id, view }: { id: string; view
       {view === "dashboard" && (
         <>
           <Card className="space-y-2">
-            <p className="text-sm text-(--color-text-secondary)">Lifecycle</p>
-            <p className="font-medium">{selection.status.replaceAll("_", " ")}</p>
+            <p className="font-medium">Application period</p>
             <p className="text-sm text-(--color-text-secondary)">
               Applications: {dateTime(selection.applicationOpenAt)} –{" "}
               {dateTime(selection.applicationCloseAt)}
@@ -326,7 +324,7 @@ export function CoreCommitteeSelectionWorkspace({ id, view }: { id: string; view
           positions={processing.positions}
           onDetail={setDetail}
           published={Boolean(selection.shortlistPublishedAt)}
-          canPublish={selection.status === "SHORTLIST"}
+          canPublish={!selection.shortlistPublishedAt}
           publish={() => {
             if (!window.confirm("Publish the shortlist to all applicants?")) return;
             void act(

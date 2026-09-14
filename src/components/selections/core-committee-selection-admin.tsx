@@ -9,15 +9,6 @@ import { apiClient, ApiError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-const nextStage: Partial<Record<CoreCommitteeSelectionRecord["status"], string>> = {
-  APPLICATION_CLOSED: "SCRUTINY",
-  SCRUTINY: "CORRECTIONS",
-  CORRECTIONS: "SHORTLIST",
-  SHORTLIST: "INTERVIEWS",
-  INTERVIEWS: "COUNCIL_REVIEW",
-  COUNCIL_REVIEW: "SELECTION_DECIDED",
-};
 function local(value?: Date | null) {
   return value
     ? new Date(new Date(value).getTime() - new Date(value).getTimezoneOffset() * 60000)
@@ -276,10 +267,6 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
   const [selection, setSelection] = useState<CoreCommitteeSelectionRecord | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [appointmentPreview, setAppointmentPreview] = useState<{
-    currentCoreCommittee: { memberships: unknown[] };
-    selected: { position: string }[];
-  } | null>(null);
   const load = async () => {
     if (!accessToken || role !== "SECRETARY") return;
     if (id) {
@@ -323,7 +310,7 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
   return (
     <div className="max-w-5xl space-y-6">
       <div>
-        <p className="text-sm text-(--color-text-secondary)">Council-led selection workflow</p>
+        <p className="text-sm text-(--color-text-secondary)">Secretary-managed selection</p>
         <h1 className="text-2xl font-semibold">
           {id ? (selection?.title ?? "Core Committee selection") : "Core Committee selections"}
         </h1>
@@ -365,7 +352,6 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                     {item.title}
                     <p className="text-sm">{item.academicYear}</p>
                   </div>
-                  <Badge variant="neutral">{item.status}</Badge>
                 </Card>
               </Link>
             ))}
@@ -379,7 +365,6 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
             </Link>
             <Card className="space-y-4">
               <div className="flex flex-wrap justify-between gap-3">
-                <Badge variant="neutral">{selection.status}</Badge>
                 {selection.status === "DRAFT" ? (
                   <Button
                     disabled={busy}
@@ -414,107 +399,8 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                   >
                     Close applications
                   </Button>
-                ) : nextStage[selection.status] ? (
-                  <Button
-                    disabled={busy}
-                    onClick={() =>
-                      void act(
-                        () =>
-                          apiClient.post(
-                            `/api/core-committee-selections/${id}/status`,
-                            { status: nextStage[selection.status] },
-                            accessToken!,
-                          ),
-                        `Moved to ${nextStage[selection.status]!.replaceAll("_", " ")}`,
-                      )
-                    }
-                  >
-                    Advance to {nextStage[selection.status]!.replaceAll("_", " ")}
-                  </Button>
                 ) : null}
-                {selection.status === "SELECTION_DECIDED" && (
-                  <Button
-                    disabled={busy}
-                    onClick={() =>
-                      void act(
-                        () =>
-                          apiClient.post(
-                            `/api/core-committee-selections/${id}/publish`,
-                            {},
-                            accessToken!,
-                          ),
-                        "Core Committee result published",
-                      )
-                    }
-                  >
-                    Publish selected members
-                  </Button>
-                )}
-                {selection.status === "PUBLISHED" && (
-                  <Button
-                    disabled={busy}
-                    onClick={() =>
-                      void act(
-                        async () =>
-                          setAppointmentPreview(
-                            await apiClient.get(
-                              `/api/core-committee-selections/${id}/appointment-preview`,
-                              accessToken!,
-                            ),
-                          ),
-                        "Appointment preview loaded",
-                      )
-                    }
-                  >
-                    Preview Core Committee memberships
-                  </Button>
-                )}
-                {selection.status === "PUBLISHED" && appointmentPreview && (
-                  <div className="text-sm">
-                    Outgoing memberships:{" "}
-                    {appointmentPreview.currentCoreCommittee.memberships.length}. New memberships:{" "}
-                    {appointmentPreview.selected.length}.{" "}
-                    <Button
-                      disabled={busy}
-                      onClick={() =>
-                        void act(
-                          () =>
-                            apiClient.post(
-                              `/api/core-committee-selections/${id}/appointments`,
-                              {},
-                              accessToken!,
-                            ),
-                          "Core Committee memberships confirmed",
-                        )
-                      }
-                    >
-                      Confirm memberships
-                    </Button>
-                  </div>
-                )}
-                {selection.status === "MEMBERSHIP_CONFIRMED" && (
-                  <Button
-                    disabled={busy}
-                    onClick={() =>
-                      void act(
-                        () =>
-                          apiClient.post(
-                            `/api/core-committee-selections/${id}/archive`,
-                            {},
-                            accessToken!,
-                          ),
-                        "Core Committee selection archived",
-                      )
-                    }
-                  >
-                    Archive selection
-                  </Button>
-                )}
               </div>
-              <p className="text-sm text-(--color-text-secondary)">
-                This workflow records Council-led selection. It has no voter groups, ballots,
-                quorum, or vote counting.
-              </p>
               <div className="flex flex-wrap gap-3 text-sm">
                 <Link
                   className="underline"
