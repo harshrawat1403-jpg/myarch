@@ -1230,9 +1230,6 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
           );
       }
       const data = {
-        selectionId: input.selectionId,
-        candidateId: input.candidateId,
-        positionId: input.positionId,
         councilCommitteeId: existing?.councilCommitteeId ?? null,
         outcome: input.outcome,
         internalNote: "Secretary final result",
@@ -1243,8 +1240,18 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
         finalizedAt: new Date(),
       };
       const decision = existing
-        ? await tx.coreCommitteeSelectionDecision.update({ where: { id: existing.id }, data })
-        : await tx.coreCommitteeSelectionDecision.create({ data });
+        ? await tx.coreCommitteeSelectionDecision.update({
+            where: { id: existing.id },
+            data,
+          })
+        : await tx.coreCommitteeSelectionDecision.create({
+            data: {
+              selectionId: input.selectionId,
+              candidateId: input.candidateId,
+              positionId: input.positionId,
+              ...data,
+            },
+          });
       await new PrismaAuditRecorder(tx).record({
         actorUserId: input.actorUserId,
         action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_DECISION_RECORDED,
@@ -1370,8 +1377,10 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
         where: { selectionId: selection.id },
         select: { applicantUserId: true },
       });
-      const publication = await tx.coreCommitteeSelectionPublication.create({
-        data: { selectionId: selection.id, publishedByUserId: input.actorUserId },
+      const publication = await tx.coreCommitteeSelectionPublication.upsert({
+        where: { selectionId: selection.id },
+        create: { selectionId: selection.id, publishedByUserId: input.actorUserId },
+        update: {},
       });
       await tx.coreCommitteeSelection.update({
         where: { id: selection.id },
