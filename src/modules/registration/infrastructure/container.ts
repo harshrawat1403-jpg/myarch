@@ -108,26 +108,36 @@ async function sendAccountCredentialsEmail(input: {
  * back to the use case to replay once this function returns — i.e. only
  * after Postgres has actually committed everything above.
  */
-async function runApproveTransaction<T>(
+export async function runApproveTransaction<T>(
   fn: (ctx: ApproveRegistrationTransactionContext) => Promise<T>,
 ): Promise<{ result: T; deferredNotifications: NotificationRequest[] }> {
-  return prisma.$transaction(async (tx) => {
-    const deferredNotifications: NotificationRequest[] = [];
-    const deferredNotifier: NotificationService = {
-      notify: async (request) => {
-        deferredNotifications.push(request);
-      },
-    };
+  return prisma.$transaction(
+    async (tx) => {
+      const deferredNotifications: NotificationRequest[] = [];
+      const deferredNotifier: NotificationService = {
+        notify: async (request) => {
+          deferredNotifications.push(request);
+        },
+      };
 
-    const result = await fn({
-      createStudent: (input) => buildCreateStudentUseCase(tx).execute(input),
-      resetPassword: (input) => buildAdminResetPasswordUseCase(tx, deferredNotifier).execute(input),
-      registrationRequestRepository: new PrismaRegistrationRequestRepository(tx),
-      auditRecorder: new PrismaAuditRecorder(tx),
-    });
+      const result = await fn({
+        createStudent: (input) => buildCreateStudentUseCase(tx).execute(input),
+        resetPassword: (input) => buildAdminResetPasswordUseCase(tx, deferredNotifier).execute(input),
+        registrationRequestRepository: new PrismaRegistrationRequestRepository(tx),
+        auditRecorder: new PrismaAuditRecorder(tx),
+      });
 
-    return { result, deferredNotifications };
-  });
+      return { result, deferredNotifications };
+    },
+    {
+      // Approval creates a populated student account and performs two bcrypt
+      // hashes before its final decision/audit writes. Neon/Vercel latency
+      // can exceed Prisma's 2s/5s interactive defaults; bound this exception
+      // to approval instead of relaxing transaction limits globally.
+      maxWait: 10_000,
+      timeout: 20_000,
+    },
+  );
 }
 
 async function runCredentialsResetTransaction<T>(

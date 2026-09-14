@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaTransactionClient } from "@/lib/prisma";
 import type { BatchStatus } from "@/modules/batches";
 
 /**
@@ -21,7 +21,7 @@ export interface BatchLookup {
 }
 
 export class PrismaBatchLookup implements BatchLookup {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaTransactionClient) {}
 
   async findById(id: string): Promise<{ id: string; name: string; status: BatchStatus } | null> {
     return this.prisma.batch.findUnique({

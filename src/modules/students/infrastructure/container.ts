@@ -107,14 +107,14 @@ export function getCreateStudentUseCase(): CreateStudentUseCase {
  * alongside other cross-module writes (registration's approval flow — see
  * modules/registration/infrastructure/container.ts). Always builds a fresh
  * instance bound to the given client, unlike the cached singleton above.
- * `batchLookup` deliberately stays the ordinary singleton: it only ever
- * reads, never participates in this flow's writes, so it doesn't need to
- * see the transaction.
+ * The batch lookup is transaction-scoped too. Registration approval uses
+ * this builder inside an interactive transaction, so every database access
+ * in the account-creation phase must use that same client.
  */
 export function buildCreateStudentUseCase(client: PrismaTransactionClient): CreateStudentUseCase {
   return new CreateStudentUseCase({
     studentRepository: new PrismaStudentRepository(client),
-    batchLookup,
+    batchLookup: new PrismaBatchLookup(client),
     userProvisioner: new PrismaUserProvisioner(client, getEnv().BCRYPT_COST_FACTOR),
   });
 }
