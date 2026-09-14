@@ -935,7 +935,15 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
         );
       const interview = await tx.coreCommitteeSelectionInterview.create({
         data: {
-          ...input,
+          selectionId: input.selectionId,
+          candidateId: input.candidateId,
+          positionId: input.positionId,
+          scheduledAt: input.scheduledAt,
+          durationMinutes: input.durationMinutes,
+          mode: input.mode,
+          location: input.location,
+          candidateInstructions: input.candidateInstructions,
+          internalNotes: input.internalNotes,
           status: "SCHEDULED",
           scheduledByUserId: input.actorUserId,
         },

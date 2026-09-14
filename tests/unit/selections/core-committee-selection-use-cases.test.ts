@@ -205,6 +205,17 @@ describe("Core Committee selection authority", () => {
     await useCases.shortlist(secretary, "selection", { candidateId, positionIds: [positionId] });
     await useCases.publishShortlist(secretary, "selection");
     await useCases.interview(secretary, "selection", { candidateId, positionId, scheduledAt: "2099-09-12T10:00:00.000Z", durationMinutes: 30, mode: "ONLINE", location: "https://meet.example.com/core", internalNotes: "private" });
+    expect(repository.createInterview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectionId: "selection",
+        candidateId,
+        positionId,
+        durationMinutes: 30,
+        mode: "ONLINE",
+        location: "https://meet.example.com/core",
+        actorUserId: "secretary",
+      }),
+    );
     await useCases.rescheduleInterview(secretary, "selection", interviewId, { scheduledAt: "2099-09-12T11:00:00.000Z", durationMinutes: 30, mode: "ONLINE", location: "https://meet.example.com/core", internalNotes: "private" });
     await useCases.cancelInterview(secretary, "selection", interviewId, { reason: "Venue changed" });
     expect(notifications.notify).toHaveBeenCalledWith(expect.objectContaining({ template: "CORE_COMMITTEE_SELECTION_SHORTLISTED" }));
