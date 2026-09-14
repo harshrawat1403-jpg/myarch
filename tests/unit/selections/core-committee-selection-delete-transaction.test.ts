@@ -4,6 +4,7 @@ import { PrismaCoreCommitteeSelectionRepository } from "../../../src/modules/sel
 describe("Core Committee permanent deletion transaction", () => {
   it("deletes a legacy Draft selection through one bounded transaction client", async () => {
     const deleteMany = vi.fn().mockResolvedValue({ count: 0 });
+    const deleteAppointment = vi.fn().mockResolvedValue({ count: 0 });
     const deletePublication = vi.fn().mockResolvedValue({ count: 0 });
     const tx = {
       $queryRaw: vi.fn().mockResolvedValue([]),
@@ -32,6 +33,7 @@ describe("Core Committee permanent deletion transaction", () => {
       coreCommitteeSelectionInterviewHistory: { deleteMany },
       coreCommitteeCouncilReview: { deleteMany },
       coreCommitteeSelectionDecision: { deleteMany },
+      coreCommitteeSelectionAppointment: { deleteMany: deleteAppointment },
       coreCommitteeSelectionCorrectionRequest: { deleteMany },
       coreCommitteeSelectionScrutinyReview: { deleteMany },
       coreCommitteeSelectionCandidatePosition: { deleteMany },
@@ -68,6 +70,9 @@ describe("Core Committee permanent deletion transaction", () => {
     expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
       deletePublication.mock.invocationCallOrder[0]!,
     );
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      deleteMany.mock.invocationCallOrder[0]!,
+    );
     expect(tx.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ targetEntityId: "selection" }),
@@ -78,6 +83,8 @@ describe("Core Committee permanent deletion transaction", () => {
 
   it("keeps a populated deletion and its audit record on the transaction client", async () => {
     const deleteMany = vi.fn().mockResolvedValue({ count: 1 });
+    const deleteAppointment = vi.fn().mockResolvedValue({ count: 1 });
+    const deleteDecision = vi.fn().mockResolvedValue({ count: 1 });
     const deletePublication = vi.fn().mockResolvedValue({ count: 1 });
     const tx = {
       $queryRaw: vi.fn().mockResolvedValue([]),
@@ -105,7 +112,8 @@ describe("Core Committee permanent deletion transaction", () => {
       },
       coreCommitteeSelectionInterviewHistory: { deleteMany },
       coreCommitteeCouncilReview: { deleteMany },
-      coreCommitteeSelectionDecision: { deleteMany },
+      coreCommitteeSelectionDecision: { deleteMany: deleteDecision },
+      coreCommitteeSelectionAppointment: { deleteMany: deleteAppointment },
       coreCommitteeSelectionCorrectionRequest: { deleteMany },
       coreCommitteeSelectionScrutinyReview: { deleteMany },
       coreCommitteeSelectionCandidatePosition: { deleteMany },
@@ -136,6 +144,15 @@ describe("Core Committee permanent deletion transaction", () => {
     expect(tx.coreCommitteeSelectionCandidatePosition.deleteMany).toHaveBeenCalledWith({
       where: { candidateId: { in: ["candidate"] } },
     });
+    expect(tx.coreCommitteeSelectionAppointment.deleteMany).toHaveBeenCalledWith({
+      where: { selectionId: "selection" },
+    });
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      deleteDecision.mock.invocationCallOrder[0]!,
+    );
+    expect(deleteAppointment.mock.invocationCallOrder[0]).toBeLessThan(
+      deleteDecision.mock.invocationCallOrder[0]!,
+    );
     expect(tx.form.delete).toHaveBeenCalledWith({ where: { id: "managed-form" } });
     expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
     expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(

@@ -42,6 +42,10 @@ function route(operation: Operation, admin: boolean, withId = true, status = 200
           return conflict(
             "Conflicting Core Committee selection data or concurrent change; refresh and retry",
           );
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2010")
+          return conflict(
+            "Core Committee selection deletion was blocked by protected selection data; refresh and retry",
+          );
         if (error instanceof Prisma.PrismaClientValidationError)
           return badRequest("Invalid Core Committee decision or publication data");
         throw error;

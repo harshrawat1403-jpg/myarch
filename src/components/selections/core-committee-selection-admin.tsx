@@ -551,14 +551,26 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                           "Type DELETE CORE SELECTION to permanently delete this application and its responses.",
                         ) ?? "");
                   if (!confirmation) return;
-                  void act(async () => {
-                    await apiClient.post(
-                      `/api/core-committee-selections/${id}/delete`,
-                      { confirmation },
-                      accessToken!,
-                    );
-                    router.push("/dashboard/core-committee-selections");
-                  }, "Core Committee application deleted");
+                  void (async () => {
+                    setBusy(true);
+                    setMessage("");
+                    try {
+                      await apiClient.post(
+                        `/api/core-committee-selections/${id}/delete`,
+                        { confirmation },
+                        accessToken!,
+                      );
+                      router.push("/dashboard/core-committee-selections");
+                    } catch (error) {
+                      setMessage(
+                        error instanceof ApiError
+                          ? error.message
+                          : "Unable to delete Core Committee selection",
+                      );
+                    } finally {
+                      setBusy(false);
+                    }
+                  })();
                 }}
               >
                 Delete application form

@@ -1587,6 +1587,10 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
             "validation",
           );
 
+        // The database immutability triggers permit protected Core rows to be
+        // removed only inside this explicitly authorized transaction.
+        await tx.$executeRaw`SELECT set_config('myarch.allow_core_publication_delete', 'on', true)`;
+
         const candidateIds = (
           await tx.coreCommitteeSelectionCandidate.findMany({
             where: { selectionId: selection.id },
@@ -1611,6 +1615,9 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
           where: { selectionId: selection.id },
         });
         await tx.coreCommitteeCouncilReview.deleteMany({ where: { selectionId: selection.id } });
+        await tx.coreCommitteeSelectionAppointment.deleteMany({
+          where: { selectionId: selection.id },
+        });
         await tx.coreCommitteeSelectionDecision.deleteMany({
           where: { selectionId: selection.id },
         });
@@ -1630,10 +1637,6 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
         await tx.coreCommitteeSelectionDeadlineExtension.deleteMany({
           where: { selectionId: selection.id },
         });
-        // The database trigger accepts this transaction-local escape hatch only
-        // for the explicitly authorized, confirmed permanent-delete workflow.
-        // PostgreSQL clears it automatically on commit or rollback.
-        await tx.$executeRaw`SELECT set_config('myarch.allow_core_publication_delete', 'on', true)`;
         await tx.coreCommitteeSelectionPublication.deleteMany({
           where: { selectionId: selection.id },
         });
