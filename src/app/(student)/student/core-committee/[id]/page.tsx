@@ -12,7 +12,13 @@ import { Card } from "@/components/ui/card";
 import { FormRenderer } from "@/components/forms/form-renderer";
 
 function lifecycleLabel(selection: StudentCoreCommitteeSelectionDetail): string {
-  if (selection.application) return selection.application.status.replaceAll("_", " ");
+  if (selection.application?.result)
+    return selection.application.result.outcome === "SELECTED" ? "Final selected" : "Final not selected";
+  if (selection.application?.status === "INELIGIBLE") return "Not shortlisted";
+  if (selection.application?.status === "SHORTLISTED") return "Shortlisted";
+  if (selection.application?.status === "CORRECTION_REQUIRED") return "Update requested";
+  if (selection.application && selection.status === "APPLICATION_OPEN") return "Submitted";
+  if (selection.application) return "Under review";
   const now = Date.now();
   if (now < new Date(selection.applicationOpenAt).getTime()) return "Opens soon";
   if (selection.status === "APPLICATION_OPEN" && now < new Date(selection.applicationCloseAt).getTime()) return "Open";
@@ -92,7 +98,7 @@ export default function StudentCoreCommitteeDetailPage() {
         <section className="space-y-2"><h2 className="font-medium">Application brief</h2><p className="whitespace-pre-wrap text-sm text-(--color-text-secondary)">{selection.brief}</p></section>
 
         {selection.application ? (
-          <section className="space-y-3 border-t border-(--color-border) pt-4"><h2 className="font-medium">Your submitted application</h2><p className="text-sm">Selected domain: <strong>{selection.application.domain.title}</strong></p><p className="text-sm">Submitted {new Date(selection.application.submittedAt).toLocaleString()} · {selection.application.status.replaceAll("_", " ")}</p>{clientFields.length > 0 && <FormRenderer fields={clientFields} answers={selection.application.answers} readOnly />}</section>
+          <section className="space-y-3 border-t border-(--color-border) pt-4"><h2 className="font-medium">Your submitted application</h2><p className="text-sm">Selected domain: <strong>{selection.application.domain.title}</strong></p><p className="text-sm">Submitted {new Date(selection.application.submittedAt).toLocaleString()} · {label}</p>{(selection.application.interviews ?? []).length > 0 && <div className="space-y-2"><h3 className="font-medium">Interviews</h3>{(selection.application.interviews ?? []).map((interview) => <div key={interview.id} className="rounded border border-(--color-border) p-3 text-sm"><p>{interview.status.replaceAll("_", " ")}{interview.scheduledAt ? ` · ${new Date(interview.scheduledAt).toLocaleString()}` : ""}</p>{interview.durationMinutes && <p>Duration: {interview.durationMinutes} minutes</p>}{interview.mode && <p>Mode: {interview.mode}</p>}{interview.location && <p>Venue/link: {interview.location}</p>}{interview.candidateInstructions && <p>{interview.candidateInstructions}</p>}</div>)}</div>}{selection.application.result && <p className="rounded border border-(--color-border) p-3 text-sm">Final result: {selection.application.result.outcome === "SELECTED" ? "Selected" : "Not selected"} · Published {new Date(selection.application.result.publishedAt).toLocaleString()}</p>}{clientFields.length > 0 && <FormRenderer fields={clientFields} answers={selection.application.answers} readOnly />}</section>
         ) : (
           <>
             <section className="space-y-3 border-t border-(--color-border) pt-4"><div><h2 className="font-medium">Choose one domain</h2><p className="text-sm text-(--color-text-secondary)">You may apply for exactly one domain in this selection.</p></div>{selection.positions.map((position) => <label key={position.id} className={`block cursor-pointer rounded border p-4 ${selectedDomainId === position.id ? "border-(--color-accent)" : "border-(--color-border)"}`}><div className="flex gap-3"><input type="radio" name="domain" checked={selectedDomainId === position.id} disabled={!withinWindow || busy} onChange={() => { setSelectedDomainId(position.id); setReviewing(false); setConfirmed(false); }} /><div className="space-y-1"><p className="font-medium">{position.title}</p><p className="text-sm text-(--color-text-secondary)">{position.seats} {position.seats === 1 ? "position" : "positions"}</p><p className="whitespace-pre-wrap text-sm text-(--color-text-secondary)">{position.description}</p></div></div></label>)}</section>

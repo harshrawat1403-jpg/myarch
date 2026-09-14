@@ -14,8 +14,10 @@ import type {
 import type {
   CoreCommitteeSelectionCandidateRecord,
   CoreCommitteeSelectionRecord,
+  StudentCoreCommitteeInterview,
   StudentCoreCommitteeSelectionDetail,
   StudentCoreCommitteeApplicationField,
+  StudentCoreCommitteeResult,
   StudentCoreCommitteeSelectionSummary,
 } from "../domain/entities";
 import type {
@@ -71,6 +73,18 @@ type StudentCandidateRow = {
   status: CoreCommitteeSelectionCandidateRecord["status"];
   positions: Array<{ position: { id: string; title: string } }>;
   application: { submission: { submittedAt: Date; answers: PrismaTypes.JsonValue } };
+  interviews: Array<{
+    id: string;
+    positionId: string;
+    scheduledAt: Date | null;
+    durationMinutes: number | null;
+    mode: string | null;
+    location: string | null;
+    candidateInstructions: string | null;
+    status: "PLANNED" | "SCHEDULED" | "COMPLETED" | "CANCELLED";
+    completedAt: Date | null;
+  }>;
+  decisions: Array<{ outcome: "SELECTED" | "NOT_SELECTED" }>;
 };
 type StudentSummaryRow = {
   id: string;
@@ -80,7 +94,37 @@ type StudentSummaryRow = {
   applicationOpenAt: Date;
   applicationCloseAt: Date;
   candidates: StudentCandidateRow[];
+  publication: { publishedAt: Date } | null;
 };
+
+function studentInterview(
+  interview: StudentCandidateRow["interviews"][number],
+): StudentCoreCommitteeInterview {
+  return {
+    id: interview.id,
+    positionId: interview.positionId,
+    scheduledAt: interview.scheduledAt,
+    durationMinutes: interview.durationMinutes,
+    mode: interview.mode,
+    location: interview.location,
+    candidateInstructions: interview.candidateInstructions,
+    status: interview.status,
+    completedAt: interview.completedAt,
+  };
+}
+
+function studentResult(
+  candidate: StudentCandidateRow,
+  publication: { publishedAt: Date } | null,
+): StudentCoreCommitteeResult | null {
+  if (!publication) return null;
+  return {
+    outcome: candidate.decisions.some((decision) => decision.outcome === "SELECTED")
+      ? "SELECTED"
+      : "NOT_SELECTED",
+    publishedAt: publication.publishedAt,
+  };
+}
 
 function candidateDomain(candidate: StudentCandidateRow) {
   const domain = candidate.positions[0]?.position;
@@ -102,6 +146,8 @@ function toStudentSummary(row: StudentSummaryRow): StudentCoreCommitteeSelection
           status: candidate.status,
           submittedAt: candidate.application.submission.submittedAt,
           domain: candidateDomain(candidate),
+          interviews: candidate.interviews.map(studentInterview),
+          result: studentResult(candidate, row.publication),
         }
       : null,
   };
@@ -170,9 +216,15 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     const rows = await this.prisma.coreCommitteeSelection.findMany({
       where: { status: { not: "DRAFT" } },
       include: {
+        publication: { select: { publishedAt: true } },
         candidates: {
           where: { applicantUserId: studentUserId },
-          include: { positions: { include: { position: true } }, application: { include: { submission: true } } },
+          include: {
+            positions: { include: { position: true } },
+            application: { include: { submission: true } },
+            interviews: true,
+            decisions: { select: { outcome: true } },
+          },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -188,9 +240,15 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
       include: {
         positions: { orderBy: { displayOrder: "asc" } },
         applicationForm: { include: { form: { include: { fields: { orderBy: { displayOrder: "asc" } } } } } },
+        publication: { select: { publishedAt: true } },
         candidates: {
           where: { applicantUserId: studentUserId },
-          include: { positions: { include: { position: true } }, application: { include: { submission: true } } },
+          include: {
+            positions: { include: { position: true } },
+            application: { include: { submission: true } },
+            interviews: true,
+            decisions: { select: { outcome: true } },
+          },
         },
       },
     });
@@ -213,6 +271,8 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
             submittedAt: candidate.application.submission.submittedAt,
             domain: candidateDomain(candidate),
             answers: toAnswers(candidate.application.submission.answers),
+            interviews: candidate.interviews.map(studentInterview),
+            result: studentResult(candidate, row.publication),
           }
         : null,
     };
@@ -1136,6 +1196,8 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
       include: {
         candidates: {
           include: {
+            applicant: { include: { studentProfile: true } },
+            application: { include: { submission: { include: { studentProfile: true } } } },
             positions: { include: { position: true } },
             scrutinyReviews: true,
             correctionRequests: true,
@@ -1150,7 +1212,30 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     });
     if (!selection)
       throw new CoreCommitteeSelectionError("Core Committee selection not found", "notFound");
-    return { candidates: selection.candidates, positions: selection.positions };
+    return {
+      positions: selection.positions.map(({ id, title, seats, displayOrder }) => ({
+        id,
+        title,
+        seats,
+        displayOrder,
+      })),
+      candidates: selection.candidates.map((candidate) => ({
+        ...candidate,
+        candidateName: candidate.applicant.studentProfile?.fullName ?? candidate.applicant.email,
+        rollNumber: candidate.application.submission.studentProfile?.rollNumber ?? null,
+        submittedAt: candidate.application.submission.submittedAt,
+        answers: candidate.application.submission.answers,
+        applicationStatus: candidate.application.currentStatus,
+        positions: candidate.positions.map(({ positionId, position }) => ({
+          positionId,
+          title: position.title,
+        })),
+        shortlist: candidate.shortlistEntries.map(({ positionId, createdAt }) => ({
+          positionId,
+          createdAt,
+        })),
+      })),
+    };
   }
   async councilProcessing(selectionId: string): Promise<CoreCommitteeSelectionCouncilProcessingDTO> {
     const selection = await this.prisma.coreCommitteeSelection.findUnique({
@@ -1201,7 +1286,7 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
         id: candidate.id,
         applicantUserId: candidate.applicantUserId,
         candidateName: candidate.applicant.studentProfile?.fullName ?? candidate.applicant.email,
-        rollNumber: candidate.application.submission.studentProfile.rollNumber ?? null,
+        rollNumber: candidate.application.submission.studentProfile?.rollNumber ?? null,
         applicationId: candidate.application.id,
         submittedAt: candidate.application.submission.submittedAt,
         answers: candidate.application.submission.answers,

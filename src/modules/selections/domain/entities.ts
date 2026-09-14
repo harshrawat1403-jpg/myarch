@@ -34,7 +34,26 @@ export interface StudentCoreCommitteeSelectionSummary {
     status: CoreCommitteeSelectionCandidateRecord["status"];
     submittedAt: Date;
     domain: { id: string; title: string };
+    interviews: StudentCoreCommitteeInterview[];
+    result: StudentCoreCommitteeResult | null;
   } | null;
+}
+
+export interface StudentCoreCommitteeInterview {
+  id: string;
+  positionId: string;
+  scheduledAt: Date | null;
+  durationMinutes: number | null;
+  mode: string | null;
+  location: string | null;
+  candidateInstructions: string | null;
+  status: "PLANNED" | "SCHEDULED" | "COMPLETED" | "CANCELLED";
+  completedAt: Date | null;
+}
+
+export interface StudentCoreCommitteeResult {
+  outcome: "SELECTED" | "NOT_SELECTED";
+  publishedAt: Date;
 }
 
 export interface StudentCoreCommitteeSelectionDetail
