@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines how code is written in TNPArch so that it stays consistent, type-safe, and navigable by a future maintainer who is not the original author — a near-certainty given the annual Secretary/Coordinator turnover described in `01_Product_Vision.md`.
+Defines how code is written in MYARCH so that it stays consistent, type-safe, and navigable by a future maintainer who is not the original author — a near-certainty given the annual Secretary/Coordinator turnover described in `01_Product_Vision.md`.
 
 ## Scope
 

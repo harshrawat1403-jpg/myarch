@@ -72,7 +72,7 @@ export default function RecruiterInterestsPage() {
         </h1>
         <p className="mt-1 text-sm text-(--color-text-secondary)">
           Students you&apos;ve expressed interest in. The platform never shares a student&apos;s direct contact
-          details — once accepted, the Placement office facilitates the connection.
+          details — once accepted, Admin facilitates the connection.
         </p>
       </div>
 
@@ -102,7 +102,7 @@ export default function RecruiterInterestsPage() {
 
                 {interest.status === "ACCEPTED" && (
                   <p className="text-xs text-(--color-text-secondary)">
-                    Accepted — the Placement office will facilitate the connection.
+                    Accepted — Admin will facilitate the connection.
                   </p>
                 )}
               </Card>

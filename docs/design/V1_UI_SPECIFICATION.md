@@ -212,7 +212,7 @@ Carried forward from `13_Component_Library.md`'s baseline, plus this audit's spe
 ### Public Website (new in V1.1 — none of this exists today)
 
 ```
-/                    Home        — hero, what TNPArch is, department identity, CTA → /login
+/                    Home        — hero, what MYARCH is, department identity, CTA → /login
 /about               About       — department mission, program overview, team/faculty
 /placements          Placements  — placement statistics, past recruiters, process overview
 /students            Students    — "for prospective/current students" info page (NOT the admin student list)
@@ -265,7 +265,7 @@ Full detail for the 7 new public pages (highest-value new planning work) and one
 ```
 DESKTOP (≥1024px)                                    MOBILE (<640px)
 ┌──────────────────────────────────────────┐         ┌───────────────────┐
-│ TNPArch      Home About Placements ...  Login│      │ TNPArch      ☰    │
+│ MYARCH       Home About Placements ...  Login│      │ MYARCH       ☰    │
 ├──────────────────────────────────────────┤         ├───────────────────┤
 │                                            │         │                   │
 │         HERO: headline + subhead          │         │   HERO (stacked)  │
@@ -275,7 +275,7 @@ DESKTOP (≥1024px)                                    MOBILE (<640px)
 │  StatPanel   StatPanel   StatPanel        │         │   StatPanel       │
 │  (placement) (recruiters)(avg. package)   │         │   StatPanel       │
 ├──────────────────────────────────────────┤         │   StatPanel       │
-│  "Why TNPArch" — 3-column feature blurb   │         ├───────────────────┤
+│  "Why MYARCH" — 3-column feature blurb    │         ├───────────────────┤
 ├──────────────────────────────────────────┤         │  Feature (stacked)│
 │  Footer: About · Contact · Login          │         ├───────────────────┤
 └──────────────────────────────────────────┘         │  Footer           │
@@ -290,7 +290,7 @@ graph TD
   StatRow --> StatPanel1[StatPanel: Placement Rate]
   StatRow --> StatPanel2[StatPanel: Recruiters]
   StatRow --> StatPanel3[StatPanel: Avg Package]
-  Home --> Features[Why TNPArch — 3 feature Cards]
+  Home --> Features[Why MYARCH — 3 feature Cards]
   Home --> Footer
 ```
 
@@ -299,15 +299,15 @@ Sections: nav, hero, stat row (3 `StatPanel`s sourced from the Public Placement 
 **Hero CTA refinement (from the journey review, Part G):** a single "Login" button next to "Explore Placements" doesn't tell a first-time visitor *who* login is for — a student, a recruiter, and a staff member all see the identical button with no signal it'll route them correctly. The hero keeps exactly two buttons (adding a third starts to look like a button wall), but rephrases them audience-agnostically: **"Explore Placements"** (primary, leads with the department's actual outcomes — serves the general visitor) and **"Sign In"** (secondary — serves students/recruiters/staff alike; the post-login redirect, already built, routes each role correctly, so one button genuinely does serve all three). The **"For Students"** / **"For Recruiters"** distinction is instead made by the nav itself (see PublicNav spec below) and by each of those two pages' own page-specific CTA once the visitor has self-identified by navigating there — this avoids the hero trying to branch by audience before the visitor has told it who they are.
 
 **`PublicNav` exact spec** (applies identically to all 7 public pages, expanding Part E's entry):
-- Desktop (≥`md`, 768px): a single horizontal strip, `--color-surface` background, `--color-text-secondary`/20 bottom border (matching `SheetLayout`'s rail border treatment, so the two navs read as one family per Part I). Left: "TNPArch" wordmark (links to `/`). Right, in order: Home, About, Placements, Students, Recruiters, Contact, then a visually distinct **Sign In** button (`Button variant="secondary"`, not a plain link — the one item that should look actionable, not just navigational).
+- Desktop (≥`md`, 768px): a single horizontal strip, `--color-surface` background, `--color-text-secondary`/20 bottom border (matching `SheetLayout`'s rail border treatment, so the two navs read as one family per Part I). Left: "MYARCH" wordmark (links to `/`). Right, in order: Home, About, Placements, Students, Recruiters, Contact, then a visually distinct **Sign In** button (`Button variant="secondary"`, not a plain link — the one item that should look actionable, not just navigational).
 - Active-page link: `--color-accent` text + `aria-current="page"` — identical treatment to `SheetLayout`'s active rail item (Part I consistency rule).
 - Mobile (<`md`): wordmark + `☰` icon-button only. Tapping `☰` opens a full-height overlay (same `Modal`-style focus trap as Part B's Dialogs, presented as a slide-down rather than a centered dialog) listing all 7 items plus Sign In, each full-width and tappable; closes on selection, `Escape`, or tapping `☰` again (now rendered as `✕`).
 
 **`Footer` exact spec** (applies identically to all 7 public pages, expanding Part E's entry): three columns at `lg` and above, stacked at `md` and below —
-1. **About TNPArch** — one-line description + "Department of Architecture & Planning, VNIT Nagpur."
+1. **About MYARCH** — one-line description + "Department of Architecture & Planning, VNIT Nagpur."
 2. **Quick Links** — About, Placements, Students, Recruiters, Contact (mirrors the nav, for visitors who scrolled past it).
 3. **Contact** — department email + a link to `/contact`.
-Bottom strip below the three columns: `© {year} TNPArch — Department of Architecture & Planning, VNIT Nagpur.` in `--color-text-secondary`, `--font-data` (matching the Title Block's metadata-label typographic treatment, tying the footer into the same drafting-sheet vocabulary rather than reading as generic boilerplate).
+Bottom strip below the three columns: `© {year} MYARCH — Department of Architecture & Planning, VNIT Nagpur.` in `--color-text-secondary`, `--font-data` (matching the Title Block's metadata-label typographic treatment, tying the footer into the same drafting-sheet vocabulary rather than reading as generic boilerplate).
 
 ### D.2 Public — About
 
@@ -380,7 +380,7 @@ DESKTOP                                        MOBILE
 ┌────────────────────────────────────┐         ┌───────────────┐
 │ Nav                                  │        │ Nav (☰)        │
 ├──────────────────────────────────────┤        ├───────────────┤
-│ Title: Recruit from TNPArch          │        │ Title          │
+│ Title: Recruit from MYARCH           │        │ Title          │
 │ Pitch copy + StatPanel row            │        │ Pitch + Stats │
 ├──────────────────────────────────────┤        │ (stacked)     │
 │ "What you get" — 3-col feature grid   │        ├───────────────┤
@@ -424,7 +424,7 @@ DESKTOP & MOBILE (already responsive — centered card, works at any width)
 ┌───────────────────────────┐
 │                             │
 │      ┌───────────────┐     │
-│      │ TNPArch        │     │
+│      │ MYARCH         │     │
 │      │ Department     │     │
 │      │  sign in       │     │
 │      │                │     │
@@ -442,7 +442,7 @@ No changes proposed — already matches the design system and is inherently resp
 ```
 DESKTOP (≥768px)                                         MOBILE (<768px) — V1.1 target, not shipped today
 ┌──────────┬──────────────────────────────────┐          ┌─────────────────────────┐
-│ TNPArch  │  Dashboard Overview               │          │ TNPArch  Overview   ☰   │
+│ MYARCH   │  Dashboard Overview               │          │ MYARCH   Overview   ☰   │
 │ Secretary│                                    │          ├─────────────────────────┤
 ├──────────┤  [StatPanel][StatPanel][StatPanel] │          │ [StatPanel]             │
 │ Overview │                                    │          │ [StatPanel]             │

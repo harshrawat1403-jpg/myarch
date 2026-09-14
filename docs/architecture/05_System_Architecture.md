@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Describes the high-level shape of TNPArch: how the system is decomposed, how data flows through it, and how Clean Architecture and SOLID principles are applied concretely rather than as slogans.
+Describes the high-level shape of MYARCH: how the system is decomposed, how data flows through it, and how Clean Architecture and SOLID principles are applied concretely rather than as slogans.
 
 ## Scope
 
@@ -10,7 +10,7 @@ Covers the architectural style, layering, module boundaries, and major data/cont
 
 ## Architectural Style: Modular Monolith, Feature-First
 
-TNPArch is built as a **modular monolith**: a single deployable application (one Next.js codebase, one database) internally organized into independent, feature-first modules with enforced boundaries. This is a deliberate choice against two alternatives:
+MYARCH is built as a **modular monolith**: a single deployable application (one Next.js codebase, one database) internally organized into independent, feature-first modules with enforced boundaries. This is a deliberate choice against two alternatives:
 
 - **Not a distributed microservice system** — the team is small (effectively one developer, Claude Code, plus the Secretary as product owner), the scale is modest (see `04_Non_Functional_Requirements.md` Assumptions), and operating multiple services would add deployment and debugging overhead with no corresponding benefit at this scale.
 - **Not an unstructured monolith either** — features are isolated into modules with explicit contracts between them, so that if the platform ever needs to extract a module into its own service (e.g., the Brochure Builder's PDF rendering, which is CPU-heavy), it can do so without a full rewrite.

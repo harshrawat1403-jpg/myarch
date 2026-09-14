@@ -48,11 +48,11 @@ describe("Recruiter interests page (/recruiter/interests) — V4.0 C4", () => {
     expect(screen.getByText("Sent")).toBeInTheDocument();
   });
 
-  it("shows the Secretary-facilitation note once an interest is accepted, never a raw contact reveal", async () => {
+  it("shows the Admin-facilitation note once an interest is accepted, never a raw contact reveal", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse([{ ...SENT_INTEREST, status: "ACCEPTED", respondedAt: "2026-01-02T00:00:00.000Z" }]));
     render(<RecruiterInterestsPage />);
 
-    expect(await screen.findByText(/placement office will facilitate the connection/i)).toBeInTheDocument();
+    expect(await screen.findByText(/admin will facilitate the connection/i)).toBeInTheDocument();
   });
 
   it("links each row to the student's recruiter profile page", async () => {

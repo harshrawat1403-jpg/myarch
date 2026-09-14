@@ -48,8 +48,8 @@ $ pg_restore -h 127.0.0.1 -p 55432 -U postgres -d tnparch_restore_test tnparch_b
 $ psql ... -c "SELECT email, role FROM users ORDER BY role;"
          email          |    role
 ------------------------+-------------
- secretary@tnparch.in   | SECRETARY
- coordinator@tnparch.in | COORDINATOR
+ secretary@myarch.in   | SECRETARY
+ coordinator@myarch.in | COORDINATOR
  alice@vnit.ac.in       | STUDENT
  bilal@vnit.ac.in       | STUDENT
  chitra@vnit.ac.in      | STUDENT

@@ -24,7 +24,7 @@ function record(overrides: Partial<CoordinatorRecord> = {}): CoordinatorRecord {
   return {
     id: overrides.id ?? "coord-mc",
     userId: overrides.userId ?? "user-mc",
-    email: overrides.email ?? "coordinator@tnparch.in",
+    email: overrides.email ?? "coordinator@myarch.in",
     fullName: overrides.fullName ?? "Maintenance Coordinator",
     isActive: overrides.isActive ?? true,
     position: overrides.position ?? null,
@@ -98,7 +98,7 @@ describe("UpdateMaintenanceCoordinatorPermissionsUseCase", () => {
     const ctx = buildContext();
     ctx.coordinatorRepository.seed(record({ id: "coord-mc", maintenanceRole: "MAINTENANCE_COORDINATOR" }));
     ctx.coordinatorRepository.seed(
-      record({ id: "coord-other", userId: "user-other", email: "other@tnparch.in", maintenanceRole: null }),
+      record({ id: "coord-other", userId: "user-other", email: "other@myarch.in", maintenanceRole: null }),
     );
 
     const updated = await ctx.useCase.execute({ actor: SECRETARY, permissions: ["maintenance.view"] });

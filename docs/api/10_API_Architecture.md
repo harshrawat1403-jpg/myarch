@@ -81,7 +81,7 @@ Long-running actions (brochure generation, bulk export/import) return `202 Accep
 
 ## Versioning Stance
 
-No `/v1/` prefix or formal versioning scheme for Phase 1–3. The API has exactly one internal consumer (the TNPArch frontend, same repository, deployed together), so there is no independent client to version against. This is revisited only if a genuinely external API consumer emerges (see Future Considerations).
+No `/v1/` prefix or formal versioning scheme for Phase 1–3. The API has exactly one internal consumer (the MYARCH frontend, same repository, deployed together), so there is no independent client to version against. This is revisited only if a genuinely external API consumer emerges (see Future Considerations).
 
 ## Assumptions
 

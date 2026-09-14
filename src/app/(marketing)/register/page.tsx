@@ -20,8 +20,8 @@ export default function RegisterPage() {
             Register as a Student
           </PageTitle>
           <p className="mx-auto mt-6 max-w-xl text-base text-(--color-text-secondary) lg:text-lg">
-            Submit your details for department review. The Training &amp; Placement Cell will contact you once your
-            application has been decided.
+            Submit your details for department review. An Admin will contact you once your application has been
+            decided.
           </p>
         </PageContainer>
       </section>

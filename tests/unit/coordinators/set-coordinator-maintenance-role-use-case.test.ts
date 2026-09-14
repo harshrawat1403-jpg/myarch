@@ -18,7 +18,7 @@ function record(overrides: Partial<CoordinatorRecord> = {}): CoordinatorRecord {
   return {
     id: overrides.id ?? "coord-1",
     userId: overrides.userId ?? "user-1",
-    email: overrides.email ?? "alice@tnparch.in",
+    email: overrides.email ?? "alice@myarch.in",
     fullName: overrides.fullName ?? "Alice Coordinator",
     isActive: overrides.isActive ?? true,
     position: overrides.position ?? null,
@@ -63,7 +63,7 @@ describe("SetCoordinatorMaintenanceRoleUseCase", () => {
   it("rejects a second active MAINTENANCE_SECRETARY", async () => {
     const ctx = buildContext();
     ctx.coordinatorRepository.seed(record({ id: "coord-1", maintenanceRole: "MAINTENANCE_SECRETARY" }));
-    ctx.coordinatorRepository.seed(record({ id: "coord-2", userId: "user-2", email: "bob@tnparch.in" }));
+    ctx.coordinatorRepository.seed(record({ id: "coord-2", userId: "user-2", email: "bob@myarch.in" }));
 
     await expect(
       ctx.useCase.execute({ actor: SECRETARY, coordinatorId: "coord-2", maintenanceRole: "MAINTENANCE_SECRETARY" }),
@@ -73,7 +73,7 @@ describe("SetCoordinatorMaintenanceRoleUseCase", () => {
   it("rejects a second active MAINTENANCE_COORDINATOR independently of the MAINTENANCE_SECRETARY cap", async () => {
     const ctx = buildContext();
     ctx.coordinatorRepository.seed(record({ id: "coord-1", maintenanceRole: "MAINTENANCE_COORDINATOR" }));
-    ctx.coordinatorRepository.seed(record({ id: "coord-2", userId: "user-2", email: "bob@tnparch.in" }));
+    ctx.coordinatorRepository.seed(record({ id: "coord-2", userId: "user-2", email: "bob@myarch.in" }));
 
     await expect(
       ctx.useCase.execute({ actor: SECRETARY, coordinatorId: "coord-2", maintenanceRole: "MAINTENANCE_COORDINATOR" }),

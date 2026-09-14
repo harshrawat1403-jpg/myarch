@@ -17,7 +17,7 @@
  * page needs it (Footer, Contact) — a single source of truth rather than
  * the same placeholder string copy-pasted per call site.
  */
-export const DEPARTMENT_EMAIL = "contact@tnparch.in";
+export const DEPARTMENT_EMAIL = "contact@myarch.in";
 
 /**
  * Version 2.0: every Home page prose string, previously inline JSX text,

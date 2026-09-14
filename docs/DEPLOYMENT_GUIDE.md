@@ -1,6 +1,6 @@
 # Deployment Guide
 
-**Audience:** whoever deploys and maintains TNPArch in production.
+**Audience:** whoever deploys and maintains MYARCH in production.
 **Last validated:** 2026-08-06, against a real PostgreSQL 16.4 instance (see "How this guide was validated" at the end).
 
 ## Platform choice

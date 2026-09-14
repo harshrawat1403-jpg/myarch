@@ -15,7 +15,7 @@ import { escapeHtml } from "../layout";
  */
 export const accountCredentialsIssuedTemplate: EmailTemplateDefinition = {
   subject: (context) =>
-    context.reason === "password_reset" ? "Your TNPArch password was reset" : "Your TNPArch account is ready",
+    context.reason === "password_reset" ? "Your MYARCH password was reset" : "Your MYARCH account is ready",
 
   bodyText: (context) => {
     const recipientName = String(context.recipientName ?? "there");
@@ -23,9 +23,9 @@ export const accountCredentialsIssuedTemplate: EmailTemplateDefinition = {
     return (
       `Hi ${recipientName},\n\n` +
       (isReset
-        ? "Your TNPArch account password has been reset by a department administrator."
-        : "A TNPArch account has been created for you.") +
-      " A temporary password has been issued — please contact the T&P office if you have not received it, " +
+        ? "Your MYARCH account password has been reset by a department administrator."
+        : "A MYARCH account has been created for you.") +
+      " A temporary password has been issued — please contact the Technical Team if you have not received it, " +
       "and you will be required to set a new password the first time you sign in."
     );
   },
@@ -37,8 +37,8 @@ export const accountCredentialsIssuedTemplate: EmailTemplateDefinition = {
       `<p>Hi ${recipientName},</p>` +
       `<p>${
         isReset
-          ? "Your TNPArch account password has been reset by a department administrator."
-          : "A TNPArch account has been created for you."
+          ? "Your MYARCH account password has been reset by a department administrator."
+          : "A MYARCH account has been created for you."
       } A temporary password has been issued — please contact the T&amp;P office if you have not received it, ` +
       "and you will be required to set a new password the first time you sign in.</p>"
     );
@@ -50,5 +50,5 @@ export const accountCredentialsIssuedInAppTemplate: InAppTemplateDefinition = {
   message: (context) =>
     context.reason === "password_reset"
       ? "Your account password was reset by a department administrator."
-      : "A TNPArch account has been created for you.",
+      : "A MYARCH account has been created for you.",
 };

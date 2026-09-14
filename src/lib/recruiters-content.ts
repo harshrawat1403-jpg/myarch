@@ -83,7 +83,7 @@ export const PLACEMENT_SUPPORT: SupportItem[] = [
   {
     title: "Single Point of Contact",
     description:
-      "The Training & Placement Cell is the one point of contact for scheduling, logistics, and queries.",
+      "The Technical Team is the one point of contact for MYARCH support, scheduling, logistics, and queries.",
   },
 ];
 
@@ -91,7 +91,7 @@ export const RECRUITERS_FAQ_EXTRA: FaqContentItem[] = [
   {
     question: "How do we schedule a pre-placement talk?",
     answer:
-      "Once access is granted, the Training & Placement Cell coordinates scheduling directly with your team.",
+      "Once access is granted, Admin coordinates scheduling directly with your team.",
   },
   {
     question: "Do you support virtual interviews?",

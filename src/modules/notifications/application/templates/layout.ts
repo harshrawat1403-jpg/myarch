@@ -4,10 +4,10 @@
  * template can never duplicate or drift from this layout.
  */
 
-const BRAND_NAME = "TNPArch";
-const BRAND_TAGLINE = "Training & Placement Portal — Department of Architecture & Planning, VNIT Nagpur";
+const BRAND_NAME = "MYARCH";
+const BRAND_TAGLINE = "MYARCH — Department of Architecture & Planning, VNIT Nagpur";
 const FOOTER_TEXT =
-  "This is an automated message from TNPArch. Please do not reply to this email.";
+  "This is an automated message from MYARCH. Please do not reply to this email.";
 
 export function escapeHtml(value: string): string {
   return value

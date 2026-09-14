@@ -18,7 +18,7 @@ function formatDate(date: Date | string): string {
 }
 
 /**
- * TNPArch's signature reused element (docs/design/12_Design_System.md,
+ * MYARCH's signature reused element (docs/design/12_Design_System.md,
  * docs/design/13_Component_Library.md): a technical-drawing-style metadata
  * panel appearing identically across dashboard cards, profile headers,
  * batch cards, and statistics panels — same frame, different content per

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Provides concrete, actionable guidance for keeping TNPArch fast at its actual scale, with particular attention to the parts of the product that are inherently heavier: image-dense portfolio profiles and brochure generation. Expands on the targets set in `04_Non_Functional_Requirements.md`.
+Provides concrete, actionable guidance for keeping MYARCH fast at its actual scale, with particular attention to the parts of the product that are inherently heavier: image-dense portfolio profiles and brochure generation. Expands on the targets set in `04_Non_Functional_Requirements.md`.
 
 ## Scope
 

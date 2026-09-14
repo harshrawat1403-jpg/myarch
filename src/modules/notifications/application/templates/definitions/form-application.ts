@@ -3,8 +3,8 @@ import { escapeHtml } from "../layout";
 
 export const formSubmittedTemplate: EmailTemplateDefinition = {
   subject: (context) => `New form submission: ${String(context.formTitle ?? "a form")}`,
-  bodyText: (context) => `A student submitted ${String(context.formTitle ?? "a form")}. Log in to TNPArch to review it.`,
-  bodyHtml: (context) => `<p>A student submitted <strong>${escapeHtml(String(context.formTitle ?? "a form"))}</strong>.</p><p>Log in to TNPArch to review it.</p>`,
+  bodyText: (context) => `A student submitted ${String(context.formTitle ?? "a form")}. Log in to MYARCH to review it.`,
+  bodyHtml: (context) => `<p>A student submitted <strong>${escapeHtml(String(context.formTitle ?? "a form"))}</strong>.</p><p>Log in to MYARCH to review it.</p>`,
 };
 export const formSubmittedInAppTemplate: InAppTemplateDefinition = {
   title: () => "New form submission",
@@ -33,8 +33,8 @@ export const formApplicationUnderReviewInAppTemplate: InAppTemplateDefinition = 
 
 export const formApplicationDecidedTemplate: EmailTemplateDefinition = {
   subject: (context) => `Application decision: ${String(context.formTitle ?? "a form")}`,
-  bodyText: (context) => `Your application for ${String(context.formTitle ?? "a form")} was ${String(context.status ?? "updated").toLowerCase()}. Log in to TNPArch for details.`,
-  bodyHtml: (context) => `<p>Your application for <strong>${escapeHtml(String(context.formTitle ?? "a form"))}</strong> was <strong>${escapeHtml(String(context.status ?? "updated").toLowerCase())}</strong>.</p><p>Log in to TNPArch for details.</p>`,
+  bodyText: (context) => `Your application for ${String(context.formTitle ?? "a form")} was ${String(context.status ?? "updated").toLowerCase()}. Log in to MYARCH for details.`,
+  bodyHtml: (context) => `<p>Your application for <strong>${escapeHtml(String(context.formTitle ?? "a form"))}</strong> was <strong>${escapeHtml(String(context.status ?? "updated").toLowerCase())}</strong>.</p><p>Log in to MYARCH for details.</p>`,
 };
 export const formApplicationDecidedInAppTemplate: InAppTemplateDefinition = {
   title: (context) => `Application ${String(context.status ?? "updated").toLowerCase()}`,

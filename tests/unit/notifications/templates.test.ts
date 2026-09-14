@@ -55,23 +55,23 @@ describe("renderEmailTemplate — ACCOUNT_CREDENTIALS_ISSUED", () => {
     const created = renderEmailTemplate(
       "ACCOUNT_CREDENTIALS_ISSUED",
       { recipientName: "Arjun Mehta", reason: "account_created" },
-      "arjun@tnparch.in",
+      "arjun@myarch.in",
     );
     const reset = renderEmailTemplate(
       "ACCOUNT_CREDENTIALS_ISSUED",
       { recipientName: "Arjun Mehta", reason: "password_reset" },
-      "arjun@tnparch.in",
+      "arjun@myarch.in",
     );
 
-    expect(created.subject).toBe("Your TNPArch account is ready");
-    expect(reset.subject).toBe("Your TNPArch password was reset");
+    expect(created.subject).toBe("Your MYARCH account is ready");
+    expect(reset.subject).toBe("Your MYARCH password was reset");
   });
 
   it("never includes a password field in the rendered content", () => {
     const message = renderEmailTemplate(
       "ACCOUNT_CREDENTIALS_ISSUED",
       { recipientName: "Arjun Mehta", reason: "account_created", password: "should-never-appear" },
-      "arjun@tnparch.in",
+      "arjun@myarch.in",
     );
 
     expect(message.text).not.toContain("should-never-appear");
@@ -100,7 +100,7 @@ describe("renderEmailTemplate — ACCOUNT_CREDENTIALS_DELIVERY", () => {
 });
 
 describe("shared email layout — branding and footer applied uniformly", () => {
-  it("every template's html includes the TNPArch brand name and the automated-message footer", () => {
+  it("every template's html includes the MYARCH brand name and the automated-message footer", () => {
     const approved = renderEmailTemplate("PROFILE_APPROVED", { studentName: "Alice" }, "a@vnit.ac.in");
     const changesRequested = renderEmailTemplate(
       "PROFILE_CHANGES_REQUESTED",
@@ -114,9 +114,9 @@ describe("shared email layout — branding and footer applied uniformly", () => 
     );
 
     for (const message of [approved, changesRequested, credentialsIssued]) {
-      expect(message.html).toContain("TNPArch");
+      expect(message.html).toContain("MYARCH");
       expect(message.html).toContain("automated message");
-      expect(message.text).toContain("TNPArch");
+      expect(message.text).toContain("MYARCH");
       expect(message.text).toContain("automated message");
     }
   });

@@ -10,7 +10,7 @@ export const registrationSubmittedTemplate: EmailTemplateDefinition = {
     const batchName = String(context.batchName ?? "a batch");
     return (
       `${applicantName} has submitted a registration request for ${batchName}.\n\n` +
-      "Please log in to TNPArch to review it."
+      "Please log in to MYARCH to review it."
     );
   },
 
@@ -19,7 +19,7 @@ export const registrationSubmittedTemplate: EmailTemplateDefinition = {
     const batchName = escapeHtml(String(context.batchName ?? "a batch"));
     return (
       `<p><strong>${applicantName}</strong> has submitted a registration request for <strong>${batchName}</strong>.</p>` +
-      "<p>Please log in to TNPArch to review it.</p>"
+      "<p>Please log in to MYARCH to review it.</p>"
     );
   },
 };

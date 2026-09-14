@@ -61,7 +61,7 @@ describe("createCoordinatorRouteHandler — MaxActiveCoordinatorsError mapping (
     mockExecute.mockRejectedValueOnce(new MaxActiveCoordinatorsError());
 
     const res = await createCoordinatorRouteHandler(
-      buildRequest({ email: "third@tnparch.in", fullName: "Third Coordinator" }),
+      buildRequest({ email: "third@myarch.in", fullName: "Third Coordinator" }),
     );
 
     expect(res.status).toBe(400);
@@ -74,7 +74,7 @@ describe("createCoordinatorRouteHandler — MaxActiveCoordinatorsError mapping (
     mockExecute.mockRejectedValueOnce(new MaxActiveCoordinatorsError());
 
     const res = await createCoordinatorRouteHandler(
-      buildRequest({ email: "third@tnparch.in", fullName: "Third Coordinator" }),
+      buildRequest({ email: "third@myarch.in", fullName: "Third Coordinator" }),
     );
 
     expect(mockExecute).toHaveBeenCalledTimes(1);

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Records the concrete technology choices for TNPArch and, critically, *why* each was chosen over the alternatives considered. This is a decision record, not a tutorial — see `19_Decision_Log.md` for the dated log entry corresponding to each choice.
+Records the concrete technology choices for MYARCH and, critically, *why* each was chosen over the alternatives considered. This is a decision record, not a tutorial — see `19_Decision_Log.md` for the dated log entry corresponding to each choice.
 
 ## Scope
 

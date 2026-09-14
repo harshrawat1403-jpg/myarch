@@ -1,4 +1,4 @@
-# TNPArch V4.0 — Product Requirements & Architecture Plan
+# MYARCH V4.0 — Product Requirements & Architecture Plan
 
 **Status:** APPROVED WITH DECISIONS. All open questions in §24 are resolved (either by explicit user decision or by default-approval of this document's own recommendation, each marked accordingly). Implementation has **not** started — per the approving instruction, work stops after this document and the finalized milestone plan (§17) until explicit approval to begin milestone A0.
 
@@ -10,7 +10,7 @@
 
 ## 0. Executive Summary
 
-V4.0 turns TNPArch from an internal administration platform into the full public-facing placement product: a public student directory, a recruiter engagement workflow (save/shortlist/express interest), a real placement/internship/alumni pipeline, a Publication Studio, notifications, global search, and reporting — all wired into one integrated data model rather than duplicated per feature.
+V4.0 turns MYARCH from an internal administration platform into the full public-facing placement product: a public student directory, a recruiter engagement workflow (save/shortlist/express interest), a real placement/internship/alumni pipeline, a Publication Studio, notifications, global search, and reporting — all wired into one integrated data model rather than duplicated per feature.
 
 Three research findings materially change the shape of this plan versus what a spec-only reading would suggest:
 

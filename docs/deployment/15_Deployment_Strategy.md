@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Defines how TNPArch is built, released, and hosted, and lays out the tradeoffs for the hosting target the brief leaves open. This document gives the Secretary what's needed to make that decision, and specifies the pipeline that applies regardless of which target is chosen.
+Defines how MYARCH is built, released, and hosted, and lays out the tradeoffs for the hosting target the brief leaves open. This document gives the Secretary what's needed to make that decision, and specifies the pipeline that applies regardless of which target is chosen.
 
 ## Scope
 
-Covers environments, CI/CD pipeline, hosting options and tradeoffs, domain/TLS setup for `tnparch.in`, and release process. Does not cover application-level security controls (see `14_Security_Architecture.md`) beyond where they intersect with deployment (e.g., secret storage, HTTPS termination).
+Covers environments, CI/CD pipeline, hosting options and tradeoffs, domain/TLS setup for `myarch.in`, and release process. Does not cover application-level security controls (see `14_Security_Architecture.md`) beyond where they intersect with deployment (e.g., secret storage, HTTPS termination).
 
 ## Environments
 
@@ -14,7 +14,7 @@ Covers environments, CI/CD pipeline, hosting options and tradeoffs, domain/TLS s
 |---|---|---|
 | Local | Individual development | Seeded synthetic data only, never production data |
 | Staging | Pre-production verification, UAT with the Secretary before a release reaches students/recruiters | Synthetic or anonymized data |
-| Production | Live system at `tnparch.in` | Real student/recruiter data |
+| Production | Live system at `myarch.in` | Real student/recruiter data |
 
 Each environment has its own database, its own object storage bucket/prefix, and its own secrets — production credentials are never used locally (`NFR-OPS-03`).
 
@@ -39,7 +39,7 @@ Database migrations run as an explicit step in the deploy pipeline (`prisma migr
 
 ## Hosting Target: Open Decision
 
-The brief lists this as unresolved. The options below are evaluated against TNPArch's actual constraints: a Next.js + PostgreSQL app, modest scale (`04_Non_Functional_Requirements.md` Assumptions), a single-developer operating model, and a department (not institutional IT) as the long-term owner.
+The brief lists this as unresolved. The options below are evaluated against MYARCH's actual constraints: a Next.js + PostgreSQL app, modest scale (`04_Non_Functional_Requirements.md` Assumptions), a single-developer operating model, and a department (not institutional IT) as the long-term owner.
 
 | Option | Pros | Cons | Best fit if… |
 |---|---|---|---|
@@ -54,9 +54,9 @@ This decision is tracked as open in `18_Open_Questions.md` and must be finalized
 
 ## Domain & TLS
 
-- Production is served at `tnparch.in` (and `www.tnparch.in` redirecting to the canonical host).
+- Production is served at `myarch.in` (and `www.myarch.in` redirecting to the canonical host).
 - TLS certificates are provisioned and auto-renewed by the hosting platform (Railway/Render both handle this natively) or, if self-hosted, via Let's Encrypt with automated renewal — manual certificate renewal is not an acceptable operational model given the small team.
-- DNS is managed wherever the domain `tnparch.in` is registered; access to that DNS control panel should be held by the Secretary (department-owned), not solely by an individual developer account, to avoid a single point of failure on domain control.
+- DNS is managed wherever the domain `myarch.in` is registered; access to that DNS control panel should be held by the Secretary (department-owned), not solely by an individual developer account, to avoid a single point of failure on domain control.
 
 ## Rollback Strategy
 

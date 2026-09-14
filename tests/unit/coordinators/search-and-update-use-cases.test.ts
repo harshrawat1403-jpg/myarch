@@ -16,7 +16,7 @@ function record(overrides: Partial<CoordinatorRecord> = {}): CoordinatorRecord {
   return {
     id: overrides.id ?? "coord-record-1",
     userId: overrides.userId ?? "user-1",
-    email: overrides.email ?? "alice@tnparch.in",
+    email: overrides.email ?? "alice@myarch.in",
     fullName: overrides.fullName ?? "Alice Coordinator",
     isActive: overrides.isActive ?? true,
     position: overrides.position ?? null,

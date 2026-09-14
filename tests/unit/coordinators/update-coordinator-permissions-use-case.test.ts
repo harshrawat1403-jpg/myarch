@@ -17,7 +17,7 @@ function seedRecord(overrides: Partial<CoordinatorRecord> = {}): CoordinatorReco
   return {
     id: "target-coordinator",
     userId: "target-user",
-    email: "target@tnparch.in",
+    email: "target@myarch.in",
     fullName: "Target Coordinator",
     isActive: true,
     position: null,

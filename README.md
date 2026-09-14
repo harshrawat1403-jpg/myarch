@@ -1,4 +1,4 @@
-# TNPArch — Training & Placement Portal
+# MYARCH — Architecture & Planning Platform
 
 **Department of Architecture & Planning, VNIT Nagpur**
 Version 1.0.0 — production-ready baseline release.

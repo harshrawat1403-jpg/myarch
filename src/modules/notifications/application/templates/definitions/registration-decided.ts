@@ -15,7 +15,7 @@ import { escapeHtml } from "../layout";
  */
 export const registrationDecidedTemplate: EmailTemplateDefinition = {
   subject: (context) =>
-    context.decision === "REJECTED" ? "Your TNPArch registration application" : "Your registration was approved",
+    context.decision === "REJECTED" ? "Your MYARCH registration application" : "Your registration was approved",
 
   bodyText: (context) => {
     const applicantName = String(context.applicantName ?? "there");
@@ -23,11 +23,11 @@ export const registrationDecidedTemplate: EmailTemplateDefinition = {
       const reason = String(context.rejectionReason ?? "");
       return (
         `Hello ${applicantName},\n\nYour registration application has been reviewed and was not approved.\n\n` +
-        `Reason: ${reason}\n\nIf you believe this is in error, please contact the Training & Placement Cell directly.`
+        `Reason: ${reason}\n\nIf you believe this is in error, please contact an Admin directly.`
       );
     }
     return (
-      `Hi ${applicantName},\n\nYour registration application has been approved. Your TNPArch account is ready — ` +
+      `Hi ${applicantName},\n\nYour registration application has been approved. Your MYARCH account is ready — ` +
       "check your email for your temporary login credentials."
     );
   },
@@ -38,11 +38,11 @@ export const registrationDecidedTemplate: EmailTemplateDefinition = {
       const reason = escapeHtml(String(context.rejectionReason ?? ""));
       return (
         `<p>Hello ${applicantName},</p><p>Your registration application has been reviewed and was not approved.</p>` +
-        `<p><strong>Reason:</strong> ${reason}</p><p>If you believe this is in error, please contact the Training &amp; Placement Cell directly.</p>`
+        `<p><strong>Reason:</strong> ${reason}</p><p>If you believe this is in error, please contact an Admin directly.</p>`
       );
     }
     return (
-      `<p>Hi ${applicantName},</p><p>Your registration application has been <strong>approved</strong>. Your TNPArch account ` +
+      `<p>Hi ${applicantName},</p><p>Your registration application has been <strong>approved</strong>. Your MYARCH account ` +
       "is ready — check your email for your temporary login credentials.</p>"
     );
   },

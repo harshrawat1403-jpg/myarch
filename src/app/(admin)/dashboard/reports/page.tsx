@@ -137,7 +137,7 @@ export default function ReportsPage() {
           Reports
         </h1>
         <p className="mt-1 text-sm text-(--color-text-secondary)">
-          Institutional reports and administrative data exports for the Department T&amp;P Team.
+          Institutional reports and administrative data exports for Admin.
         </p>
       </div>
 

@@ -13,7 +13,7 @@ import type { FaqContentItem } from "./placements-content";
  * which says so plainly rather than inventing digits.
  */
 
-export const TPO_EMAIL = "placements@tnparch.in";
+export const TPO_EMAIL = "support@myarch.in";
 
 export const CONTACT_HERO = {
   eyebrow: "Contact",
@@ -34,8 +34,8 @@ export const CONTACT_PANELS: ContactInfoPanel[] = [
     email: DEPARTMENT_EMAIL,
   },
   {
-    label: "Training & Placement Cell",
-    description: "Recruiter access and student placement queries.",
+    label: "Technical Team",
+    description: "MYARCH support, recruiter access, and student placement queries.",
     email: TPO_EMAIL,
   },
 ];
@@ -74,13 +74,13 @@ export const ENQUIRY_ROUTES: EnquiryRoute[] = [
 
 export const CONTACT_CTA = {
   title: "We typically respond within 2–3 working days.",
-  description: "For placement-specific queries, the Training & Placement Cell is the fastest route.",
+  description: "For MYARCH and placement-specific queries, the Technical Team is the fastest route.",
 };
 
 export const CONTACT_FAQ: FaqContentItem[] = [
   {
     question: "How quickly will I get a response?",
-    answer: "The Training & Placement Cell typically responds within 2–3 working days during the academic term.",
+    answer: "The Technical Team typically responds within 2–3 working days during the academic term.",
   },
   {
     question: "I'm a recruiter — where do I start?",

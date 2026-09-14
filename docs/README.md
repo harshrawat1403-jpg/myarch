@@ -1,14 +1,14 @@
-# TNPArch — Department Training & Placement Portal
+# MYARCH — Architecture & Planning Platform
 
 **Documentation Index**
 
 Department of Architecture & Planning, VNIT Nagpur
-Domain: `tnparch.in`
+Domain: `myarch.in`
 Prepared by: Harsh Rawat, Training & Placement Secretary
 
 ## What This Is
 
-TNPArch is a private, department-owned Training & Placement Management Platform for the Department of Architecture & Planning at VNIT Nagpur. It replaces WhatsApp/Excel/email-based placement coordination with a single system of record, built around a strict separation between a student's private academic data and their public, recruiter-facing, portfolio-first profile.
+MYARCH is a private, department-owned platform for the Department of Architecture & Planning at VNIT Nagpur. It replaces WhatsApp/Excel/email-based coordination with a single system of record, built around a strict separation between a student's private academic data and their public, recruiter-facing, portfolio-first profile.
 
 Full context: [`01_Product_Vision.md`](01_Product_Vision.md).
 

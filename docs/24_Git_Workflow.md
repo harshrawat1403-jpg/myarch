@@ -6,7 +6,7 @@ Defines how version control is used day-to-day: branching, commit conventions, a
 
 ## Scope
 
-Applies to the TNPArch repository for all phases. Complements `15_Deployment_Strategy.md`'s CI/CD pipeline, which is triggered directly by the branch/merge events described here.
+Applies to the MYARCH repository for all phases. Complements `15_Deployment_Strategy.md`'s CI/CD pipeline, which is triggered directly by the branch/merge events described here.
 
 ## Branching Model
 

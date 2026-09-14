@@ -34,7 +34,7 @@ Run it twice for two distinct values. Never reuse a value across environments (d
 | `BCRYPT_COST_FACTOR` | No | `12` | Enforced minimum is 12 — the app refuses to start below it (NFR-SEC per `docs/security/14_Security_Architecture.md`) |
 | `STORAGE_ENDPOINT` / `STORAGE_REGION` / `STORAGE_BUCKET` / `STORAGE_ACCESS_KEY_ID` / `STORAGE_SECRET_ACCESS_KEY` | No | empty | Reserved for the object-storage integration (resumes/portfolio files) — **not yet implemented**; the app runs fully without these today (see `SYSTEM_ARCHITECTURE.md`'s known limitations) |
 | `EMAIL_PROVIDER` | No | `console` | `console` (dev logger, the only one implemented) \| `resend` \| `smtp` (both accepted by validation but throw "not implemented" at first use — see `DEPLOYMENT_GUIDE.md`) |
-| `EMAIL_FROM_ADDRESS` | No | `noreply@tnparch.in` | |
+| `EMAIL_FROM_ADDRESS` | No | `noreply@myarch.in` | |
 | `RESEND_API_KEY` | No | empty | Only consulted once a Resend implementation exists |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | No | empty | Only consulted once an SMTP implementation exists |
 | `JOB_WORKER_POLL_INTERVAL_MS` | No | `2000` | How often the worker polls when idle |

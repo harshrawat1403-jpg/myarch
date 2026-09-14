@@ -86,12 +86,12 @@ describe("CreateCoordinatorUseCase", () => {
 
   it("rejects a non-Secretary actor", async () => {
     await expect(
-      ctx.useCase.execute({ actor: COORDINATOR, email: "new@tnparch.in", fullName: "New Coordinator" }),
+      ctx.useCase.execute({ actor: COORDINATOR, email: "new@myarch.in", fullName: "New Coordinator" }),
     ).rejects.toBeInstanceOf(NotAuthorizedError);
   });
 
   it("creates a coordinator and returns a plaintext temp password", async () => {
-    const result = await ctx.useCase.execute({ actor: SECRETARY, email: "new@tnparch.in", fullName: "New Coordinator" });
+    const result = await ctx.useCase.execute({ actor: SECRETARY, email: "new@myarch.in", fullName: "New Coordinator" });
 
     expect(result.coordinator.fullName).toBe("New Coordinator");
     expect(result.tempPassword).toBeTruthy();
@@ -102,7 +102,7 @@ describe("CreateCoordinatorUseCase", () => {
     await expect(
       ctx.useCase.execute({
         actor: SECRETARY,
-        email: "new@tnparch.in",
+        email: "new@myarch.in",
         fullName: "New Coordinator",
         batchIds: ["no-such-batch"],
       }),
@@ -113,7 +113,7 @@ describe("CreateCoordinatorUseCase", () => {
     ctx.batchLookup.seed("batch-b", "ACTIVE");
     const result = await ctx.useCase.execute({
       actor: SECRETARY,
-      email: "new@tnparch.in",
+      email: "new@myarch.in",
       fullName: "New Coordinator",
       batchIds: ["batch-a", "batch-b"],
     });
@@ -122,9 +122,9 @@ describe("CreateCoordinatorUseCase", () => {
   });
 
   it("throws DuplicateEmailError when the email is already in use, and leaves no orphan behind", async () => {
-    ctx.coordinatorUserProvisioner.seedExistingEmail("taken@tnparch.in");
+    ctx.coordinatorUserProvisioner.seedExistingEmail("taken@myarch.in");
     await expect(
-      ctx.useCase.execute({ actor: SECRETARY, email: "taken@tnparch.in", fullName: "New Coordinator" }),
+      ctx.useCase.execute({ actor: SECRETARY, email: "taken@myarch.in", fullName: "New Coordinator" }),
     ).rejects.toBeInstanceOf(DuplicateEmailError);
 
     expect(ctx.coordinatorRepository.snapshot()).toHaveLength(0);
@@ -132,7 +132,7 @@ describe("CreateCoordinatorUseCase", () => {
   });
 
   it("records a COORDINATOR_CREATED audit entry", async () => {
-    await ctx.useCase.execute({ actor: SECRETARY, email: "new@tnparch.in", fullName: "New Coordinator" });
+    await ctx.useCase.execute({ actor: SECRETARY, email: "new@myarch.in", fullName: "New Coordinator" });
     expect(ctx.auditRecorder.entries).toContainEqual(
       expect.objectContaining({ actorUserId: "sec-1", action: "COORDINATOR_CREATED" }),
     );
@@ -141,7 +141,7 @@ describe("CreateCoordinatorUseCase", () => {
   it("creates an Other Coordinator with a custom position label", async () => {
     const result = await ctx.useCase.execute({
       actor: SECRETARY,
-      email: "cultural@tnparch.in",
+      email: "cultural@myarch.in",
       fullName: "Cultural Lead",
       position: "OTHER",
       customPosition: "Cultural Coordinator",
@@ -152,7 +152,7 @@ describe("CreateCoordinatorUseCase", () => {
 
   it("rejects position OTHER with no customPosition text", async () => {
     await expect(
-      ctx.useCase.execute({ actor: SECRETARY, email: "new@tnparch.in", fullName: "New Coordinator", position: "OTHER" }),
+      ctx.useCase.execute({ actor: SECRETARY, email: "new@myarch.in", fullName: "New Coordinator", position: "OTHER" }),
     ).rejects.toBeInstanceOf(InvalidCustomPositionError);
   });
 
@@ -160,7 +160,7 @@ describe("CreateCoordinatorUseCase", () => {
     await expect(
       ctx.useCase.execute({
         actor: SECRETARY,
-        email: "new@tnparch.in",
+        email: "new@myarch.in",
         fullName: "New Coordinator",
         position: "OTHER",
         customPosition: "   ",
@@ -171,7 +171,7 @@ describe("CreateCoordinatorUseCase", () => {
   it("ignores/clears customPosition when position is not OTHER", async () => {
     const result = await ctx.useCase.execute({
       actor: SECRETARY,
-      email: "tech@tnparch.in",
+      email: "tech@myarch.in",
       fullName: "Tech Coordinator",
       position: "TECHNICAL",
       customPosition: "should be discarded",
@@ -184,7 +184,7 @@ describe("CreateCoordinatorUseCase", () => {
     const existing = (id: string): CoordinatorRecord => ({
       id,
       userId: `${id}-user`,
-      email: `${id}@tnparch.in`,
+      email: `${id}@myarch.in`,
       fullName: id,
       isActive: true,
       position: null,
@@ -198,7 +198,7 @@ describe("CreateCoordinatorUseCase", () => {
     ctx.coordinatorRepository.seed(existing("coord-2"));
 
     await expect(
-      ctx.useCase.execute({ actor: SECRETARY, email: "third@tnparch.in", fullName: "Third Coordinator" }),
+      ctx.useCase.execute({ actor: SECRETARY, email: "third@myarch.in", fullName: "Third Coordinator" }),
     ).rejects.toBeInstanceOf(MaxActiveCoordinatorsError);
 
     // The pre-transaction check means nothing was ever provisioned, and the
@@ -212,7 +212,7 @@ describe("CreateCoordinatorUseCase", () => {
     ctx.coordinatorRepository.seed({
       id: "coord-disabled",
       userId: "coord-disabled-user",
-      email: "disabled@tnparch.in",
+      email: "disabled@myarch.in",
       fullName: "Disabled Coordinator",
       isActive: false,
       position: null,
@@ -223,7 +223,7 @@ describe("CreateCoordinatorUseCase", () => {
       createdAt: new Date(),
     });
 
-    const result = await ctx.useCase.execute({ actor: SECRETARY, email: "new@tnparch.in", fullName: "New Coordinator" });
+    const result = await ctx.useCase.execute({ actor: SECRETARY, email: "new@myarch.in", fullName: "New Coordinator" });
     expect(result.coordinator.fullName).toBe("New Coordinator");
   });
 
@@ -231,7 +231,7 @@ describe("CreateCoordinatorUseCase", () => {
     it("creates a Maintenance Secretary in one atomic call", async () => {
       const result = await ctx.useCase.execute({
         actor: SECRETARY,
-        email: "mtsec@tnparch.in",
+        email: "mtsec@myarch.in",
         fullName: "Maintenance Sec",
         position: "TECHNICAL",
         maintenanceRole: "MAINTENANCE_SECRETARY",
@@ -248,7 +248,7 @@ describe("CreateCoordinatorUseCase", () => {
     it("creates a Maintenance Coordinator in one atomic call", async () => {
       const result = await ctx.useCase.execute({
         actor: SECRETARY,
-        email: "mtcoord@tnparch.in",
+        email: "mtcoord@myarch.in",
         fullName: "Maintenance Coord",
         position: "TECHNICAL",
         maintenanceRole: "MAINTENANCE_COORDINATOR",
@@ -261,7 +261,7 @@ describe("CreateCoordinatorUseCase", () => {
       ctx.coordinatorRepository.seed({
         id: "existing-mtsec",
         userId: "existing-mtsec-user",
-        email: "existing-mtsec@tnparch.in",
+        email: "existing-mtsec@myarch.in",
         fullName: "Existing MtSec",
         isActive: true,
         position: "TECHNICAL",
@@ -275,7 +275,7 @@ describe("CreateCoordinatorUseCase", () => {
       await expect(
         ctx.useCase.execute({
           actor: SECRETARY,
-          email: "second-mtsec@tnparch.in",
+          email: "second-mtsec@myarch.in",
           fullName: "Second MtSec",
           position: "TECHNICAL",
           maintenanceRole: "MAINTENANCE_SECRETARY",
@@ -287,7 +287,7 @@ describe("CreateCoordinatorUseCase", () => {
       // both have been rolled back, not just the maintenanceRole field.
       expect(ctx.coordinatorRepository.snapshot()).toHaveLength(1);
       expect(ctx.coordinatorRepository.snapshot()[0]!.id).toBe("existing-mtsec");
-      expect(ctx.coordinatorUserProvisioner.provisionedEmails).not.toContain("second-mtsec@tnparch.in");
+      expect(ctx.coordinatorUserProvisioner.provisionedEmails).not.toContain("second-mtsec@myarch.in");
       expect(ctx.auditRecorder.entries.filter((e) => e.action === "COORDINATOR_CREATED")).toHaveLength(0);
     });
 
@@ -295,7 +295,7 @@ describe("CreateCoordinatorUseCase", () => {
       ctx.coordinatorRepository.seed({
         id: "existing-mtcoord",
         userId: "existing-mtcoord-user",
-        email: "existing-mtcoord@tnparch.in",
+        email: "existing-mtcoord@myarch.in",
         fullName: "Existing MtCoord",
         isActive: true,
         position: "TECHNICAL",
@@ -309,7 +309,7 @@ describe("CreateCoordinatorUseCase", () => {
       await expect(
         ctx.useCase.execute({
           actor: SECRETARY,
-          email: "second-mtcoord@tnparch.in",
+          email: "second-mtcoord@myarch.in",
           fullName: "Second MtCoord",
           position: "TECHNICAL",
           maintenanceRole: "MAINTENANCE_COORDINATOR",
@@ -317,7 +317,7 @@ describe("CreateCoordinatorUseCase", () => {
       ).rejects.toBeInstanceOf(MaxActiveMaintenanceRoleError);
 
       expect(ctx.coordinatorRepository.snapshot()).toHaveLength(1);
-      expect(ctx.coordinatorUserProvisioner.provisionedEmails).not.toContain("second-mtcoord@tnparch.in");
+      expect(ctx.coordinatorUserProvisioner.provisionedEmails).not.toContain("second-mtcoord@myarch.in");
     });
   });
 });

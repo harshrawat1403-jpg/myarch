@@ -1,6 +1,6 @@
 # Operations Guide
 
-**Audience:** whoever keeps TNPArch running day to day in production — starting/stopping services, reading logs, diagnosing problems, and knowing when to escalate.
+**Audience:** whoever keeps MYARCH running day to day in production — starting/stopping services, reading logs, diagnosing problems, and knowing when to escalate.
 
 ## Services at a glance
 

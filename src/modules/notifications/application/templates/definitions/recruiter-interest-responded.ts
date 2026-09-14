@@ -10,7 +10,7 @@ export const recruiterInterestRespondedTemplate: EmailTemplateDefinition = {
     if (context.decision === "ACCEPTED") {
       return (
         `${studentName} has accepted your expression of interest.\n\n` +
-        "Per department policy, the platform does not exchange direct contact information — the T&P office will facilitate the connection."
+        "Per department policy, the platform does not exchange direct contact information — Admin will facilitate the connection."
       );
     }
     return `${studentName} has declined your expression of interest.`;
@@ -32,6 +32,6 @@ export const recruiterInterestRespondedInAppTemplate: InAppTemplateDefinition = 
   title: (context) => (context.decision === "ACCEPTED" ? "Interest accepted" : "Interest declined"),
   message: (context) =>
     context.decision === "ACCEPTED"
-      ? `${String(context.studentName ?? "A student")} accepted your interest — the T&P office will facilitate contact.`
+      ? `${String(context.studentName ?? "A student")} accepted your interest — Admin will facilitate contact.`
       : `${String(context.studentName ?? "A student")} declined your interest.`,
 };

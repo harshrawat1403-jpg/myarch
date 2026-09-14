@@ -64,7 +64,7 @@ Living document — updated as questions are resolved (move them to `19_Decision
 
 ### Q6 — Academic Data Source of Truth
 
-**Question:** Is CGPA/backlog data entered manually by the Secretary/Coordinators into TNPArch each season, or is there an existing institutional system it should ideally be sourced from?
+**Question:** Is CGPA/backlog data entered manually by the Secretary/Coordinators into MYARCH each season, or is there an existing institutional system it should ideally be sourced from?
 
 **Why it matters:** Affects whether Excel import (FR-STUD-05) is the primary data-entry path (implying manual entry is the norm) or whether a future integration with an institutional academic system should be anticipated architecturally.
 

@@ -15,7 +15,7 @@ describe("ContactForm — visual-only enquiry form", () => {
   it("shows validation errors for empty required fields and does not show the confirmation", async () => {
     mockSearch = "";
     const user = userEvent.setup();
-    render(<ContactForm contactEmail="contact@tnparch.in" />);
+    render(<ContactForm contactEmail="contact@myarch.in" />);
 
     await user.click(screen.getByRole("button", { name: /send message/i }));
 
@@ -28,7 +28,7 @@ describe("ContactForm — visual-only enquiry form", () => {
   it("rejects an invalid email format", async () => {
     mockSearch = "";
     const user = userEvent.setup();
-    render(<ContactForm contactEmail="contact@tnparch.in" />);
+    render(<ContactForm contactEmail="contact@myarch.in" />);
 
     await user.type(screen.getByLabelText("Name"), "Test Recruiter");
     await user.type(screen.getByLabelText("Email"), "not-an-email");
@@ -41,7 +41,7 @@ describe("ContactForm — visual-only enquiry form", () => {
   it("shows the interim confirmation, linking to the given contact email, once every field validates", async () => {
     mockSearch = "";
     const user = userEvent.setup();
-    render(<ContactForm contactEmail="contact@tnparch.in" />);
+    render(<ContactForm contactEmail="contact@myarch.in" />);
 
     await user.type(screen.getByLabelText("Name"), "Test Recruiter");
     await user.type(screen.getByLabelText("Email"), "recruiter@example.com");
@@ -49,19 +49,19 @@ describe("ContactForm — visual-only enquiry form", () => {
     await user.click(screen.getByRole("button", { name: /send message/i }));
 
     expect(screen.getByText(/message ready/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "contact@tnparch.in" })).toHaveAttribute("href", "mailto:contact@tnparch.in");
+    expect(screen.getByRole("link", { name: "contact@myarch.in" })).toHaveAttribute("href", "mailto:contact@myarch.in");
   });
 
   it("preselects the Reason field from a ?reason= query param", () => {
     mockSearch = "reason=recruiter";
-    render(<ContactForm contactEmail="contact@tnparch.in" />);
+    render(<ContactForm contactEmail="contact@myarch.in" />);
 
     expect(screen.getByLabelText("Reason")).toHaveValue("recruiter");
   });
 
   it("falls back to General Enquiry for an unrecognized reason value", () => {
     mockSearch = "reason=nonsense";
-    render(<ContactForm contactEmail="contact@tnparch.in" />);
+    render(<ContactForm contactEmail="contact@myarch.in" />);
 
     expect(screen.getByLabelText("Reason")).toHaveValue("general");
   });

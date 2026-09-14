@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines concrete accessibility requirements for TNPArch, ensuring the dark, blueprint-inspired design system (`12_Design_System.md`) is usable by everyone — including students and recruiters using assistive technology, low vision, or keyboard-only navigation — without diluting the visual identity the brief specifically asks for.
+Defines concrete accessibility requirements for MYARCH, ensuring the dark, blueprint-inspired design system (`12_Design_System.md`) is usable by everyone — including students and recruiters using assistive technology, low vision, or keyboard-only navigation — without diluting the visual identity the brief specifically asks for.
 
 ## Scope
 

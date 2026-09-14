@@ -1,6 +1,6 @@
 # API Reference
 
-All endpoints are under the deployed origin (e.g. `https://tnparch.in`). Every endpoint except `/api/health`, `/api/health/ready`, and `/api/auth/*` requires a valid access token in an `Authorization: Bearer <token>` header, obtained from `POST /api/auth/login`.
+All endpoints are under the deployed origin (e.g. `https://myarch.in`). Every endpoint except `/api/health`, `/api/health/ready`, and `/api/auth/*` requires a valid access token in an `Authorization: Bearer <token>` header, obtained from `POST /api/auth/login`.
 
 **Response envelope**, consistent across every endpoint: success responses are `{ "data": ... }`; errors are `{ "error": { "code": "...", "message": "...", "details": ... } }` with a matching HTTP status (401 unauthenticated, 403 forbidden, 400 validation, 404 not found, 409 conflict, 429 rate-limited, 503 a health check's dependency is down).
 

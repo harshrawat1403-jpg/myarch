@@ -183,7 +183,7 @@ async function main() {
   // the seed data internally consistent with how the app actually works,
   // rather than attributing those rows to the Coordinator, who could never
   // really have performed them.
-  const secretaryUser = await upsertUser("secretary@tnparch.in", "SECRETARY");
+  const secretaryUser = await upsertUser("secretary@myarch.in", "SECRETARY");
   await prisma.secretaryProfile.upsert({
     where: { userId: secretaryUser.id },
     update: {},
@@ -201,7 +201,7 @@ async function main() {
     },
   });
 
-  const coordinatorUser = await upsertUser("coordinator@tnparch.in", "COORDINATOR");
+  const coordinatorUser = await upsertUser("coordinator@myarch.in", "COORDINATOR");
   const coordinatorProfile = await prisma.coordinatorProfile.upsert({
     where: { userId: coordinatorUser.id },
     update: {},
@@ -314,7 +314,7 @@ async function main() {
   const none = SHOWCASE_STUDENTS.filter((s) => s.profileState === "NONE").length;
 
   console.log("Seed complete:");
-  console.log("  Coordinator (scoped to B.Arch 2026): coordinator@tnparch.in");
+  console.log("  Coordinator (scoped to B.Arch 2026): coordinator@myarch.in");
   console.log("  Recruiter:                            recruiter@example.com");
   console.log("  Student (primary):                    gautam@vnit.ac.in");
   console.log(

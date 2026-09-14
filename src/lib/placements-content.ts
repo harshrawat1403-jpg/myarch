@@ -162,7 +162,7 @@ export const FAQ_PUBLIC_PROFILE_INFO: FaqContentItem = {
 export const FAQ_CONTACT_ROUTING: FaqContentItem = {
   question: "Who do we contact with questions?",
   answer:
-    "The Contact page routes placement-related queries to the Training & Placement Cell directly.",
+    "The Contact page routes placement-related queries to the Technical Team directly.",
 };
 
 export const PLACEMENTS_FAQ: FaqContentItem[] = [

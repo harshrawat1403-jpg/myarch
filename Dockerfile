@@ -1,4 +1,4 @@
-# TNPArch — production container image.
+# MYARCH — production container image.
 #
 # Two runtime targets share the same build: `web` (the Next.js server,
 # using the minimal `output: "standalone"` bundle) and `worker` (the

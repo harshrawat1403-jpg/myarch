@@ -61,7 +61,7 @@ Sequenced by dependency and standalone value, so each can ship independently rat
 
 - **End of Day 1**: data model and roles frozen — no further changes without an explicit Secretary-approved exception.
 - **End of Day 12**: functional testing against real student data complete; any P0 bug found here blocks Day 13–14.
-- **End of Day 14**: MVP live at `tnparch.in`, handoff complete.
+- **End of Day 14**: MVP live at `myarch.in`, handoff complete.
 - **Post-MVP checkpoint**: after one real placement-season cycle using Phase 1 features, review before committing to Phase 2 scope/sequencing — real usage may reorder Phase 2/3 priorities.
 
 ## Assumptions

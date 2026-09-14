@@ -9,7 +9,7 @@ export const recruiterInterestReceivedTemplate: EmailTemplateDefinition = {
     const companyName = String(context.companyName ?? "A recruiter");
     return (
       `${companyName} has expressed interest in your public profile.\n\n` +
-      "Log in to TNPArch and visit My Interests to accept or decline."
+      "Log in to MYARCH and visit My Interests to accept or decline."
     );
   },
 
@@ -17,7 +17,7 @@ export const recruiterInterestReceivedTemplate: EmailTemplateDefinition = {
     const companyName = escapeHtml(String(context.companyName ?? "A recruiter"));
     return (
       `<p><strong>${companyName}</strong> has expressed interest in your public profile.</p>` +
-      "<p>Log in to TNPArch and visit My Interests to accept or decline.</p>"
+      "<p>Log in to MYARCH and visit My Interests to accept or decline.</p>"
     );
   },
 };

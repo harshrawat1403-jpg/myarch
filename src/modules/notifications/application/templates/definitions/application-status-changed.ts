@@ -9,14 +9,14 @@ export const applicationStatusChangedTemplate: EmailTemplateDefinition = {
     const companyName = String(context.companyName ?? "A company");
     const title = String(context.title ?? "your application");
     const toStatus = String(context.toStatus ?? "updated");
-    return `Your application to ${companyName} — ${title} — is now ${toStatus}.\n\nLog in to TNPArch for details.`;
+    return `Your application to ${companyName} — ${title} — is now ${toStatus}.\n\nLog in to MYARCH for details.`;
   },
 
   bodyHtml: (context) => {
     const companyName = escapeHtml(String(context.companyName ?? "A company"));
     const title = escapeHtml(String(context.title ?? "your application"));
     const toStatus = escapeHtml(String(context.toStatus ?? "updated"));
-    return `<p>Your application to <strong>${companyName}</strong> — ${title} — is now <strong>${toStatus}</strong>.</p><p>Log in to TNPArch for details.</p>`;
+    return `<p>Your application to <strong>${companyName}</strong> — ${title} — is now <strong>${toStatus}</strong>.</p><p>Log in to MYARCH for details.</p>`;
   },
 };
 

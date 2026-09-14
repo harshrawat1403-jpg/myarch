@@ -41,7 +41,7 @@ const ACTIONABLE_UNREAD = {
 const NON_ACTIONABLE_UNREAD = {
   id: "notif-plain",
   title: "Account created",
-  message: "A TNPArch account has been created for you.",
+  message: "A MYARCH account has been created for you.",
   isRead: false,
   createdAt: "2026-08-03T00:00:00.000Z",
   destination: null,

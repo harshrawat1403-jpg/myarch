@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines how TNPArch meets the project brief's mandatory pre-production security requirements, and how those requirements are implemented as architecture rather than as a checklist applied after the fact. This is the authoritative security specification; deviations from it require an explicit, documented decision in `19_Decision_Log.md`.
+Defines how MYARCH meets the project brief's mandatory pre-production security requirements, and how those requirements are implemented as architecture rather than as a checklist applied after the fact. This is the authoritative security specification; deviations from it require an explicit, documented decision in `19_Decision_Log.md`.
 
 ## Scope
 

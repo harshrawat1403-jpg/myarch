@@ -27,7 +27,7 @@ function record(): CoordinatorRecord {
   return {
     id: "coord-mc",
     userId: "user-mc",
-    email: "coordinator@tnparch.in",
+    email: "coordinator@myarch.in",
     fullName: "Maintenance Coordinator",
     isActive: true,
     position: null,

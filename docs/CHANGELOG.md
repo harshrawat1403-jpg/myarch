@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the TNPArch project are recorded here. This log tracks the project as a whole (documentation and, once implementation begins, releases) — not individual commits, which live in git history (`24_Git_Workflow.md`).
+All notable changes to the MYARCH project are recorded here. This log tracks the project as a whole (documentation and, once implementation begins, releases) — not individual commits, which live in git history (`24_Git_Workflow.md`).
 
 Format follows [Keep a Changelog](https://keepachangelog.com/) conventions, adapted for a documentation-first project stage. Dates are in `YYYY-MM-DD` format.
 

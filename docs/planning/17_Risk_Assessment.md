@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Identifies what is most likely to threaten TNPArch's success — technically, operationally, and organizationally — and how each risk is mitigated or accepted. This is a working document: risks should be revisited as the project progresses, not written once and forgotten.
+Identifies what is most likely to threaten MYARCH's success — technically, operationally, and organizationally — and how each risk is mitigated or accepted. This is a working document: risks should be revisited as the project progresses, not written once and forgotten.
 
 ## Scope
 

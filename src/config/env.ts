@@ -41,7 +41,7 @@ const envSchema = z
     // a concrete implementation is added (additive infrastructure work,
     // zero application-layer changes required).
     EMAIL_PROVIDER: z.enum(["console", "resend", "smtp"]).default("console"),
-    EMAIL_FROM_ADDRESS: z.string().default("noreply@tnparch.in"),
+    EMAIL_FROM_ADDRESS: z.string().default("noreply@myarch.in"),
     RESEND_API_KEY: z.string().optional(),
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.string().optional(),

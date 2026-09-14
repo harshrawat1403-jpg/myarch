@@ -19,9 +19,9 @@ describe("Footer — public site shared footer", () => {
 
   it("renders contact details", () => {
     render(<Footer />);
-    expect(screen.getByRole("link", { name: /contact@tnparch\.in/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /contact@myarch\.in/i })).toHaveAttribute(
       "href",
-      "mailto:contact@tnparch.in",
+      "mailto:contact@myarch.in",
     );
   });
 

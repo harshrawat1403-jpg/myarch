@@ -10,7 +10,7 @@ Covers logical entity design, relationships, and the approval-workflow data shap
 
 ## Design Principle: Private/Public Separation Is Structural, Not a Flag
 
-The most common mistake in a system like this is a single `Student` table with a `is_public` boolean or per-field visibility flags. TNPArch deliberately rejects that shape (directly implementing `NFR-DATA-01`):
+The most common mistake in a system like this is a single `Student` table with a `is_public` boolean or per-field visibility flags. MYARCH deliberately rejects that shape (directly implementing `NFR-DATA-01`):
 
 - `StudentPrivateProfile` and `StudentPublicProfile` (published) are **separate tables**, with separate access-control paths in the API layer.
 - A recruiter-facing query can only ever join against `StudentPublicProfile` — there is no query path, permission check, or ORM relation that lets a recruiter-scoped request reach `StudentPrivateProfile`, even accidentally.

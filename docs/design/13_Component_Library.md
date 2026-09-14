@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Catalogues the reusable UI components TNPArch is built from, so features are assembled from a consistent, shared set rather than each screen inventing its own version of a card, table, or form field. This document defines *what* components exist and their responsibilities; visual tokens come from `12_Design_System.md`, structural placement from `11_UI_Architecture.md`.
+Catalogues the reusable UI components MYARCH is built from, so features are assembled from a consistent, shared set rather than each screen inventing its own version of a card, table, or form field. This document defines *what* components exist and their responsibilities; visual tokens come from `12_Design_System.md`, structural placement from `11_UI_Architecture.md`.
 
 ## Scope
 

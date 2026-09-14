@@ -99,7 +99,7 @@ export default function StudentInterestsPage() {
           My Interests
         </h1>
         <p className="mt-1 text-sm text-(--color-text-secondary)">
-          Recruiters who have expressed interest in your profile. Accepting notifies the Placement office to
+          Recruiters who have expressed interest in your profile. Accepting notifies Admin to
           facilitate the connection — the platform never shares direct contact details.
         </p>
       </div>

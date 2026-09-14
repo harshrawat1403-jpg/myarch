@@ -36,8 +36,8 @@ describe("Contact page (/contact)", () => {
 
   it("renders both contact panels with correct mailto links", async () => {
     render(<ToastProvider>{await ContactPage()}</ToastProvider>);
-    expect(screen.getByRole("link", { name: "contact@tnparch.in" })).toHaveAttribute("href", "mailto:contact@tnparch.in");
-    expect(screen.getByRole("link", { name: "placements@tnparch.in" })).toHaveAttribute("href", "mailto:placements@tnparch.in");
+    expect(screen.getByRole("link", { name: "contact@myarch.in" })).toHaveAttribute("href", "mailto:contact@myarch.in");
+    expect(screen.getByRole("link", { name: "support@myarch.in" })).toHaveAttribute("href", "mailto:support@myarch.in");
   });
 
   it("renders all three enquiry routing cards", async () => {
@@ -63,11 +63,11 @@ describe("Contact page (/contact)", () => {
     expect(screen.getByText(/phone contact details are being finalised/i)).toBeInTheDocument();
   });
 
-  it("the closing CTA links to the Placement Cell and to Placements", async () => {
+  it("the closing CTA links to the Technical Team and to Placements", async () => {
     render(<ToastProvider>{await ContactPage()}</ToastProvider>);
-    expect(screen.getByRole("link", { name: /email the placement cell/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /email the technical team/i })).toHaveAttribute(
       "href",
-      "mailto:placements@tnparch.in",
+      "mailto:support@myarch.in",
     );
     expect(screen.getByRole("link", { name: /browse placements/i })).toHaveAttribute("href", "/placements");
   });

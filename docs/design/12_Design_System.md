@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the visual language of TNPArch: color, typography, spacing, motion, and the signature Title Block motif — as concrete, reusable tokens rather than per-screen judgment calls. This document is the single source of truth for every visual decision; `13_Component_Library.md` describes how these tokens compose into components.
+Defines the visual language of MYARCH: color, typography, spacing, motion, and the signature Title Block motif — as concrete, reusable tokens rather than per-screen judgment calls. This document is the single source of truth for every visual decision; `13_Component_Library.md` describes how these tokens compose into components.
 
 ## Scope
 
@@ -10,7 +10,7 @@ Covers design tokens and the rationale behind them. Component-level application 
 
 ## Design Identity
 
-TNPArch's interface is inspired by **architectural drafting sheets and blueprint drawings** — deliberately not a generic SaaS dashboard aesthetic. This is a functional choice, not decoration: the department's own discipline (architecture) is visually literate in technical drawings, and a placement platform that looks like one signals it was built specifically for them, not adapted from a generic template.
+MYARCH's interface is inspired by **architectural drafting sheets and blueprint drawings** — deliberately not a generic SaaS dashboard aesthetic. This is a functional choice, not decoration: the department's own discipline (architecture) is visually literate in technical drawings, and a placement platform that looks like one signals it was built specifically for them, not adapted from a generic template.
 
 Concretely, this means: restrained color (a dark neutral field with a single precise accent, as a drafting sheet uses black/graphite lines with sparing color highlights), monospaced data labels (as dimension/annotation text on a drawing), and a persistent metadata block echoing a drawing's title block.
 
@@ -70,7 +70,7 @@ Per the brief's "restrained motion" principle:
 
 ## The Title Block: Signature Design Element
 
-The Title Block is TNPArch's reused, load-bearing design motif — a persistent metadata panel styled after the information block in the corner of a technical architectural drawing, appearing consistently across:
+The Title Block is MYARCH's reused, load-bearing design motif — a persistent metadata panel styled after the information block in the corner of a technical architectural drawing, appearing consistently across:
 
 - Dashboard summary cards
 - Student profile headers

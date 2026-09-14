@@ -167,7 +167,7 @@ export default async function ContactPage() {
           <EditableText contentKey="cta.description" defaultValue={CONTACT_CTA.description} as="p" multiline className="mx-auto mt-4 block max-w-md text-(--color-text-secondary)" />
           <div className="mt-8 flex flex-wrap items-center justify-center gap-6">
             <Link href={`mailto:${TPO_EMAIL}`} className={buttonClassName("primary", "px-8 py-3 text-base")}>
-              Email the Placement Cell
+              Email the Technical Team
             </Link>
             <Link
               href="/placements"

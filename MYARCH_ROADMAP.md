@@ -76,7 +76,7 @@ The objective is to evolve the existing application into a complete department-w
 
 
 
-MYARCH IS NOT A TnP PORTAL.
+MYARCH IS NOT A LEGACY PLACEMENT PORTAL.
 
 
 

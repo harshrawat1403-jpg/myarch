@@ -38,7 +38,7 @@ describe("UploadAvatarUseCase", () => {
     ctx = buildUseCase();
     ctx.userRepository.seed({
       id: "sec-1",
-      email: "secretary@tnparch.in",
+      email: "secretary@myarch.in",
       passwordHash: "irrelevant",
       role: "SECRETARY",
       isActive: true,

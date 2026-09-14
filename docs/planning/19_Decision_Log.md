@@ -16,7 +16,7 @@ Each entry: date, decision, alternatives considered, rationale, and status.
 
 ### 2026-08-05 — Adopt Modular Monolith over Microservices
 
-**Decision:** Build TNPArch as a single Next.js deployment with internal feature-first modules (Clean Architecture layering), not a distributed microservice system.
+**Decision:** Build MYARCH as a single Next.js deployment with internal feature-first modules (Clean Architecture layering), not a distributed microservice system.
 
 **Alternatives considered:** Separate frontend + backend services; per-feature microservices.
 
@@ -80,7 +80,7 @@ Each entry: date, decision, alternatives considered, rationale, and status.
 
 **Alternatives considered:** Versioned API from day one.
 
-**Rationale:** The API has exactly one consumer (the TNPArch frontend, same repository, deployed together); versioning solves a problem that doesn't exist yet. Revisit only if an external consumer emerges.
+**Rationale:** The API has exactly one consumer (the MYARCH frontend, same repository, deployed together); versioning solves a problem that doesn't exist yet. Revisit only if an external consumer emerges.
 
 **Status:** Decided. See `10_API_Architecture.md`.
 

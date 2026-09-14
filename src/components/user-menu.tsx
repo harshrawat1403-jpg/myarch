@@ -23,7 +23,7 @@ export interface UserMenuProps {
  * with an avatar-initial circle (matching the sidebar's own profile block)
  * and a Lucide chevron instead of the V1.1 ▲/▼ glyphs.
  *
- * Getting back to the public website is the TNPArch sidebar branding's job
+ * Getting back to the public website is the MYARCH sidebar branding's job
  * (`SheetLayout`), not this menu's — see that component's own doc comment.
  */
 export function UserMenu({ roleLabel, scopeLabel, accountSettingsHref, onLogout }: UserMenuProps) {

@@ -12,7 +12,7 @@ export const profileChangesRequestedTemplate: EmailTemplateDefinition = {
       `Hi ${studentName},\n\n` +
       "A reviewer has requested changes to your public profile draft before it can be approved.\n\n" +
       `Reviewer comment:\n${reviewComment}\n\n` +
-      "Please log in to your TNPArch account, update your draft, and resubmit it for review."
+      "Please log in to your MYARCH account, update your draft, and resubmit it for review."
     );
   },
 
@@ -23,7 +23,7 @@ export const profileChangesRequestedTemplate: EmailTemplateDefinition = {
       `<p>Hi ${studentName},</p>` +
       "<p>A reviewer has requested changes to your public profile draft before it can be approved.</p>" +
       `<p><strong>Reviewer comment:</strong><br />${reviewComment}</p>` +
-      "<p>Please log in to your TNPArch account, update your draft, and resubmit it for review.</p>"
+      "<p>Please log in to your MYARCH account, update your draft, and resubmit it for review.</p>"
     );
   },
 };

@@ -10,16 +10,16 @@ export const registrationReviewedTemplate: EmailTemplateDefinition = {
     const applicantName = String(context.applicantName ?? "A registration request");
     const needsAttention = context.status === "NEEDS_ATTENTION";
     return needsAttention
-      ? `A Coordinator has flagged ${applicantName}'s registration request as needing attention. Please log in to TNPArch to review their comment.`
-      : `A Coordinator has reviewed ${applicantName}'s registration request. It's ready for your decision in TNPArch.`;
+      ? `A Coordinator has flagged ${applicantName}'s registration request as needing attention. Please log in to MYARCH to review their comment.`
+      : `A Coordinator has reviewed ${applicantName}'s registration request. It's ready for your decision in MYARCH.`;
   },
 
   bodyHtml: (context) => {
     const applicantName = escapeHtml(String(context.applicantName ?? "A registration request"));
     const needsAttention = context.status === "NEEDS_ATTENTION";
     return needsAttention
-      ? `<p>A Coordinator has flagged <strong>${applicantName}</strong>'s registration request as needing attention. Please log in to TNPArch to review their comment.</p>`
-      : `<p>A Coordinator has reviewed <strong>${applicantName}</strong>'s registration request. It's ready for your decision in TNPArch.</p>`;
+      ? `<p>A Coordinator has flagged <strong>${applicantName}</strong>'s registration request as needing attention. Please log in to MYARCH to review their comment.</p>`
+      : `<p>A Coordinator has reviewed <strong>${applicantName}</strong>'s registration request. It's ready for your decision in MYARCH.</p>`;
   },
 };
 

@@ -12,7 +12,7 @@ function record(id: string): CoordinatorRecord {
   return {
     id,
     userId: `user-${id}`,
-    email: `${id}@tnparch.in`,
+    email: `${id}@myarch.in`,
     fullName: `Coordinator ${id}`,
     isActive: true,
     position: null,

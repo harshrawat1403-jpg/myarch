@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the four roles in TNPArch, exactly what each can and cannot do, and how scope (e.g., a Coordinator's batch assignment) constrains that access. This is the authoritative permissions matrix that authorization code must match exactly.
+Defines the four roles in MYARCH, exactly what each can and cannot do, and how scope (e.g., a Coordinator's batch assignment) constrains that access. This is the authoritative permissions matrix that authorization code must match exactly.
 
 ## Scope
 

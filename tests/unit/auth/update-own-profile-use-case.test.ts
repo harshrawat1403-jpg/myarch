@@ -32,7 +32,7 @@ describe("UpdateOwnProfileUseCase", () => {
     ctx = buildUseCase();
     ctx.userRepository.seed({
       id: "sec-1",
-      email: "secretary@tnparch.in",
+      email: "secretary@myarch.in",
       passwordHash: await ctx.passwordHasher.hash("current-password"),
       role: "SECRETARY",
       isActive: true,
@@ -53,32 +53,32 @@ describe("UpdateOwnProfileUseCase", () => {
 
   it("rejects an email change with no current password", async () => {
     await expect(
-      ctx.useCase.execute({ actor: ACTOR, email: "new@tnparch.in" }),
+      ctx.useCase.execute({ actor: ACTOR, email: "new@myarch.in" }),
     ).rejects.toBeInstanceOf(CurrentPasswordIncorrectError);
   });
 
   it("rejects an email change with the wrong current password", async () => {
     await expect(
-      ctx.useCase.execute({ actor: ACTOR, email: "new@tnparch.in", currentPassword: "wrong" }),
+      ctx.useCase.execute({ actor: ACTOR, email: "new@myarch.in", currentPassword: "wrong" }),
     ).rejects.toBeInstanceOf(CurrentPasswordIncorrectError);
   });
 
   it("updates the email with the correct current password", async () => {
     const result = await ctx.useCase.execute({
       actor: ACTOR,
-      email: "new@tnparch.in",
+      email: "new@myarch.in",
       currentPassword: "current-password",
     });
 
-    expect(result.email).toBe("new@tnparch.in");
+    expect(result.email).toBe("new@myarch.in");
     const updated = await ctx.userRepository.findById("sec-1");
-    expect(updated!.email).toBe("new@tnparch.in");
+    expect(updated!.email).toBe("new@myarch.in");
   });
 
   it("rejects an email already in use by another account", async () => {
     ctx.userRepository.seed({
       id: "other-user",
-      email: "taken@tnparch.in",
+      email: "taken@myarch.in",
       passwordHash: "irrelevant",
       role: "COORDINATOR",
       isActive: true,
@@ -87,14 +87,14 @@ describe("UpdateOwnProfileUseCase", () => {
     });
 
     await expect(
-      ctx.useCase.execute({ actor: ACTOR, email: "taken@tnparch.in", currentPassword: "current-password" }),
+      ctx.useCase.execute({ actor: ACTOR, email: "taken@myarch.in", currentPassword: "current-password" }),
     ).rejects.toBeInstanceOf(EmailAlreadyInUseError);
   });
 
   it("allows 'changing' the email to the same value it already is, without requiring a password", async () => {
     await expect(
-      ctx.useCase.execute({ actor: ACTOR, email: "secretary@tnparch.in" }),
-    ).resolves.toEqual({ email: "secretary@tnparch.in" });
+      ctx.useCase.execute({ actor: ACTOR, email: "secretary@myarch.in" }),
+    ).resolves.toEqual({ email: "secretary@myarch.in" });
   });
 
   it("records an ACCOUNT_SETTINGS_UPDATED audit entry", async () => {
@@ -128,7 +128,7 @@ describe("UpdateOwnProfileUseCase", () => {
     await ctx.useCase.execute({
       actor: ACTOR,
       fullName: "New Name",
-      email: "new@tnparch.in",
+      email: "new@myarch.in",
       currentPassword: "current-password",
     });
 
@@ -138,6 +138,6 @@ describe("UpdateOwnProfileUseCase", () => {
       fullName: "New Name",
     });
     const updated = await ctx.userRepository.findById("sec-1");
-    expect(updated!.email).toBe("new@tnparch.in");
+    expect(updated!.email).toBe("new@myarch.in");
   });
 });

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document provides the final checklist before declaring the MVP production-ready. It defines the manual acceptance criteria against which the Secretary (or whoever performs sign-off) verifies that every MVP feature works correctly before TNPArch goes live at `tnparch.in`. It is the last gate in the Phase 1 schedule — corresponding to Day 12 ("Testing — real student data, bug fixing") and the go/no-go decision ahead of Day 14 ("Deployment, project handoff") in `16_Project_Roadmap.md`.
+This document provides the final checklist before declaring the MVP production-ready. It defines the manual acceptance criteria against which the Secretary (or whoever performs sign-off) verifies that every MVP feature works correctly before MYARCH goes live at `myarch.in`. It is the last gate in the Phase 1 schedule — corresponding to Day 12 ("Testing — real student data, bug fixing") and the go/no-go decision ahead of Day 14 ("Deployment, project handoff") in `16_Project_Roadmap.md`.
 
 This document is deliberately **implementation-agnostic**: it describes expected system *behavior*, not code, so it remains valid regardless of how a given feature is technically implemented, and so it can be executed by someone testing the live product without needing to read source code.
 

@@ -1,10 +1,10 @@
 # System Architecture
 
-A single, current reference for how TNPArch is built and deployed. Where the frozen `docs/architecture/*` documents describe the original Phase 1 design intent, this document describes what actually exists today, including everything added across the Notification Architecture, Background Job Processing System, Production Readiness Sprint, and this deployment phase.
+A single, current reference for how MYARCH is built and deployed. Where the frozen `docs/architecture/*` documents describe the original Phase 1 design intent, this document describes what actually exists today, including everything added across the Notification Architecture, Background Job Processing System, Production Readiness Sprint, and this deployment phase.
 
 ## Overview
 
-TNPArch is a **Modular Monolith**: one Next.js 16 (App Router) application, one PostgreSQL database, deployed as two processes (`web` and `worker`) built from the same codebase. It is not microservices — every module runs in the same process space and shares one database — but internally it is organized as if it could be split apart later, via strict per-module boundaries.
+MYARCH is a **Modular Monolith**: one Next.js 16 (App Router) application, one PostgreSQL database, deployed as two processes (`web` and `worker`) built from the same codebase. It is not microservices — every module runs in the same process space and shares one database — but internally it is organized as if it could be split apart later, via strict per-module boundaries.
 
 ```
                          ┌─────────────────────────────┐

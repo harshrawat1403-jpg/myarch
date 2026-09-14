@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "license": "UNLICENSED",
-  "description": "Department Training & Placement Portal — Department of Architecture & Planning, VNIT Nagpur",
+  "description": "MYARCH platform for the Department of Architecture & Planning, VNIT Nagpur",
   "author": "Department of Architecture & Planning, VNIT Nagpur",
   "engines": {
     "node": ">=20.0.0"
