@@ -1201,7 +1201,7 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
   }) {
     return this.serializable(async (tx) => {
       const selection = await lockSelection(tx, input.selectionId);
-      if (selection.status === "PUBLISHED" || selection.status === "MEMBERSHIP_CONFIRMED" || selection.status === "ARCHIVED")
+      if (selection.publication)
         throw new CoreCommitteeSelectionError("Published results cannot be changed", "validation");
       const candidate = await tx.coreCommitteeSelectionCandidate.findFirst({
         where: {

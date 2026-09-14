@@ -139,7 +139,9 @@ export function CoreCommitteeSelectionWorkspace({ id, view }: { id: string; view
       setMessage(success);
     } catch (error) {
       setMessage(
-        error instanceof ApiError ? error.message : "Unable to update Core Committee workflow",
+        error instanceof ApiError || error instanceof Error
+          ? error.message
+          : "Unable to update Core Committee workflow",
       );
     } finally {
       setBusy(false);
@@ -912,14 +914,14 @@ function ResultsPanel({
                   <div className="flex gap-2">
                     <Button
                       disabled={busy}
-                      variant={outcome === "SELECTED" ? "primary" : "secondary"}
+                      variant={outcome === "SELECTED" ? "secondary" : "primary"}
                       onClick={() => onDecision(candidate, position.id, "SELECTED")}
                     >
-                      Select
+                      {outcome === "SELECTED" ? "Selected" : "Select"}
                     </Button>
                     <Button
                       disabled={busy}
-                      variant={outcome === "NOT_SELECTED" ? "primary" : "secondary"}
+                      variant={outcome === "NOT_SELECTED" ? "secondary" : "secondary"}
                       onClick={() => onDecision(candidate, position.id, "NOT_SELECTED")}
                     >
                       Not selected
