@@ -2389,6 +2389,7 @@ model CoreCommitteeSelection {
   status                      CoreCommitteeSelectionStatus              @default(DRAFT)
   applicationOpenAt           DateTime
   applicationCloseAt          DateTime
+  shortlistPublishedAt       DateTime?
   correctionOpenAt            DateTime?
   correctionCloseAt           DateTime?
   maxPositionsPerCandidate    Int                                       @default(1)
@@ -2402,6 +2403,7 @@ model CoreCommitteeSelection {
   createdAt                   DateTime                                  @default(now())
   updatedAt                   DateTime                                  @updatedAt
   positions                   CoreCommitteeSelectionPosition[]
+  questions                   CoreCommitteeSelectionQuestion[]
   applicationForm             CoreCommitteeSelectionApplicationForm?
   deadlineExtensions          CoreCommitteeSelectionDeadlineExtension[]
   candidates                  CoreCommitteeSelectionCandidate[]
@@ -2437,11 +2439,35 @@ model CoreCommitteeSelectionPosition {
   councilReviews                     CoreCommitteeCouncilReview[]
   decisions                          CoreCommitteeSelectionDecision[]
   coreCommitteeSelectionAppointments CoreCommitteeSelectionAppointment[]
+  questions                          CoreCommitteeSelectionQuestion[]
 
   @@unique([selectionId, identityKey])
   @@unique([id, selectionId])
   @@index([selectionId, displayOrder])
   @@map("core_committee_selection_positions")
+}
+
+model CoreCommitteeSelectionQuestion {
+  id          String                         @id @default(uuid()) @db.Uuid
+  selectionId String                         @db.Uuid
+  selection   CoreCommitteeSelection         @relation(fields: [selectionId], references: [id], onDelete: Restrict)
+  positionId  String                         @db.Uuid
+  position    CoreCommitteeSelectionPosition @relation(fields: [positionId, selectionId], references: [id, selectionId], onDelete: Restrict)
+  key         String
+  label       String
+  type        FormFieldType
+  description String?
+  required    Boolean                        @default(false)
+  options     Json?
+  validation  Json?
+  displayOrder Int                           @default(0)
+  createdAt   DateTime                        @default(now())
+  updatedAt   DateTime                        @updatedAt
+
+  @@unique([positionId, key])
+  @@unique([id, selectionId])
+  @@index([selectionId, positionId, displayOrder])
+  @@map("core_committee_selection_questions")
 }
 
 model CoreCommitteeSelectionApplicationForm {

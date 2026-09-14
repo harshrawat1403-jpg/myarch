@@ -2,13 +2,20 @@ import type {
   CoreCommitteeSelectionConfig,
   CoreCommitteeSelectionPositionConfig,
   CoreCommitteeSelectionStatus,
+  CoreCommitteeSelectionQuestionConfig,
 } from "./core-committee-selection";
 export interface CoreCommitteeSelectionRecord extends CoreCommitteeSelectionConfig {
   id: string;
   status: CoreCommitteeSelectionStatus;
   configurationLockedAt: Date | null;
+  shortlistPublishedAt: Date | null;
   createdAt: Date;
-  positions: (CoreCommitteeSelectionPositionConfig & { id: string })[];
+  positions: Array<
+    Omit<CoreCommitteeSelectionPositionConfig, "questions"> & {
+      id: string;
+      questions: StudentCoreCommitteeApplicationField[];
+    }
+  >;
   applicationForm: { formId: string; title: string; status: string } | null;
 }
 export interface CoreCommitteeSelectionCandidateRecord {
@@ -30,12 +37,14 @@ export interface StudentCoreCommitteeSelectionSummary {
   status: CoreCommitteeSelectionStatus;
   applicationOpenAt: Date;
   applicationCloseAt: Date;
+  shortlistPublishedAt: Date | null;
   application: {
     status: CoreCommitteeSelectionCandidateRecord["status"];
     submittedAt: Date;
     domain: { id: string; title: string };
     interviews: StudentCoreCommitteeInterview[];
     result: StudentCoreCommitteeResult | null;
+    shortlistOutcome: "SHORTLISTED" | "NOT_SHORTLISTED" | null;
   } | null;
 }
 
@@ -56,19 +65,21 @@ export interface StudentCoreCommitteeResult {
   publishedAt: Date;
 }
 
-export interface StudentCoreCommitteeSelectionDetail
-  extends StudentCoreCommitteeSelectionSummary {
+export interface StudentCoreCommitteeSelectionDetail extends StudentCoreCommitteeSelectionSummary {
   positions: Array<{
     id: string;
     title: string;
     description: string;
     seats: number;
     displayOrder: number;
+    questions: readonly StudentCoreCommitteeApplicationField[];
   }>;
   fields: readonly StudentCoreCommitteeApplicationField[];
-  application: (StudentCoreCommitteeSelectionSummary["application"] & {
-    answers: Record<string, unknown>;
-  }) | null;
+  application:
+    | (StudentCoreCommitteeSelectionSummary["application"] & {
+        answers: Record<string, unknown>;
+      })
+    | null;
 }
 
 /** A form-field projection for students. The managed form ID stays server-side. */

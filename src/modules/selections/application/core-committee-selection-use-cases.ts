@@ -160,19 +160,42 @@ export class CoreCommitteeSelectionUseCases {
     });
   }
   async shortlist(actor: AuthenticatedActor, selectionId: string, input: unknown) {
-    await this.councilOrSecretary(actor, selectionId);
+    requireSelectionSecretary(actor);
     const value = z
       .object({
         candidateId: z.string().uuid(),
         positionIds: z.array(z.string().uuid()).min(1).max(100),
+        shortlisted: z.boolean().default(true),
       })
       .strict()
       .parse(input);
     const result = await this.repository.shortlist({ selectionId, ...value, actorUserId: actor.userId });
-    await this.notifyUnique([result.candidateUserId], "CORE_COMMITTEE_SELECTION_SHORTLISTED", {
+    return result;
+  }
+  async publishShortlist(actor: AuthenticatedActor, selectionId: string) {
+    requireSelectionSecretary(actor);
+    const result = await this.repository.publishShortlist({
       selectionId,
-      selectionTitle: result.selectionTitle,
+      actorUserId: actor.userId,
     });
+    if (!result.idempotent && result.notificationRecipients) {
+      await this.notifyUnique(
+        result.notificationRecipients.shortlistedCandidateUserIds ?? [],
+        "CORE_COMMITTEE_SELECTION_SHORTLISTED",
+        {
+          selectionId: result.notificationRecipients.selectionId,
+          selectionTitle: result.notificationRecipients.selectionTitle,
+        },
+      );
+      await this.notifyUnique(
+        result.notificationRecipients.notShortlistedCandidateUserIds ?? [],
+        "CORE_COMMITTEE_SELECTION_NOT_SHORTLISTED",
+        {
+          selectionId: result.notificationRecipients.selectionId,
+          selectionTitle: result.notificationRecipients.selectionTitle,
+        },
+      );
+    }
     return result;
   }
   async interview(actor: AuthenticatedActor, selectionId: string, input: unknown) {
@@ -184,13 +207,21 @@ export class CoreCommitteeSelectionUseCases {
         scheduledAt: z
           .union([z.string().datetime(), z.date()])
           .transform((value) => new Date(value)),
-        durationMinutes: z.number().int().positive().max(1440).optional(),
-        mode: z.string().trim().max(100).optional(),
+        durationMinutes: z.number().int().positive().max(1440),
+        mode: z.enum(["IN_PERSON", "ONLINE"]),
         location: z.string().trim().max(2000).optional(),
         candidateInstructions: z.string().trim().max(5000).optional(),
         internalNotes: z.string().trim().max(10000).optional(),
       })
       .strict()
+      .superRefine((value, context) => {
+        if (value.scheduledAt <= new Date())
+          context.addIssue({ code: "custom", path: ["scheduledAt"], message: "Interview time must be in the future" });
+        if (value.mode === "IN_PERSON" && !value.location)
+          context.addIssue({ code: "custom", path: ["location"], message: "Venue is required for in-person interviews" });
+        if (value.mode === "ONLINE" && !value.location)
+          context.addIssue({ code: "custom", path: ["location"], message: "Meeting link is required for online interviews" });
+      })
       .parse(input);
     const result = await this.repository.createInterview({ selectionId, ...value, actorUserId: actor.userId });
     await this.notifyUnique([result.candidateUserId], "CORE_COMMITTEE_SELECTION_INTERVIEW_SCHEDULED", {
@@ -224,12 +255,19 @@ export class CoreCommitteeSelectionUseCases {
     await this.councilOrSecretary(actor, selectionId);
     const value = z.object({
       scheduledAt: z.union([z.string().datetime(), z.date()]).transform((date) => new Date(date)),
-      durationMinutes: z.number().int().positive().max(1440).optional(),
-      mode: z.string().trim().max(100).optional(),
+      durationMinutes: z.number().int().positive().max(1440),
+      mode: z.enum(["IN_PERSON", "ONLINE"]),
       location: z.string().trim().max(2000).optional(),
       candidateInstructions: z.string().trim().max(5000).optional(),
       internalNotes: z.string().trim().max(10000).optional(),
-    }).strict().parse(input);
+    }).strict().superRefine((value, context) => {
+      if (value.scheduledAt <= new Date())
+        context.addIssue({ code: "custom", path: ["scheduledAt"], message: "Interview time must be in the future" });
+      if (value.mode === "IN_PERSON" && !value.location)
+        context.addIssue({ code: "custom", path: ["location"], message: "Venue is required for in-person interviews" });
+      if (value.mode === "ONLINE" && !value.location)
+        context.addIssue({ code: "custom", path: ["location"], message: "Meeting link is required for online interviews" });
+    }).parse(input);
     const result = await this.repository.rescheduleInterview({ selectionId, interviewId, ...value, actorUserId: actor.userId });
     await this.notifyUnique([result.candidateUserId], "CORE_COMMITTEE_SELECTION_INTERVIEW_RESCHEDULED", {
       selectionId, selectionTitle: result.selectionTitle, scheduledAt: value.scheduledAt.toISOString(),
@@ -367,6 +405,7 @@ export class CoreCommitteeSelectionUseCases {
       | "CORE_COMMITTEE_SELECTION_NOT_SELECTED"
       | "CORE_COMMITTEE_SELECTION_MEMBERSHIP_CONFIRMED"
       | "CORE_COMMITTEE_SELECTION_SHORTLISTED"
+      | "CORE_COMMITTEE_SELECTION_NOT_SHORTLISTED"
       | "CORE_COMMITTEE_SELECTION_INTERVIEW_SCHEDULED"
       | "CORE_COMMITTEE_SELECTION_INTERVIEW_RESCHEDULED"
       | "CORE_COMMITTEE_SELECTION_INTERVIEW_CANCELLED",

@@ -32,6 +32,7 @@ function setup(currentCouncil: string | null = "council") {
     transition: vi.fn(),
     candidates: vi.fn(),
     shortlist: vi.fn(),
+    publishShortlist: vi.fn(),
     createInterview: vi.fn(),
     rescheduleInterview: vi.fn(),
     cancelInterview: vi.fn(),
@@ -184,16 +185,28 @@ describe("Core Committee selection authority", () => {
   it("notifies candidates about shortlist and interview changes without confidential notes", async () => {
     const { useCases, repository, notifications } = setup();
     repository.shortlist.mockResolvedValue({ candidateId: "candidate", candidateUserId: "student", selectionTitle: "Core" });
+    repository.publishShortlist.mockResolvedValue({
+      published: true,
+      idempotent: false,
+      notificationRecipients: {
+        selectionId: "selection",
+        selectionTitle: "Core",
+        candidateUserIds: ["student"],
+        shortlistedCandidateUserIds: ["student"],
+        notShortlistedCandidateUserIds: [],
+      },
+    });
     repository.createInterview.mockResolvedValue({ interviewId: "interview", candidateUserId: "student", selectionTitle: "Core" });
     repository.rescheduleInterview.mockResolvedValue({ interviewId: "interview", candidateUserId: "student", selectionTitle: "Core" });
     repository.cancelInterview.mockResolvedValue({ interviewId: "interview", candidateUserId: "student", selectionTitle: "Core" });
     const candidateId = "00000000-0000-4000-8000-000000000002";
     const positionId = "00000000-0000-4000-8000-000000000003";
     const interviewId = "00000000-0000-4000-8000-000000000004";
-    await useCases.shortlist(councilMember, "selection", { candidateId, positionIds: [positionId] });
-    await useCases.interview(councilMember, "selection", { candidateId, positionId, scheduledAt: "2026-09-12T10:00:00.000Z", internalNotes: "private" });
-    await useCases.rescheduleInterview(councilMember, "selection", interviewId, { scheduledAt: "2026-09-12T11:00:00.000Z", internalNotes: "private" });
-    await useCases.cancelInterview(councilMember, "selection", interviewId, { reason: "Venue changed" });
+    await useCases.shortlist(secretary, "selection", { candidateId, positionIds: [positionId] });
+    await useCases.publishShortlist(secretary, "selection");
+    await useCases.interview(secretary, "selection", { candidateId, positionId, scheduledAt: "2099-09-12T10:00:00.000Z", durationMinutes: 30, mode: "ONLINE", location: "https://meet.example.com/core", internalNotes: "private" });
+    await useCases.rescheduleInterview(secretary, "selection", interviewId, { scheduledAt: "2099-09-12T11:00:00.000Z", durationMinutes: 30, mode: "ONLINE", location: "https://meet.example.com/core", internalNotes: "private" });
+    await useCases.cancelInterview(secretary, "selection", interviewId, { reason: "Venue changed" });
     expect(notifications.notify).toHaveBeenCalledWith(expect.objectContaining({ template: "CORE_COMMITTEE_SELECTION_SHORTLISTED" }));
     expect(notifications.notify).toHaveBeenCalledWith(expect.objectContaining({ template: "CORE_COMMITTEE_SELECTION_INTERVIEW_SCHEDULED" }));
     expect(notifications.notify).toHaveBeenCalledWith(expect.objectContaining({ template: "CORE_COMMITTEE_SELECTION_INTERVIEW_RESCHEDULED" }));

@@ -1,15 +1,22 @@
-import { Prisma, type FormField as PrismaFormField, type PrismaClient, type Prisma as PrismaTypes } from "@prisma/client";
+import {
+  Prisma,
+  type CoreCommitteeSelectionQuestion as PrismaCoreQuestion,
+  type PrismaClient,
+  type Prisma as PrismaTypes,
+} from "@prisma/client";
 import { PrismaAuditRecorder } from "@/lib/audit";
 import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import {
   CoreCommitteeSelectionError,
   assertSelectionDraft,
   assertSelectionTransition,
+  validateCoreCommitteeAnswers,
 } from "../domain/core-committee-selection";
 import type {
   CoreCommitteeSelectionConfig,
   CoreCommitteeSelectionPositionConfig,
   CoreCommitteeSelectionStatus,
+  CoreCommitteeSelectionQuestionConfig,
 } from "../domain/core-committee-selection";
 import type {
   CoreCommitteeSelectionCandidateRecord,
@@ -26,8 +33,13 @@ import type {
 } from "../application/ports/core-committee-selection-repository";
 
 const selectionInclude = {
-  positions: { orderBy: { displayOrder: "asc" as const } },
-  applicationForm: { include: { form: true } },
+  positions: {
+    orderBy: { displayOrder: "asc" as const },
+    include: { questions: { orderBy: { displayOrder: "asc" as const } } },
+  },
+  applicationForm: {
+    include: { form: { include: { fields: { orderBy: { displayOrder: "asc" as const } } } } },
+  },
 };
 type SelectionRow = PrismaTypes.CoreCommitteeSelectionGetPayload<{
   include: typeof selectionInclude;
@@ -47,6 +59,7 @@ function toRecord(row: SelectionRow): CoreCommitteeSelectionRecord {
     status: row.status,
     applicationOpenAt: row.applicationOpenAt,
     applicationCloseAt: row.applicationCloseAt,
+    shortlistPublishedAt: row.shortlistPublishedAt,
     correctionOpenAt: row.correctionOpenAt,
     correctionCloseAt: row.correctionCloseAt,
     maxPositionsPerCandidate: 1,
@@ -58,6 +71,7 @@ function toRecord(row: SelectionRow): CoreCommitteeSelectionRecord {
       description: position.description,
       seats: position.seats,
       displayOrder: position.displayOrder,
+      questions: position.questions.map(toStudentField),
     })),
     applicationForm: row.applicationForm
       ? {
@@ -93,6 +107,7 @@ type StudentSummaryRow = {
   status: CoreCommitteeSelectionStatus;
   applicationOpenAt: Date;
   applicationCloseAt: Date;
+  shortlistPublishedAt: Date | null;
   candidates: StudentCandidateRow[];
   publication: { publishedAt: Date } | null;
 };
@@ -128,12 +143,19 @@ function studentResult(
 
 function candidateDomain(candidate: StudentCandidateRow) {
   const domain = candidate.positions[0]?.position;
-  if (!domain) throw new CoreCommitteeSelectionError("Core Committee application is missing its selected domain");
+  if (!domain)
+    throw new CoreCommitteeSelectionError(
+      "Core Committee application is missing its selected domain",
+    );
   return { id: domain.id, title: domain.title };
 }
 
 function toStudentSummary(row: StudentSummaryRow): StudentCoreCommitteeSelectionSummary {
   const candidate = row.candidates[0] ?? null;
+  const visibleStatus =
+    candidate && !row.shortlistPublishedAt && ["INELIGIBLE", "SHORTLISTED"].includes(candidate.status)
+      ? "APPLIED"
+      : candidate?.status;
   return {
     id: row.id,
     title: row.title,
@@ -141,19 +163,26 @@ function toStudentSummary(row: StudentSummaryRow): StudentCoreCommitteeSelection
     status: row.status,
     applicationOpenAt: row.applicationOpenAt,
     applicationCloseAt: row.applicationCloseAt,
+    shortlistPublishedAt: row.shortlistPublishedAt,
     application: candidate
       ? {
-          status: candidate.status,
+          status: visibleStatus ?? "APPLIED",
           submittedAt: candidate.application.submission.submittedAt,
           domain: candidateDomain(candidate),
           interviews: candidate.interviews.map(studentInterview),
           result: studentResult(candidate, row.publication),
+          shortlistOutcome:
+            row.shortlistPublishedAt === null
+              ? null
+              : candidate.status === "SHORTLISTED"
+                ? "SHORTLISTED"
+                : "NOT_SHORTLISTED",
         }
       : null,
   };
 }
 
-function toStudentField(field: PrismaFormField): StudentCoreCommitteeApplicationField {
+function toStudentField(field: PrismaCoreQuestion): StudentCoreCommitteeApplicationField {
   return {
     id: field.id,
     key: field.key,
@@ -169,7 +198,9 @@ function toStudentField(field: PrismaFormField): StudentCoreCommitteeApplication
   };
 }
 
-function toFieldValidation(value: PrismaTypes.JsonValue | null): StudentCoreCommitteeApplicationField["validation"] {
+function toFieldValidation(
+  value: PrismaTypes.JsonValue | null,
+): StudentCoreCommitteeApplicationField["validation"] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   if (
@@ -177,13 +208,43 @@ function toFieldValidation(value: PrismaTypes.JsonValue | null): StudentCoreComm
     (record.max !== undefined && typeof record.max !== "number")
   )
     return null;
-  return { ...(typeof record.min === "number" ? { min: record.min } : {}), ...(typeof record.max === "number" ? { max: record.max } : {}) };
+  return {
+    ...(typeof record.min === "number" ? { min: record.min } : {}),
+    ...(typeof record.max === "number" ? { max: record.max } : {}),
+  };
 }
 
 function toAnswers(value: PrismaTypes.JsonValue): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? { ...(value as Record<string, unknown>) }
     : {};
+}
+
+function toQuestionCreate(field: CoreCommitteeSelectionQuestionConfig) {
+  return {
+    key: field.key,
+    label: field.label,
+    type: field.type,
+    description: field.description ?? null,
+    required: field.required,
+    options: field.options.length ? [...field.options] : undefined,
+    validation: field.validation ?? undefined,
+    displayOrder: field.displayOrder,
+  };
+}
+function toQuestionConfig(question: PrismaCoreQuestion): CoreCommitteeSelectionQuestionConfig {
+  return {
+    key: question.key,
+    label: question.label,
+    type: question.type,
+    description: question.description,
+    required: question.required,
+    options: Array.isArray(question.options)
+      ? question.options.filter((value): value is string => typeof value === "string")
+      : [],
+    validation: toFieldValidation(question.validation),
+    displayOrder: question.displayOrder,
+  };
 }
 
 async function lockSelection(tx: PrismaTypes.TransactionClient, id: string) {
@@ -220,7 +281,11 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
         candidates: {
           where: { applicantUserId: studentUserId },
           include: {
-            positions: { include: { position: true } },
+            positions: {
+              include: {
+                position: { include: { questions: { orderBy: { displayOrder: "asc" as const } } } },
+              },
+            },
             application: { include: { submission: true } },
             interviews: true,
             decisions: { select: { outcome: true } },
@@ -238,13 +303,22 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     const row = await this.prisma.coreCommitteeSelection.findFirst({
       where: { id, status: { not: "DRAFT" } },
       include: {
-        positions: { orderBy: { displayOrder: "asc" } },
-        applicationForm: { include: { form: { include: { fields: { orderBy: { displayOrder: "asc" } } } } } },
+        positions: {
+          orderBy: { displayOrder: "asc" },
+          include: { questions: { orderBy: { displayOrder: "asc" } } },
+        },
+        applicationForm: {
+          include: { form: { include: { fields: { orderBy: { displayOrder: "asc" } } } } },
+        },
         publication: { select: { publishedAt: true } },
         candidates: {
           where: { applicantUserId: studentUserId },
           include: {
-            positions: { include: { position: true } },
+            positions: {
+              include: {
+                position: { include: { questions: { orderBy: { displayOrder: "asc" as const } } } },
+              },
+            },
             application: { include: { submission: true } },
             interviews: true,
             decisions: { select: { outcome: true } },
@@ -263,16 +337,27 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
         description: position.description,
         seats: position.seats,
         displayOrder: position.displayOrder,
+        questions: position.questions.map(toStudentField),
       })),
-      fields: row.applicationForm?.form.fields.map(toStudentField) ?? [],
+      fields: candidate
+        ? (row.positions
+            .find((position) => position.id === candidate.positions[0]?.position.id)
+            ?.questions.map(toStudentField) ?? [])
+        : [],
       application: candidate
         ? {
-            status: candidate.status,
+            status: base.application?.status ?? "APPLIED",
             submittedAt: candidate.application.submission.submittedAt,
             domain: candidateDomain(candidate),
             answers: toAnswers(candidate.application.submission.answers),
             interviews: candidate.interviews.map(studentInterview),
             result: studentResult(candidate, row.publication),
+            shortlistOutcome:
+              row.shortlistPublishedAt === null
+                ? null
+                : candidate.status === "SHORTLISTED"
+                  ? "SHORTLISTED"
+                  : "NOT_SHORTLISTED",
           }
         : null,
     };
@@ -326,7 +411,11 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
       if (current.applicationForm?.managedForm)
         await tx.form.update({
           where: { id: current.applicationForm.formId },
-          data: { title: config.title, description: config.brief, deadline: config.applicationCloseAt },
+          data: {
+            title: config.title,
+            description: config.brief,
+            deadline: config.applicationCloseAt,
+          },
         });
       await new PrismaAuditRecorder(tx).record({
         actorUserId,
@@ -342,9 +431,18 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     const row = await this.prisma.$transaction(async (tx) => {
       const selection = await lockSelection(tx, input.selectionId);
       if (selection.status !== "APPLICATION_OPEN")
-        throw new CoreCommitteeSelectionError("The application deadline may only be extended while applications are open", "validation");
-      if (input.newClosingDate <= selection.applicationCloseAt || input.newClosingDate <= selection.applicationOpenAt)
-        throw new CoreCommitteeSelectionError("The new closing date must be later than the current closing date", "validation");
+        throw new CoreCommitteeSelectionError(
+          "The application deadline may only be extended while applications are open",
+          "validation",
+        );
+      if (
+        input.newClosingDate <= selection.applicationCloseAt ||
+        input.newClosingDate <= selection.applicationOpenAt
+      )
+        throw new CoreCommitteeSelectionError(
+          "The new closing date must be later than the current closing date",
+          "validation",
+        );
       await tx.coreCommitteeSelectionDeadlineExtension.create({
         data: {
           selectionId: selection.id,
@@ -354,7 +452,10 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
         },
       });
       if (selection.applicationForm?.managedForm)
-        await tx.form.update({ where: { id: selection.applicationForm.formId }, data: { deadline: input.newClosingDate } });
+        await tx.form.update({
+          where: { id: selection.applicationForm.formId },
+          data: { deadline: input.newClosingDate },
+        });
       return tx.coreCommitteeSelection.update({
         where: { id: selection.id },
         data: { applicationCloseAt: input.newClosingDate },
@@ -372,7 +473,9 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     return this.prisma.$transaction(async (tx) => {
       const selection = await lockSelection(tx, selectionId);
       assertSelectionDraft(selection.status);
-      const data = { ...config, identityKey: identityKey(config.title) };
+      const { questions, ...positionConfig } = config;
+      const data = { ...positionConfig, identityKey: identityKey(config.title) };
+      let savedPositionId = positionId;
       if (positionId) {
         const result = await tx.coreCommitteeSelectionPosition.updateMany({
           where: { id: positionId, selectionId },
@@ -380,7 +483,25 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
         });
         if (result.count !== 1)
           throw new CoreCommitteeSelectionError("Selection position not found", "notFound");
-      } else await tx.coreCommitteeSelectionPosition.create({ data: { selectionId, ...data } });
+      } else {
+        const created = await tx.coreCommitteeSelectionPosition.create({
+          data: { selectionId, ...data },
+        });
+        savedPositionId = created.id;
+      }
+      if (!savedPositionId)
+        throw new CoreCommitteeSelectionError("Selection position could not be saved");
+      await tx.coreCommitteeSelectionQuestion.deleteMany({
+        where: { selectionId, positionId: savedPositionId },
+      });
+      if (questions?.length)
+        await tx.coreCommitteeSelectionQuestion.createMany({
+          data: questions.map((question) => ({
+            ...toQuestionCreate(question),
+            selectionId,
+            positionId: savedPositionId,
+          })),
+        });
       await new PrismaAuditRecorder(tx).record({
         actorUserId,
         action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_POSITION_SAVED,
@@ -444,10 +565,7 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
       const selection = await lockSelection(tx, selectionId);
       assertSelectionTransition(selection.status, status);
       if (status === "APPLICATION_OPEN") {
-        if (
-          !selection.applicationForm ||
-          !selection.positions.length
-        )
+        if (!selection.applicationForm || !selection.positions.length)
           throw new CoreCommitteeSelectionError(
             "Opening requires at least one domain",
             "validation",
@@ -470,12 +588,37 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
             "validation",
           );
         for (const position of selection.positions) {
-          if (decisions.filter((decision) => decision.outcome === "SELECTED" && decision.positionId === position.id).length > position.seats)
-            throw new CoreCommitteeSelectionError(`Selected candidates exceed available seats for ${position.title}`, "validation");
+          if (
+            decisions.filter(
+              (decision) => decision.outcome === "SELECTED" && decision.positionId === position.id,
+            ).length > position.seats
+          )
+            throw new CoreCommitteeSelectionError(
+              `Selected candidates exceed available seats for ${position.title}`,
+              "validation",
+            );
         }
-        if (decisions.some((decision) => decision.outcome === "SELECTED" && ((decision.candidate.status !== "ELIGIBLE" && decision.candidate.status !== "SHORTLISTED") || !decision.candidate.positions.some((item) => item.positionId === decision.positionId))))
-          throw new CoreCommitteeSelectionError("Selected decisions must reference eligible candidates for their position", "validation");
+        if (
+          decisions.some(
+            (decision) =>
+              decision.outcome === "SELECTED" &&
+              ((decision.candidate.status !== "ELIGIBLE" &&
+                decision.candidate.status !== "SHORTLISTED") ||
+                !decision.candidate.positions.some(
+                  (item) => item.positionId === decision.positionId,
+                )),
+          )
+        )
+          throw new CoreCommitteeSelectionError(
+            "Selected decisions must reference eligible candidates for their position",
+            "validation",
+          );
       }
+      if (status === "INTERVIEWS" && !selection.shortlistPublishedAt)
+        throw new CoreCommitteeSelectionError(
+          "Publish the shortlist before opening interviews",
+          "validation",
+        );
       const data: PrismaTypes.CoreCommitteeSelectionUpdateInput = { status };
       if (status === "APPLICATION_OPEN")
         Object.assign(data, {
@@ -487,7 +630,11 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
       if (status === "APPLICATION_OPEN" && selection.applicationForm?.managedForm)
         await tx.form.update({
           where: { id: selection.applicationForm.formId },
-          data: { status: "PUBLISHED", publishedAt: new Date(), deadline: selection.applicationCloseAt },
+          data: {
+            status: "PUBLISHED",
+            publishedAt: new Date(),
+            deadline: selection.applicationCloseAt,
+          },
         });
       const updated = await tx.coreCommitteeSelection.update({
         where: { id: selectionId },
@@ -513,7 +660,11 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
       where: { selectionId, applicantUserId },
       include: {
         applicant: { include: { studentProfile: true } },
-        positions: { include: { position: true } },
+        positions: {
+          include: {
+            position: { include: { questions: { orderBy: { displayOrder: "asc" as const } } } },
+          },
+        },
       },
       orderBy: { createdAt: "asc" },
     });
@@ -648,15 +799,21 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     selectionId: string;
     candidateId: string;
     positionIds: string[];
+    shortlisted?: boolean;
     actorUserId: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      await this.requireStage(tx, input.selectionId, "SHORTLIST");
+      const selection = await this.requireStage(tx, input.selectionId, "SHORTLIST");
+      if (selection.shortlistPublishedAt)
+        throw new CoreCommitteeSelectionError("The published shortlist cannot be changed");
       const candidate = await tx.coreCommitteeSelectionCandidate.findUnique({
         where: { id_selectionId: { id: input.candidateId, selectionId: input.selectionId } },
         include: { positions: true },
       });
-      if (!candidate || candidate.status !== "ELIGIBLE")
+      if (
+        !candidate ||
+        !["ELIGIBLE", "SHORTLISTED", "INELIGIBLE"].includes(candidate.status)
+      )
         throw new CoreCommitteeSelectionError(
           "Only eligible candidates may be shortlisted",
           "validation",
@@ -667,27 +824,66 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
           "Select positions applied for by this candidate",
           "validation",
         );
-      await tx.coreCommitteeSelectionShortlistEntry.createMany({
-        data: input.positionIds.map((positionId) => ({
-          selectionId: input.selectionId,
-          candidateId: input.candidateId,
-          positionId,
-          shortlistedByUserId: input.actorUserId,
-        })),
-        skipDuplicates: true,
-      });
+      if (input.shortlisted === false) {
+        await tx.coreCommitteeSelectionShortlistEntry.deleteMany({
+          where: { selectionId: input.selectionId, candidateId: input.candidateId },
+        });
+      } else {
+        await tx.coreCommitteeSelectionShortlistEntry.createMany({
+          data: input.positionIds.map((positionId) => ({
+            selectionId: input.selectionId,
+            candidateId: input.candidateId,
+            positionId,
+            shortlistedByUserId: input.actorUserId,
+          })),
+          skipDuplicates: true,
+        });
+      }
       await tx.coreCommitteeSelectionCandidate.update({
         where: { id: input.candidateId },
-        data: { status: "SHORTLISTED" },
-      });
-      const selection = await tx.coreCommitteeSelection.findUniqueOrThrow({
-        where: { id: input.selectionId },
-        select: { title: true },
+        data: { status: input.shortlisted === false ? "INELIGIBLE" : "SHORTLISTED" },
       });
       return {
         candidateId: input.candidateId,
         candidateUserId: candidate.applicantUserId,
         selectionTitle: selection.title,
+      };
+    });
+  }
+  async publishShortlist(input: { selectionId: string; actorUserId: string }) {
+    return this.prisma.$transaction(async (tx) => {
+      const selection = await this.requireStage(tx, input.selectionId, "SHORTLIST");
+      if (selection.shortlistPublishedAt)
+        return { published: true as const, idempotent: true };
+      const candidates = await tx.coreCommitteeSelectionCandidate.findMany({
+        where: { selectionId: selection.id, status: { in: ["SHORTLISTED", "INELIGIBLE"] } },
+        select: { applicantUserId: true, status: true },
+      });
+      await tx.coreCommitteeSelection.update({
+        where: { id: selection.id },
+        data: { shortlistPublishedAt: new Date() },
+      });
+      await new PrismaAuditRecorder(tx).record({
+        actorUserId: input.actorUserId,
+        action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_STATUS_CHANGED,
+        targetEntityType: "CoreCommitteeSelection",
+        targetEntityId: selection.id,
+        metadata: { event: "SHORTLIST_PUBLISHED" },
+      });
+      return {
+        published: true as const,
+        idempotent: false,
+        notificationRecipients: {
+          candidateUserIds: candidates.map((candidate) => candidate.applicantUserId),
+          shortlistedCandidateUserIds: candidates
+            .filter((candidate) => candidate.status === "SHORTLISTED")
+            .map((candidate) => candidate.applicantUserId),
+          notShortlistedCandidateUserIds: candidates
+            .filter((candidate) => candidate.status === "INELIGIBLE")
+            .map((candidate) => candidate.applicantUserId),
+          selectionId: selection.id,
+          selectionTitle: selection.title,
+        },
       };
     });
   }
@@ -704,7 +900,12 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     actorUserId: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      await this.requireStage(tx, input.selectionId, "INTERVIEWS");
+      const selection = await this.requireStage(tx, input.selectionId, "INTERVIEWS");
+      if (!selection.shortlistPublishedAt)
+        throw new CoreCommitteeSelectionError(
+          "Publish the shortlist before scheduling interviews",
+          "validation",
+        );
       const listed = await tx.coreCommitteeSelectionShortlistEntry.findFirst({
         where: {
           selectionId: input.selectionId,
@@ -717,6 +918,31 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
           "Candidate is not shortlisted for this position",
           "validation",
         );
+      const candidate = await tx.coreCommitteeSelectionCandidate.findFirst({
+        where: {
+          id: input.candidateId,
+          selectionId: input.selectionId,
+          status: "SHORTLISTED",
+        },
+        select: { applicantUserId: true },
+      });
+      if (!candidate)
+        throw new CoreCommitteeSelectionError(
+          "Only shortlisted candidates may be scheduled",
+          "validation",
+        );
+      const activeInterview = await tx.coreCommitteeSelectionInterview.findFirst({
+        where: {
+          selectionId: input.selectionId,
+          candidateId: input.candidateId,
+          status: { in: ["PLANNED", "SCHEDULED"] },
+        },
+      });
+      if (activeInterview)
+        throw new CoreCommitteeSelectionError(
+          "This candidate already has an active interview",
+          "conflict",
+        );
       const interview = await tx.coreCommitteeSelectionInterview.create({
         data: {
           ...input,
@@ -724,14 +950,11 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
           scheduledByUserId: input.actorUserId,
         },
       });
-      const candidate = await tx.coreCommitteeSelectionCandidate.findUniqueOrThrow({
-        where: { id_selectionId: { id: input.candidateId, selectionId: input.selectionId } },
-        select: { applicantUserId: true },
-      });
-      const selection = await tx.coreCommitteeSelection.findUniqueOrThrow({
-        where: { id: input.selectionId }, select: { title: true },
-      });
-      return { interviewId: interview.id, candidateUserId: candidate.applicantUserId, selectionTitle: selection.title };
+      return {
+        interviewId: interview.id,
+        candidateUserId: candidate.applicantUserId,
+        selectionTitle: selection.title,
+      };
     });
   }
   async rescheduleInterview(input: {
@@ -746,32 +969,57 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     actorUserId: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      await this.requireStage(tx, input.selectionId, "INTERVIEWS");
+      const selection = await this.requireStage(tx, input.selectionId, "INTERVIEWS");
+      if (!selection.shortlistPublishedAt)
+        throw new CoreCommitteeSelectionError(
+          "Publish the shortlist before managing interviews",
+          "validation",
+        );
       const existing = await tx.coreCommitteeSelectionInterview.findFirst({
         where: { id: input.interviewId, selectionId: input.selectionId, status: "SCHEDULED" },
-        include: { candidate: { select: { applicantUserId: true } }, selection: { select: { title: true } } },
+        include: {
+          candidate: { select: { applicantUserId: true } },
+          selection: { select: { title: true } },
+        },
       });
       if (!existing)
-        throw new CoreCommitteeSelectionError("Only a scheduled interview may be rescheduled", "validation");
+        throw new CoreCommitteeSelectionError(
+          "Only a scheduled interview may be rescheduled",
+          "validation",
+        );
       await tx.coreCommitteeSelectionInterviewHistory.create({
         data: {
-          interviewId: existing.id, selectionId: input.selectionId,
-          previousScheduledAt: existing.scheduledAt, newScheduledAt: input.scheduledAt,
-          previousDurationMinutes: existing.durationMinutes, newDurationMinutes: input.durationMinutes,
-          previousMode: existing.mode, newMode: input.mode,
-          previousLocation: existing.location, newLocation: input.location,
-          previousStatus: existing.status, newStatus: "SCHEDULED", changedByUserId: input.actorUserId,
+          interviewId: existing.id,
+          selectionId: input.selectionId,
+          previousScheduledAt: existing.scheduledAt,
+          newScheduledAt: input.scheduledAt,
+          previousDurationMinutes: existing.durationMinutes,
+          newDurationMinutes: input.durationMinutes,
+          previousMode: existing.mode,
+          newMode: input.mode,
+          previousLocation: existing.location,
+          newLocation: input.location,
+          previousStatus: existing.status,
+          newStatus: "SCHEDULED",
+          changedByUserId: input.actorUserId,
         },
       });
       await tx.coreCommitteeSelectionInterview.update({
         where: { id: existing.id },
         data: {
-          scheduledAt: input.scheduledAt, durationMinutes: input.durationMinutes,
-          mode: input.mode, location: input.location,
-          candidateInstructions: input.candidateInstructions, internalNotes: input.internalNotes,
+          scheduledAt: input.scheduledAt,
+          durationMinutes: input.durationMinutes,
+          mode: input.mode,
+          location: input.location,
+          candidateInstructions: input.candidateInstructions,
+          internalNotes: input.internalNotes,
         },
       });
-      return { interviewId: existing.id, candidateUserId: existing.candidate.applicantUserId, selectionTitle: existing.selection.title };
+      return {
+        interviewId: existing.id,
+        candidateUserId: existing.candidate.applicantUserId,
+        selectionTitle: existing.selection.title,
+      };
     });
   }
   async cancelInterview(input: {
@@ -783,26 +1031,52 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     return this.prisma.$transaction(async (tx) => {
       await this.requireStage(tx, input.selectionId, "INTERVIEWS");
       const existing = await tx.coreCommitteeSelectionInterview.findFirst({
-        where: { id: input.interviewId, selectionId: input.selectionId, status: { in: ["PLANNED", "SCHEDULED"] } },
-        include: { candidate: { select: { applicantUserId: true } }, selection: { select: { title: true } } },
+        where: {
+          id: input.interviewId,
+          selectionId: input.selectionId,
+          status: { in: ["PLANNED", "SCHEDULED"] },
+        },
+        include: {
+          candidate: { select: { applicantUserId: true } },
+          selection: { select: { title: true } },
+        },
       });
       if (!existing)
-        throw new CoreCommitteeSelectionError("Interview not found or cannot be cancelled", "notFound");
+        throw new CoreCommitteeSelectionError(
+          "Interview not found or cannot be cancelled",
+          "notFound",
+        );
       await tx.coreCommitteeSelectionInterviewHistory.create({
         data: {
-          interviewId: existing.id, selectionId: input.selectionId,
-          previousScheduledAt: existing.scheduledAt, newScheduledAt: existing.scheduledAt,
-          previousDurationMinutes: existing.durationMinutes, newDurationMinutes: existing.durationMinutes,
-          previousMode: existing.mode, newMode: existing.mode,
-          previousLocation: existing.location, newLocation: existing.location,
-          previousStatus: existing.status, newStatus: "CANCELLED", changedByUserId: input.actorUserId,
+          interviewId: existing.id,
+          selectionId: input.selectionId,
+          previousScheduledAt: existing.scheduledAt,
+          newScheduledAt: existing.scheduledAt,
+          previousDurationMinutes: existing.durationMinutes,
+          newDurationMinutes: existing.durationMinutes,
+          previousMode: existing.mode,
+          newMode: existing.mode,
+          previousLocation: existing.location,
+          newLocation: existing.location,
+          previousStatus: existing.status,
+          newStatus: "CANCELLED",
+          changedByUserId: input.actorUserId,
         },
       });
       await tx.coreCommitteeSelectionInterview.update({
         where: { id: existing.id },
-        data: { status: "CANCELLED", cancelledAt: new Date(), cancelledByUserId: input.actorUserId, cancellationReason: input.reason },
+        data: {
+          status: "CANCELLED",
+          cancelledAt: new Date(),
+          cancelledByUserId: input.actorUserId,
+          cancellationReason: input.reason,
+        },
       });
-      return { interviewId: existing.id, candidateUserId: existing.candidate.applicantUserId, selectionTitle: existing.selection.title };
+      return {
+        interviewId: existing.id,
+        candidateUserId: existing.candidate.applicantUserId,
+        selectionTitle: existing.selection.title,
+      };
     });
   }
   async completeInterview(input: {
@@ -903,7 +1177,10 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     return this.serializable(async (tx) => {
       const lockedSelection = await lockSelection(tx, input.selectionId);
       if (lockedSelection.status !== "COUNCIL_REVIEW")
-        throw new CoreCommitteeSelectionError("Core Committee selection is not in Council review", "validation");
+        throw new CoreCommitteeSelectionError(
+          "Core Committee selection is not in Council review",
+          "validation",
+        );
       const current = await this.currentCouncilCommittee(
         input.selectionId,
         input.councilMemberUserId,
@@ -928,13 +1205,20 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
         },
       });
       if (!eligible)
-        throw new CoreCommitteeSelectionError("Decision candidate is not eligible for this Core Committee position", "validation");
+        throw new CoreCommitteeSelectionError(
+          "Decision candidate is not eligible for this Core Committee position",
+          "validation",
+        );
       if (input.outcome === "SELECTED" && existing?.outcome !== "SELECTED") {
         const position = lockedSelection.positions.find((item) => item.id === input.positionId);
         if (!position)
           throw new CoreCommitteeSelectionError("Core Committee domain not found", "notFound");
         const selected = await tx.coreCommitteeSelectionDecision.count({
-          where: { selectionId: input.selectionId, positionId: input.positionId, outcome: "SELECTED" },
+          where: {
+            selectionId: input.selectionId,
+            positionId: input.positionId,
+            outcome: "SELECTED",
+          },
         });
         if (selected >= position.seats)
           throw new CoreCommitteeSelectionError(
@@ -1010,8 +1294,10 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
           ...options,
         });
       } catch (error) {
-        const retryable = error instanceof Prisma.PrismaClientKnownRequestError &&
-          (error.code === "P2034" || (error.code === "P2010" && error.message.includes("Code: `40001`")));
+        const retryable =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          (error.code === "P2034" ||
+            (error.code === "P2010" && error.message.includes("Code: `40001`")));
         if (!retryable || attempt === 2) throw error;
         lastError = error;
         await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
@@ -1026,39 +1312,94 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
       include: { position: true, candidate: { include: { positions: true } } },
     });
     if (!decisions.length || decisions.some((decision) => decision.state !== "FINALIZED"))
-      throw new CoreCommitteeSelectionError("All recorded Core Committee decisions must be finalized", "validation");
+      throw new CoreCommitteeSelectionError(
+        "All recorded Core Committee decisions must be finalized",
+        "validation",
+      );
     const selected = decisions.filter((decision) => decision.outcome === "SELECTED");
     for (const position of selection.positions) {
-      if (selected.filter((decision) => decision.positionId === position.id).length > position.seats)
-        throw new CoreCommitteeSelectionError(`Selected candidates exceed available seats for ${position.title}`, "validation");
+      if (
+        selected.filter((decision) => decision.positionId === position.id).length > position.seats
+      )
+        throw new CoreCommitteeSelectionError(
+          `Selected candidates exceed available seats for ${position.title}`,
+          "validation",
+        );
     }
-    if (selected.some((decision) => (decision.candidate.status !== "ELIGIBLE" && decision.candidate.status !== "SHORTLISTED") || !decision.candidate.positions.some((item) => item.positionId === decision.positionId)))
-      throw new CoreCommitteeSelectionError("Only eligible candidates for the selected position may be appointed", "validation");
+    if (
+      selected.some(
+        (decision) =>
+          (decision.candidate.status !== "ELIGIBLE" &&
+            decision.candidate.status !== "SHORTLISTED") ||
+          !decision.candidate.positions.some((item) => item.positionId === decision.positionId),
+      )
+    )
+      throw new CoreCommitteeSelectionError(
+        "Only eligible candidates for the selected position may be appointed",
+        "validation",
+      );
     return { selection, decisions, selected };
   }
   async publishedResults(selectionId: string) {
     const selection = await this.prisma.coreCommitteeSelection.findUnique({
       where: { id: selectionId },
-      include: { publication: true, decisions: { where: { outcome: "SELECTED", state: "FINALIZED" }, include: { position: true, candidate: { include: { applicant: { include: { studentProfile: true } } } } } } },
+      include: {
+        publication: true,
+        decisions: {
+          where: { outcome: "SELECTED", state: "FINALIZED" },
+          include: {
+            position: true,
+            candidate: { include: { applicant: { include: { studentProfile: true } } } },
+          },
+        },
+      },
     });
-    if (!selection || !selection.publication) throw new CoreCommitteeSelectionError("Core Committee results are not published", "notFound");
-    return { title: selection.title, academicYear: selection.academicYear, publishedAt: selection.publication.publishedAt, positions: selection.decisions.map((decision) => ({ positionTitle: decision.position.title, selectedMember: decision.candidate.applicant.studentProfile?.fullName ?? decision.candidate.applicant.email })) };
+    if (!selection || !selection.publication)
+      throw new CoreCommitteeSelectionError("Core Committee results are not published", "notFound");
+    return {
+      title: selection.title,
+      academicYear: selection.academicYear,
+      publishedAt: selection.publication.publishedAt,
+      positions: selection.decisions.map((decision) => ({
+        positionTitle: decision.position.title,
+        selectedMember:
+          decision.candidate.applicant.studentProfile?.fullName ??
+          decision.candidate.applicant.email,
+      })),
+    };
   }
   async publish(input: { selectionId: string; actorUserId: string }) {
     return this.serializable(async (tx) => {
       const selection = await lockSelection(tx, input.selectionId);
-      if (selection.status === "PUBLISHED" || selection.status === "MEMBERSHIP_CONFIRMED" || selection.status === "ARCHIVED")
+      if (
+        selection.status === "PUBLISHED" ||
+        selection.status === "MEMBERSHIP_CONFIRMED" ||
+        selection.status === "ARCHIVED"
+      )
         return { published: true as const, idempotent: true };
       if (selection.status !== "SELECTION_DECIDED")
-        throw new CoreCommitteeSelectionError("Core Committee results may be published only after selection decisions", "validation");
+        throw new CoreCommitteeSelectionError(
+          "Core Committee results may be published only after selection decisions",
+          "validation",
+        );
       const { decisions, selected } = await this.finalizedSelection(tx, selection.id);
       const candidates = await tx.coreCommitteeSelectionCandidate.findMany({
         where: { selectionId: selection.id },
         select: { applicantUserId: true },
       });
-      const publication = await tx.coreCommitteeSelectionPublication.create({ data: { selectionId: selection.id, publishedByUserId: input.actorUserId } });
-      await tx.coreCommitteeSelection.update({ where: { id: selection.id }, data: { status: "PUBLISHED" } });
-      await new PrismaAuditRecorder(tx).record({ actorUserId: input.actorUserId, action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_RESULT_PUBLISHED, targetEntityType: "CoreCommitteeSelection", targetEntityId: selection.id });
+      const publication = await tx.coreCommitteeSelectionPublication.create({
+        data: { selectionId: selection.id, publishedByUserId: input.actorUserId },
+      });
+      await tx.coreCommitteeSelection.update({
+        where: { id: selection.id },
+        data: { status: "PUBLISHED" },
+      });
+      await new PrismaAuditRecorder(tx).record({
+        actorUserId: input.actorUserId,
+        action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_RESULT_PUBLISHED,
+        targetEntityType: "CoreCommitteeSelection",
+        targetEntityId: selection.id,
+      });
       return {
         published: true as const,
         idempotent: false,
@@ -1078,30 +1419,113 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
   async appointmentPreview(selectionId: string) {
     return this.serializable(async (tx) => {
       const { selection, selected } = await this.finalizedSelection(tx, selectionId);
-      if (selection.status !== "PUBLISHED") throw new CoreCommitteeSelectionError("Core Committee appointments require published results", "validation");
-      const currentCommittee = await tx.committee.findFirst({ where: { type: "CORE_COMMITTEE", academicYear: selection.academicYear, status: "ACTIVE" } });
-      const memberships = currentCommittee ? await tx.committeeMembership.findMany({ where: { committeeId: currentCommittee.id, isActive: true }, include: { user: { select: { id: true, email: true, studentProfile: { select: { fullName: true } } } } } }) : [];
-      return { academicYear: selection.academicYear, currentCoreCommittee: { committee: currentCommittee, memberships }, selected: selected.map((decision) => ({ decisionId: decision.id, candidateId: decision.candidateId, positionId: decision.positionId, userId: decision.candidate.applicantUserId, position: decision.position.title, candidateName: decision.candidate.applicantUserId })) };
+      if (selection.status !== "PUBLISHED")
+        throw new CoreCommitteeSelectionError(
+          "Core Committee appointments require published results",
+          "validation",
+        );
+      const currentCommittee = await tx.committee.findFirst({
+        where: { type: "CORE_COMMITTEE", academicYear: selection.academicYear, status: "ACTIVE" },
+      });
+      const memberships = currentCommittee
+        ? await tx.committeeMembership.findMany({
+            where: { committeeId: currentCommittee.id, isActive: true },
+            include: {
+              user: {
+                select: { id: true, email: true, studentProfile: { select: { fullName: true } } },
+              },
+            },
+          })
+        : [];
+      return {
+        academicYear: selection.academicYear,
+        currentCoreCommittee: { committee: currentCommittee, memberships },
+        selected: selected.map((decision) => ({
+          decisionId: decision.id,
+          candidateId: decision.candidateId,
+          positionId: decision.positionId,
+          userId: decision.candidate.applicantUserId,
+          position: decision.position.title,
+          candidateName: decision.candidate.applicantUserId,
+        })),
+      };
     });
   }
   async confirmAppointments(input: { selectionId: string; actorUserId: string }) {
     return this.serializable(async (tx) => {
       const selection = await lockSelection(tx, input.selectionId);
-      if (selection.status === "MEMBERSHIP_CONFIRMED") return { confirmed: true as const, idempotent: true };
-      if (selection.status !== "PUBLISHED") throw new CoreCommitteeSelectionError("Core Committee appointments require published results", "validation");
+      if (selection.status === "MEMBERSHIP_CONFIRMED")
+        return { confirmed: true as const, idempotent: true };
+      if (selection.status !== "PUBLISHED")
+        throw new CoreCommitteeSelectionError(
+          "Core Committee appointments require published results",
+          "validation",
+        );
       const { selected } = await this.finalizedSelection(tx, selection.id);
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`core-committee:${selection.academicYear}`}))`;
-      if (await tx.coreCommitteeSelectionAppointment.count({ where: { selectionId: selection.id } })) throw new CoreCommitteeSelectionError("Core Committee appointments already exist", "conflict");
-      let committee = await tx.committee.findFirst({ where: { type: "CORE_COMMITTEE", academicYear: selection.academicYear, status: "ACTIVE" } });
-      if (!committee) committee = await tx.committee.create({ data: { name: `Core Committee ${selection.academicYear}`, type: "CORE_COMMITTEE", academicYear: selection.academicYear, startDate: new Date() } });
+      if (
+        await tx.coreCommitteeSelectionAppointment.count({ where: { selectionId: selection.id } })
+      )
+        throw new CoreCommitteeSelectionError(
+          "Core Committee appointments already exist",
+          "conflict",
+        );
+      let committee = await tx.committee.findFirst({
+        where: { type: "CORE_COMMITTEE", academicYear: selection.academicYear, status: "ACTIVE" },
+      });
+      if (!committee)
+        committee = await tx.committee.create({
+          data: {
+            name: `Core Committee ${selection.academicYear}`,
+            type: "CORE_COMMITTEE",
+            academicYear: selection.academicYear,
+            startDate: new Date(),
+          },
+        });
       const now = new Date();
-      const outgoing = await tx.committeeMembership.updateMany({ where: { committeeId: committee.id, isActive: true }, data: { isActive: false, endDate: now } });
+      const outgoing = await tx.committeeMembership.updateMany({
+        where: { committeeId: committee.id, isActive: true },
+        data: { isActive: false, endDate: now },
+      });
       for (const decision of selected) {
-        const membership = await tx.committeeMembership.create({ data: { committeeId: committee.id, userId: decision.candidate.applicantUserId, position: decision.position.title, academicYear: selection.academicYear, startDate: now, isActive: true } });
-        await tx.coreCommitteeSelectionAppointment.create({ data: { selectionId: selection.id, decisionId: decision.id, candidateId: decision.candidateId, positionId: decision.positionId, committeeId: committee.id, membershipId: membership.id, appointedUserId: decision.candidate.applicantUserId, confirmedByUserId: input.actorUserId } });
+        const membership = await tx.committeeMembership.create({
+          data: {
+            committeeId: committee.id,
+            userId: decision.candidate.applicantUserId,
+            position: decision.position.title,
+            academicYear: selection.academicYear,
+            startDate: now,
+            isActive: true,
+          },
+        });
+        await tx.coreCommitteeSelectionAppointment.create({
+          data: {
+            selectionId: selection.id,
+            decisionId: decision.id,
+            candidateId: decision.candidateId,
+            positionId: decision.positionId,
+            committeeId: committee.id,
+            membershipId: membership.id,
+            appointedUserId: decision.candidate.applicantUserId,
+            confirmedByUserId: input.actorUserId,
+          },
+        });
       }
-      await tx.coreCommitteeSelection.update({ where: { id: selection.id }, data: { status: "MEMBERSHIP_CONFIRMED" } });
-      await new PrismaAuditRecorder(tx).record({ actorUserId: input.actorUserId, action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_APPOINTMENTS_CONFIRMED, targetEntityType: "CoreCommitteeSelection", targetEntityId: selection.id, metadata: { committeeId: committee.id, outgoingMembershipCount: outgoing.count, appointmentCount: selected.length } });
+      await tx.coreCommitteeSelection.update({
+        where: { id: selection.id },
+        data: { status: "MEMBERSHIP_CONFIRMED" },
+      });
+      await new PrismaAuditRecorder(tx).record({
+        actorUserId: input.actorUserId,
+        action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_APPOINTMENTS_CONFIRMED,
+        targetEntityType: "CoreCommitteeSelection",
+        targetEntityId: selection.id,
+        metadata: {
+          committeeId: committee.id,
+          outgoingMembershipCount: outgoing.count,
+          appointmentCount: selected.length,
+        },
+      });
       return {
         confirmed: true as const,
         idempotent: false,
@@ -1118,87 +1542,160 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
   async archive(input: { selectionId: string; actorUserId: string }) {
     return this.serializable(async (tx) => {
       const selection = await lockSelection(tx, input.selectionId);
-      if (selection.status !== "MEMBERSHIP_CONFIRMED") throw new CoreCommitteeSelectionError("Core Committee selection may be archived only after membership confirmation", "validation");
-      await tx.coreCommitteeSelection.update({ where: { id: selection.id }, data: { status: "ARCHIVED" } });
-      await new PrismaAuditRecorder(tx).record({ actorUserId: input.actorUserId, action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_ARCHIVED, targetEntityType: "CoreCommitteeSelection", targetEntityId: selection.id });
+      if (selection.status !== "MEMBERSHIP_CONFIRMED")
+        throw new CoreCommitteeSelectionError(
+          "Core Committee selection may be archived only after membership confirmation",
+          "validation",
+        );
+      await tx.coreCommitteeSelection.update({
+        where: { id: selection.id },
+        data: { status: "ARCHIVED" },
+      });
+      await new PrismaAuditRecorder(tx).record({
+        actorUserId: input.actorUserId,
+        action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_ARCHIVED,
+        targetEntityType: "CoreCommitteeSelection",
+        targetEntityId: selection.id,
+      });
       return { archived: true };
     });
   }
-  async delete(input: { selectionId: string; actorUserId: string; confirmation: string | undefined }) {
-    return this.serializable(async (tx) => {
-      const selection = await lockSelection(tx, input.selectionId);
-      if (selection.status === "MEMBERSHIP_CONFIRMED" || selection.status === "ARCHIVED")
-        throw new CoreCommitteeSelectionError(
-          "A membership-confirmed Core Committee selection cannot be permanently deleted because it would break governance history",
-          "validation",
-        );
+  async delete(input: {
+    selectionId: string;
+    actorUserId: string;
+    confirmation: string | undefined;
+  }) {
+    return this.serializable(
+      async (tx) => {
+        const selection = await lockSelection(tx, input.selectionId);
+        if (selection.status === "MEMBERSHIP_CONFIRMED" || selection.status === "ARCHIVED")
+          throw new CoreCommitteeSelectionError(
+            "A membership-confirmed Core Committee selection cannot be permanently deleted because it would break governance history",
+            "validation",
+          );
 
-      const [applications, shortlisted, interviews] = await Promise.all([
-        tx.coreCommitteeSelectionCandidate.count({ where: { selectionId: selection.id } }),
-        tx.coreCommitteeSelectionShortlistEntry.count({ where: { selectionId: selection.id } }),
-        tx.coreCommitteeSelectionInterview.count({ where: { selectionId: selection.id } }),
-      ]);
-      if ((selection.status !== "DRAFT" || applications > 0) && input.confirmation !== "DELETE CORE SELECTION")
-        throw new CoreCommitteeSelectionError("Type DELETE CORE SELECTION to permanently delete this Core Committee application", "validation");
+        const [applications, shortlisted, interviews] = await Promise.all([
+          tx.coreCommitteeSelectionCandidate.count({ where: { selectionId: selection.id } }),
+          tx.coreCommitteeSelectionShortlistEntry.count({ where: { selectionId: selection.id } }),
+          tx.coreCommitteeSelectionInterview.count({ where: { selectionId: selection.id } }),
+        ]);
+        if (
+          (selection.status !== "DRAFT" || applications > 0) &&
+          input.confirmation !== "DELETE CORE SELECTION"
+        )
+          throw new CoreCommitteeSelectionError(
+            "Type DELETE CORE SELECTION to permanently delete this Core Committee application",
+            "validation",
+          );
 
-      const candidateIds = (await tx.coreCommitteeSelectionCandidate.findMany({
-        where: { selectionId: selection.id },
-        select: { id: true, applicationId: true },
-      })).map((candidate) => candidate.id);
-      const interviewIds = (await tx.coreCommitteeSelectionInterview.findMany({
-        where: { selectionId: selection.id }, select: { id: true },
-      })).map((interview) => interview.id);
+        const candidateIds = (
+          await tx.coreCommitteeSelectionCandidate.findMany({
+            where: { selectionId: selection.id },
+            select: { id: true, applicationId: true },
+          })
+        ).map((candidate) => candidate.id);
+        const interviewIds = (
+          await tx.coreCommitteeSelectionInterview.findMany({
+            where: { selectionId: selection.id },
+            select: { id: true },
+          })
+        ).map((interview) => interview.id);
 
-      if (interviewIds.length) await tx.coreCommitteeSelectionInterviewHistory.deleteMany({ where: { interviewId: { in: interviewIds } } });
-      await tx.coreCommitteeSelectionInterview.deleteMany({ where: { selectionId: selection.id } });
-      await tx.coreCommitteeSelectionShortlistEntry.deleteMany({ where: { selectionId: selection.id } });
-      await tx.coreCommitteeCouncilReview.deleteMany({ where: { selectionId: selection.id } });
-      await tx.coreCommitteeSelectionDecision.deleteMany({ where: { selectionId: selection.id } });
-      await tx.coreCommitteeSelectionCorrectionRequest.deleteMany({ where: { selectionId: selection.id } });
-      await tx.coreCommitteeSelectionScrutinyReview.deleteMany({ where: { selectionId: selection.id } });
-      if (candidateIds.length) await tx.coreCommitteeSelectionCandidatePosition.deleteMany({ where: { candidateId: { in: candidateIds } } });
-      await tx.coreCommitteeSelectionCandidate.deleteMany({ where: { selectionId: selection.id } });
-      await tx.coreCommitteeSelectionDeadlineExtension.deleteMany({ where: { selectionId: selection.id } });
-      // The database trigger accepts this transaction-local escape hatch only
-      // for the explicitly authorized, confirmed permanent-delete workflow.
-      // PostgreSQL clears it automatically on commit or rollback.
-      await tx.$executeRaw`SELECT set_config('myarch.allow_core_publication_delete', 'on', true)`;
-      await tx.coreCommitteeSelectionPublication.deleteMany({ where: { selectionId: selection.id } });
-      await tx.coreCommitteeSelectionPosition.deleteMany({ where: { selectionId: selection.id } });
+        if (interviewIds.length)
+          await tx.coreCommitteeSelectionInterviewHistory.deleteMany({
+            where: { interviewId: { in: interviewIds } },
+          });
+        await tx.coreCommitteeSelectionInterview.deleteMany({
+          where: { selectionId: selection.id },
+        });
+        await tx.coreCommitteeSelectionShortlistEntry.deleteMany({
+          where: { selectionId: selection.id },
+        });
+        await tx.coreCommitteeCouncilReview.deleteMany({ where: { selectionId: selection.id } });
+        await tx.coreCommitteeSelectionDecision.deleteMany({
+          where: { selectionId: selection.id },
+        });
+        await tx.coreCommitteeSelectionCorrectionRequest.deleteMany({
+          where: { selectionId: selection.id },
+        });
+        await tx.coreCommitteeSelectionScrutinyReview.deleteMany({
+          where: { selectionId: selection.id },
+        });
+        if (candidateIds.length)
+          await tx.coreCommitteeSelectionCandidatePosition.deleteMany({
+            where: { candidateId: { in: candidateIds } },
+          });
+        await tx.coreCommitteeSelectionCandidate.deleteMany({
+          where: { selectionId: selection.id },
+        });
+        await tx.coreCommitteeSelectionDeadlineExtension.deleteMany({
+          where: { selectionId: selection.id },
+        });
+        // The database trigger accepts this transaction-local escape hatch only
+        // for the explicitly authorized, confirmed permanent-delete workflow.
+        // PostgreSQL clears it automatically on commit or rollback.
+        await tx.$executeRaw`SELECT set_config('myarch.allow_core_publication_delete', 'on', true)`;
+        await tx.coreCommitteeSelectionPublication.deleteMany({
+          where: { selectionId: selection.id },
+        });
+        await tx.coreCommitteeSelectionQuestion.deleteMany({
+          where: { selectionId: selection.id },
+        });
+        await tx.coreCommitteeSelectionPosition.deleteMany({
+          where: { selectionId: selection.id },
+        });
 
-      const ownedFormId = selection.applicationForm?.managedForm ? selection.applicationForm.formId : null;
-      await tx.coreCommitteeSelectionApplicationForm.deleteMany({ where: { selectionId: selection.id } });
-      // Candidate rows above release the governance relation; the owned form
-      // then cascades only its own submissions and FormApplication rows.
-      if (ownedFormId) await tx.form.delete({ where: { id: ownedFormId } });
-      await tx.coreCommitteeSelection.delete({ where: { id: selection.id } });
-      await new PrismaAuditRecorder(tx).record({
-        actorUserId: input.actorUserId,
-        action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_DELETED,
-        targetEntityType: "CoreCommitteeSelection",
-        targetEntityId: selection.id,
-        metadata: { title: selection.title, lifecycleState: selection.status, applications, interviews },
-      });
-      return { applications, shortlisted, interviews };
-    }, {
-      // A populated Core selection performs a bounded, database-only cascade
-      // of explicit Restrict-FK deletes. Neon/Vercel pool acquisition and that
-      // sequence can exceed Prisma's 2s/5s interactive defaults; keep the
-      // exception local to destructive cleanup rather than relaxing every
-      // governance transaction.
-      maxWait: 10_000,
-      timeout: 20_000,
-    });
+        const ownedFormId = selection.applicationForm?.managedForm
+          ? selection.applicationForm.formId
+          : null;
+        await tx.coreCommitteeSelectionApplicationForm.deleteMany({
+          where: { selectionId: selection.id },
+        });
+        // Candidate rows above release the governance relation; the owned form
+        // then cascades only its own submissions and FormApplication rows.
+        if (ownedFormId) await tx.form.delete({ where: { id: ownedFormId } });
+        await tx.coreCommitteeSelection.delete({ where: { id: selection.id } });
+        await new PrismaAuditRecorder(tx).record({
+          actorUserId: input.actorUserId,
+          action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_DELETED,
+          targetEntityType: "CoreCommitteeSelection",
+          targetEntityId: selection.id,
+          metadata: {
+            title: selection.title,
+            lifecycleState: selection.status,
+            applications,
+            interviews,
+          },
+        });
+        return { applications, shortlisted, interviews };
+      },
+      {
+        // A populated Core selection performs a bounded, database-only cascade
+        // of explicit Restrict-FK deletes. Neon/Vercel pool acquisition and that
+        // sequence can exceed Prisma's 2s/5s interactive defaults; keep the
+        // exception local to destructive cleanup rather than relaxing every
+        // governance transaction.
+        maxWait: 10_000,
+        timeout: 20_000,
+      },
+    );
   }
   async internalProcessing(selectionId: string) {
     const selection = await this.prisma.coreCommitteeSelection.findUnique({
       where: { id: selectionId },
       include: {
+        applicationForm: {
+          include: { form: { include: { fields: { orderBy: { displayOrder: "asc" as const } } } } },
+        },
         candidates: {
           include: {
             applicant: { include: { studentProfile: true } },
             application: { include: { submission: { include: { studentProfile: true } } } },
-            positions: { include: { position: true } },
+            positions: {
+              include: {
+                position: { include: { questions: { orderBy: { displayOrder: "asc" as const } } } },
+              },
+            },
             scrutinyReviews: true,
             correctionRequests: true,
             shortlistEntries: true,
@@ -1207,7 +1704,7 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
             decisions: true,
           },
         },
-        positions: true,
+        positions: { include: { questions: { orderBy: { displayOrder: "asc" as const } } } },
       },
     });
     if (!selection)
@@ -1230,6 +1727,7 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
           positionId,
           title: position.title,
         })),
+        questions: candidate.positions[0]?.position.questions.map(toStudentField) ?? [],
         shortlist: candidate.shortlistEntries.map(({ positionId, createdAt }) => ({
           positionId,
           createdAt,
@@ -1237,10 +1735,33 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
       })),
     };
   }
-  async councilProcessing(selectionId: string): Promise<CoreCommitteeSelectionCouncilProcessingDTO> {
+  async councilProcessing(
+    selectionId: string,
+  ): Promise<CoreCommitteeSelectionCouncilProcessingDTO> {
     const selection = await this.prisma.coreCommitteeSelection.findUnique({
       where: { id: selectionId },
       select: {
+        applicationForm: {
+          select: {
+            form: {
+              select: {
+                fields: {
+                  orderBy: { displayOrder: "asc" },
+                  select: {
+                    key: true,
+                    label: true,
+                    type: true,
+                    description: true,
+                    required: true,
+                    options: true,
+                    validation: true,
+                    displayOrder: true,
+                  },
+                },
+              },
+            },
+          },
+        },
         positions: { select: { id: true, title: true, seats: true, displayOrder: true } },
         candidates: {
           select: {
@@ -1251,7 +1772,13 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
               select: {
                 id: true,
                 currentStatus: true,
-                submission: { select: { answers: true, submittedAt: true, studentProfile: { select: { rollNumber: true } } } },
+                submission: {
+                  select: {
+                    answers: true,
+                    submittedAt: true,
+                    studentProfile: { select: { rollNumber: true } },
+                  },
+                },
               },
             },
             applicant: { select: { studentProfile: { select: { fullName: true } }, email: true } },
@@ -1272,7 +1799,13 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
               },
             },
             decisions: {
-              select: { positionId: true, outcome: true, state: true, decidedAt: true, finalizedAt: true },
+              select: {
+                positionId: true,
+                outcome: true,
+                state: true,
+                decidedAt: true,
+                finalizedAt: true,
+              },
             },
           },
         },
@@ -1292,6 +1825,7 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
         answers: candidate.application.submission.answers,
         applicationStatus: candidate.application.currentStatus,
         status: candidate.status,
+        questions: [],
         positions: candidate.positions.map((position) => ({
           positionId: position.positionId,
           title: position.position.title,
@@ -1333,16 +1867,20 @@ export async function associateCoreCommitteeSelectionCandidate(
   await tx.$queryRaw`SELECT "id" FROM "core_committee_selections" WHERE "id" = ${link.selectionId}::uuid FOR UPDATE`;
   const selection = await tx.coreCommitteeSelection.findUnique({
     where: { id: link.selectionId },
-    include: { applicationForm: true, positions: true },
+    include: {
+      applicationForm: true,
+      positions: { include: { questions: { orderBy: { displayOrder: "asc" } } } },
+    },
   });
   const application = await tx.formApplication.findUnique({
     where: { id: input.applicationId },
     include: { submission: true },
   });
+  if (!selection)
+    throw new CoreCommitteeSelectionError("Core Committee selection not found", "notFound");
+  if (!application) throw new CoreCommitteeSelectionError("Application not found", "notFound");
   if (
-    !selection ||
     selection.applicationForm?.formId !== input.formId ||
-    !application ||
     application.submission.formId !== input.formId ||
     application.submission.applicantUserId !== input.applicantUserId
   )
@@ -1368,6 +1906,16 @@ export async function associateCoreCommitteeSelectionCandidate(
       "A Core Committee candidacy already exists for this selection",
     );
   }
+  const selectedPosition = selection.positions.find((position) => position.id === positionIds[0]);
+  if (!selectedPosition)
+    throw new CoreCommitteeSelectionError(
+      "Select exactly one valid Core Committee domain",
+      "validation",
+    );
+  validateCoreCommitteeAnswers(
+    selectedPosition.questions.map(toQuestionConfig),
+    toAnswers(application.submission.answers),
+  );
   const now = new Date();
   if (
     selection.status !== "APPLICATION_OPEN" ||

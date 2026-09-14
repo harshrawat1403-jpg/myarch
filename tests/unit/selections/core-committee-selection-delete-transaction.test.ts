@@ -10,13 +10,25 @@ describe("Core Committee permanent deletion transaction", () => {
       $executeRaw: vi.fn().mockResolvedValue(1),
       coreCommitteeSelection: {
         findUnique: vi.fn().mockResolvedValue({
-          id: "selection", title: "Legacy Core", status: "DRAFT", positions: [], applicationForm: null,
+          id: "selection",
+          title: "Legacy Core",
+          status: "DRAFT",
+          positions: [],
+          applicationForm: null,
         }),
         delete: vi.fn().mockResolvedValue({ id: "selection" }),
       },
-      coreCommitteeSelectionCandidate: { count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([]), deleteMany },
+      coreCommitteeSelectionCandidate: {
+        count: vi.fn().mockResolvedValue(0),
+        findMany: vi.fn().mockResolvedValue([]),
+        deleteMany,
+      },
       coreCommitteeSelectionShortlistEntry: { count: vi.fn().mockResolvedValue(0), deleteMany },
-      coreCommitteeSelectionInterview: { count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([]), deleteMany },
+      coreCommitteeSelectionInterview: {
+        count: vi.fn().mockResolvedValue(0),
+        findMany: vi.fn().mockResolvedValue([]),
+        deleteMany,
+      },
       coreCommitteeSelectionInterviewHistory: { deleteMany },
       coreCommitteeCouncilReview: { deleteMany },
       coreCommitteeSelectionDecision: { deleteMany },
@@ -24,6 +36,7 @@ describe("Core Committee permanent deletion transaction", () => {
       coreCommitteeSelectionScrutinyReview: { deleteMany },
       coreCommitteeSelectionCandidatePosition: { deleteMany },
       coreCommitteeSelectionDeadlineExtension: { deleteMany },
+      coreCommitteeSelectionQuestion: { deleteMany },
       coreCommitteeSelectionPublication: { deleteMany: deletePublication },
       coreCommitteeSelectionPosition: { deleteMany },
       coreCommitteeSelectionApplicationForm: { deleteMany },
@@ -37,8 +50,13 @@ describe("Core Committee permanent deletion transaction", () => {
     };
     const repository = new PrismaCoreCommitteeSelectionRepository(root as never);
 
-    await expect(repository.delete({ selectionId: "selection", actorUserId: "secretary", confirmation: undefined }))
-      .resolves.toEqual({ applications: 0, shortlisted: 0, interviews: 0 });
+    await expect(
+      repository.delete({
+        selectionId: "selection",
+        actorUserId: "secretary",
+        confirmation: undefined,
+      }),
+    ).resolves.toEqual({ applications: 0, shortlisted: 0, interviews: 0 });
 
     expect(root.$transaction).toHaveBeenCalledWith(
       expect.any(Function),
@@ -50,9 +68,11 @@ describe("Core Committee permanent deletion transaction", () => {
     expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
       deletePublication.mock.invocationCallOrder[0]!,
     );
-    expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ targetEntityId: "selection" }),
-    }));
+    expect(tx.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ targetEntityId: "selection" }),
+      }),
+    );
     expect(deleteMany).toHaveBeenCalled();
   });
 
@@ -64,7 +84,10 @@ describe("Core Committee permanent deletion transaction", () => {
       $executeRaw: vi.fn().mockResolvedValue(1),
       coreCommitteeSelection: {
         findUnique: vi.fn().mockResolvedValue({
-          id: "selection", title: "Populated Core", status: "APPLICATION_OPEN", positions: [],
+          id: "selection",
+          title: "Populated Core",
+          status: "APPLICATION_OPEN",
+          positions: [],
           applicationForm: { managedForm: true, formId: "managed-form" },
         }),
         delete: vi.fn().mockResolvedValue({ id: "selection" }),
@@ -75,7 +98,11 @@ describe("Core Committee permanent deletion transaction", () => {
         deleteMany,
       },
       coreCommitteeSelectionShortlistEntry: { count: vi.fn().mockResolvedValue(1), deleteMany },
-      coreCommitteeSelectionInterview: { count: vi.fn().mockResolvedValue(1), findMany: vi.fn().mockResolvedValue([{ id: "interview" }]), deleteMany },
+      coreCommitteeSelectionInterview: {
+        count: vi.fn().mockResolvedValue(1),
+        findMany: vi.fn().mockResolvedValue([{ id: "interview" }]),
+        deleteMany,
+      },
       coreCommitteeSelectionInterviewHistory: { deleteMany },
       coreCommitteeCouncilReview: { deleteMany },
       coreCommitteeSelectionDecision: { deleteMany },
@@ -83,6 +110,7 @@ describe("Core Committee permanent deletion transaction", () => {
       coreCommitteeSelectionScrutinyReview: { deleteMany },
       coreCommitteeSelectionCandidatePosition: { deleteMany },
       coreCommitteeSelectionDeadlineExtension: { deleteMany },
+      coreCommitteeSelectionQuestion: { deleteMany },
       coreCommitteeSelectionPublication: { deleteMany: deletePublication },
       coreCommitteeSelectionPosition: { deleteMany },
       coreCommitteeSelectionApplicationForm: { deleteMany },
@@ -94,11 +122,13 @@ describe("Core Committee permanent deletion transaction", () => {
     };
     const repository = new PrismaCoreCommitteeSelectionRepository(root as never);
 
-    await expect(repository.delete({
-      selectionId: "selection",
-      actorUserId: "secretary",
-      confirmation: "DELETE CORE SELECTION",
-    })).resolves.toEqual({ applications: 1, shortlisted: 1, interviews: 1 });
+    await expect(
+      repository.delete({
+        selectionId: "selection",
+        actorUserId: "secretary",
+        confirmation: "DELETE CORE SELECTION",
+      }),
+    ).resolves.toEqual({ applications: 1, shortlisted: 1, interviews: 1 });
 
     expect(tx.coreCommitteeSelectionInterviewHistory.deleteMany).toHaveBeenCalledWith({
       where: { interviewId: { in: ["interview"] } },
@@ -111,11 +141,18 @@ describe("Core Committee permanent deletion transaction", () => {
     expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
       deletePublication.mock.invocationCallOrder[0]!,
     );
-    expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        targetEntityId: "selection",
-        metadata: { title: "Populated Core", lifecycleState: "APPLICATION_OPEN", applications: 1, interviews: 1 },
+    expect(tx.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          targetEntityId: "selection",
+          metadata: {
+            title: "Populated Core",
+            lifecycleState: "APPLICATION_OPEN",
+            applications: 1,
+            interviews: 1,
+          },
+        }),
       }),
-    }));
+    );
   });
 });

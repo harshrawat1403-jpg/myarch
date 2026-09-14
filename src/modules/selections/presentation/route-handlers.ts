@@ -218,6 +218,10 @@ export const shortlistCoreCommitteeSelectionRouteHandler = route(
   async (req, actor, id) => coreCommitteeSelectionUseCases.shortlist(actor, id, await body(req)),
   false,
 );
+export const publishCoreCommitteeSelectionShortlistRouteHandler = route(
+  (_req, actor, id) => coreCommitteeSelectionUseCases.publishShortlist(actor, id),
+  true,
+);
 export const createCoreCommitteeSelectionInterviewRouteHandler = route(
   async (req, actor, id) => coreCommitteeSelectionUseCases.interview(actor, id, await body(req)),
   false,

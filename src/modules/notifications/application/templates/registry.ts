@@ -77,6 +77,8 @@ import {
   coreCommitteeSelectionSelectedTemplate,
   coreCommitteeSelectionShortlistedInAppTemplate,
   coreCommitteeSelectionShortlistedTemplate,
+  coreCommitteeSelectionNotShortlistedInAppTemplate,
+  coreCommitteeSelectionNotShortlistedTemplate,
 } from "./definitions/core-committee-selection";
 
 /**
@@ -138,6 +140,7 @@ export const EMAIL_TEMPLATE_REGISTRY: Record<NotificationTemplateId, EmailTempla
   CORE_COMMITTEE_SELECTION_NOT_SELECTED: coreCommitteeSelectionNotSelectedTemplate,
   CORE_COMMITTEE_SELECTION_MEMBERSHIP_CONFIRMED: coreCommitteeSelectionMembershipConfirmedTemplate,
   CORE_COMMITTEE_SELECTION_SHORTLISTED: coreCommitteeSelectionShortlistedTemplate,
+  CORE_COMMITTEE_SELECTION_NOT_SHORTLISTED: coreCommitteeSelectionNotShortlistedTemplate,
   CORE_COMMITTEE_SELECTION_INTERVIEW_SCHEDULED: coreCommitteeSelectionInterviewScheduledTemplate,
   CORE_COMMITTEE_SELECTION_INTERVIEW_RESCHEDULED: coreCommitteeSelectionInterviewRescheduledTemplate,
   CORE_COMMITTEE_SELECTION_INTERVIEW_CANCELLED: coreCommitteeSelectionInterviewCancelledTemplate,
@@ -183,6 +186,7 @@ export const IN_APP_TEMPLATE_REGISTRY: Record<NotificationTemplateId, InAppTempl
   CORE_COMMITTEE_SELECTION_NOT_SELECTED: coreCommitteeSelectionNotSelectedInAppTemplate,
   CORE_COMMITTEE_SELECTION_MEMBERSHIP_CONFIRMED: coreCommitteeSelectionMembershipConfirmedInAppTemplate,
   CORE_COMMITTEE_SELECTION_SHORTLISTED: coreCommitteeSelectionShortlistedInAppTemplate,
+  CORE_COMMITTEE_SELECTION_NOT_SHORTLISTED: coreCommitteeSelectionNotShortlistedInAppTemplate,
   CORE_COMMITTEE_SELECTION_INTERVIEW_SCHEDULED: coreCommitteeSelectionInterviewScheduledInAppTemplate,
   CORE_COMMITTEE_SELECTION_INTERVIEW_RESCHEDULED: coreCommitteeSelectionInterviewRescheduledInAppTemplate,
   CORE_COMMITTEE_SELECTION_INTERVIEW_CANCELLED: coreCommitteeSelectionInterviewCancelledInAppTemplate,
@@ -260,6 +264,7 @@ export const NOTIFICATION_CHANNELS: Record<NotificationTemplateId, readonly Noti
   CORE_COMMITTEE_SELECTION_NOT_SELECTED: ["EMAIL", "IN_APP"],
   CORE_COMMITTEE_SELECTION_MEMBERSHIP_CONFIRMED: ["IN_APP"],
   CORE_COMMITTEE_SELECTION_SHORTLISTED: ["EMAIL", "IN_APP"],
+  CORE_COMMITTEE_SELECTION_NOT_SHORTLISTED: ["EMAIL", "IN_APP"],
   CORE_COMMITTEE_SELECTION_INTERVIEW_SCHEDULED: ["EMAIL", "IN_APP"],
   CORE_COMMITTEE_SELECTION_INTERVIEW_RESCHEDULED: ["EMAIL", "IN_APP"],
   CORE_COMMITTEE_SELECTION_INTERVIEW_CANCELLED: ["EMAIL", "IN_APP"],

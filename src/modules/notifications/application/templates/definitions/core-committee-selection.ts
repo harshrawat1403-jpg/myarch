@@ -67,6 +67,17 @@ export const coreCommitteeSelectionShortlistedTemplate: EmailTemplateDefinition 
 export const coreCommitteeSelectionShortlistedInAppTemplate: InAppTemplateDefinition = {
   title: () => "Shortlisted for Core Committee", message: (context) => selectionTitle(context),
 };
+export const coreCommitteeSelectionNotShortlistedTemplate: EmailTemplateDefinition = {
+  subject: (context) => `Core Committee shortlist update: ${selectionTitle(context)}`,
+  bodyText: (context) =>
+    `Your application for ${selectionTitle(context)} was not shortlisted for the next stage. Check the department portal for details.`,
+  bodyHtml: (context) =>
+    `<p>Your application for <strong>${escapeHtml(selectionTitle(context))}</strong> was not shortlisted for the next stage.</p><p>Check the department portal for details.</p>`,
+};
+export const coreCommitteeSelectionNotShortlistedInAppTemplate: InAppTemplateDefinition = {
+  title: () => "Core Committee shortlist update",
+  message: (context) => selectionTitle(context),
+};
 
 export const coreCommitteeSelectionInterviewScheduledTemplate: EmailTemplateDefinition = {
   subject: (context) => `Core Committee interview scheduled: ${selectionTitle(context)}`,

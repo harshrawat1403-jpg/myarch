@@ -18,10 +18,9 @@ const selection = {
   applicationOpenAt: new Date(Date.now() - 60_000).toISOString(),
   applicationCloseAt: new Date(Date.now() + 3_600_000).toISOString(),
   positions: [
-    { id: "domain-1", title: "Technical Coordinator", description: "Maintain digital systems.\nCoordinate technical work.", seats: 2, displayOrder: 0 },
-    { id: "domain-2", title: "Design Coordinator", description: "Coordinate visual communication.", seats: 1, displayOrder: 1 },
+    { id: "domain-1", title: "Technical Coordinator", description: "Maintain digital systems.\nCoordinate technical work.", seats: 2, displayOrder: 0, questions: [] },
+    { id: "domain-2", title: "Design Coordinator", description: "Coordinate visual communication.", seats: 1, displayOrder: 1, questions: [{ id: "field-1", key: "motivation", label: "Why this domain?", type: "LONG_TEXT", description: null, required: true, options: [], validation: null, displayOrder: 0 }] },
   ],
-  fields: [{ id: "field-1", key: "motivation", label: "Why this domain?", type: "LONG_TEXT", description: null, required: true, options: [], validation: null, displayOrder: 0 }],
   application: null,
 };
 

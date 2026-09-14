@@ -25,6 +25,173 @@ function local(value?: Date | null) {
         .slice(0, 16)
     : "";
 }
+function PositionQuestions({
+  position,
+  selectionId,
+  accessToken,
+  busy,
+  onSaved,
+}: {
+  position: CoreCommitteeSelectionRecord["positions"][number];
+  selectionId: string;
+  accessToken: string;
+  busy: boolean;
+  onSaved: () => void;
+}) {
+  const [questions, setQuestions] = useState(
+    position.questions.map((question) => ({
+      key: question.key,
+      label: question.label,
+      type: question.type,
+      required: question.required,
+      options: question.options.join(", "),
+    })),
+  );
+  return (
+    <div className="mt-3 space-y-2 border-t border-(--color-border) pt-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium">Questions for this domain</p>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={busy || questions.length >= 20}
+          onClick={() =>
+            setQuestions((items) => [
+              ...items,
+              {
+                key: `question_${items.length + 1}`,
+                label: "",
+                type: "LONG_TEXT" as const,
+                required: true,
+                options: "",
+              },
+            ])
+          }
+        >
+          Add question
+        </Button>
+      </div>
+      {questions.map((question, index) => (
+        <div key={`${question.key}-${index}`} className="grid gap-2 sm:grid-cols-[1fr_9rem_auto]">
+          <Input
+            aria-label={`Question ${index + 1} label`}
+            placeholder="Question prompt"
+            required
+            value={question.label}
+            onChange={(event) =>
+              setQuestions((items) =>
+                items.map((item, itemIndex) =>
+                  itemIndex === index ? { ...item, label: event.target.value } : item,
+                ),
+              )
+            }
+          />
+          <select
+            aria-label={`Question ${index + 1} type`}
+            value={question.type}
+            className="rounded border border-(--color-border) p-2"
+            onChange={(event) =>
+              setQuestions((items) =>
+                items.map((item, itemIndex) =>
+                  itemIndex === index
+                    ? { ...item, type: event.target.value as typeof item.type }
+                    : item,
+                ),
+              )
+            }
+          >
+            <option value="LONG_TEXT">Long text</option>
+            <option value="TEXT">Short text</option>
+            <option value="DROPDOWN">Dropdown</option>
+            <option value="RADIO">Single choice</option>
+            <option value="CHECKBOX">Checkbox</option>
+            <option value="NUMBER">Number</option>
+            <option value="DATE">Date</option>
+          </select>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setQuestions((items) => items.filter((_, i) => i !== index))}
+          >
+            Remove
+          </Button>
+          <Input
+            aria-label={`Question ${index + 1} key`}
+            pattern="[a-z][a-z0-9_]*"
+            required
+            value={question.key}
+            placeholder="answer_key"
+            onChange={(event) =>
+              setQuestions((items) =>
+                items.map((item, itemIndex) =>
+                  itemIndex === index ? { ...item, key: event.target.value } : item,
+                ),
+              )
+            }
+          />
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={question.required}
+              onChange={(event) =>
+                setQuestions((items) =>
+                  items.map((item, itemIndex) =>
+                    itemIndex === index ? { ...item, required: event.target.checked } : item,
+                  ),
+                )
+              }
+            />
+            Required
+          </label>
+          {(question.type === "DROPDOWN" || question.type === "RADIO") && (
+            <Input
+              className="sm:col-span-2"
+              placeholder="Option one, Option two"
+              value={question.options}
+              onChange={(event) =>
+                setQuestions((items) =>
+                  items.map((item, itemIndex) =>
+                    itemIndex === index ? { ...item, options: event.target.value } : item,
+                  ),
+                )
+              }
+            />
+          )}
+        </div>
+      ))}
+      {!questions.length && (
+        <p className="text-sm text-(--color-text-secondary)">No questions configured.</p>
+      )}
+      <Button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          await apiClient.put(
+            `/api/core-committee-selections/${selectionId}/positions/${position.id}`,
+            {
+              title: position.title,
+              description: position.description,
+              seats: position.seats,
+              displayOrder: position.displayOrder,
+              questions: questions.map((question, displayOrder) => ({
+                ...question,
+                displayOrder,
+                options: question.options
+                  .split(",")
+                  .map((item) => item.trim())
+                  .filter(Boolean),
+              })),
+            },
+            accessToken,
+          );
+          onSaved();
+        }}
+      >
+        Save domain questions
+      </Button>
+    </div>
+  );
+}
 function Config({
   selection,
   busy,
@@ -109,14 +276,17 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
   const [selection, setSelection] = useState<CoreCommitteeSelectionRecord | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [appointmentPreview, setAppointmentPreview] = useState<{ currentCoreCommittee: { memberships: unknown[] }; selected: { position: string }[] } | null>(null);
+  const [appointmentPreview, setAppointmentPreview] = useState<{
+    currentCoreCommittee: { memberships: unknown[] };
+    selected: { position: string }[];
+  } | null>(null);
   const load = async () => {
     if (!accessToken || role !== "SECRETARY") return;
     if (id) {
       const detail = await apiClient.get<CoreCommitteeSelectionRecord>(
-          `/api/core-committee-selections/${id}`,
-          accessToken,
-        );
+        `/api/core-committee-selections/${id}`,
+        accessToken,
+      );
       setSelection(detail);
     } else
       setItems(
@@ -262,21 +432,120 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                     Advance to {nextStage[selection.status]!.replaceAll("_", " ")}
                   </Button>
                 ) : null}
-                {selection.status === "SELECTION_DECIDED" && <Button disabled={busy} onClick={() => void act(() => apiClient.post(`/api/core-committee-selections/${id}/publish`, {}, accessToken!), "Core Committee result published")}>Publish selected members</Button>}
-                {selection.status === "PUBLISHED" && <Button disabled={busy} onClick={() => void act(async () => setAppointmentPreview(await apiClient.get(`/api/core-committee-selections/${id}/appointment-preview`, accessToken!)), "Appointment preview loaded")}>Preview Core Committee memberships</Button>}
-                {selection.status === "PUBLISHED" && appointmentPreview && <div className="text-sm">Outgoing memberships: {appointmentPreview.currentCoreCommittee.memberships.length}. New memberships: {appointmentPreview.selected.length}. <Button disabled={busy} onClick={() => void act(() => apiClient.post(`/api/core-committee-selections/${id}/appointments`, {}, accessToken!), "Core Committee memberships confirmed")}>Confirm memberships</Button></div>}
-                {selection.status === "MEMBERSHIP_CONFIRMED" && <Button disabled={busy} onClick={() => void act(() => apiClient.post(`/api/core-committee-selections/${id}/archive`, {}, accessToken!), "Core Committee selection archived")}>Archive selection</Button>}
+                {selection.status === "SELECTION_DECIDED" && (
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      void act(
+                        () =>
+                          apiClient.post(
+                            `/api/core-committee-selections/${id}/publish`,
+                            {},
+                            accessToken!,
+                          ),
+                        "Core Committee result published",
+                      )
+                    }
+                  >
+                    Publish selected members
+                  </Button>
+                )}
+                {selection.status === "PUBLISHED" && (
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      void act(
+                        async () =>
+                          setAppointmentPreview(
+                            await apiClient.get(
+                              `/api/core-committee-selections/${id}/appointment-preview`,
+                              accessToken!,
+                            ),
+                          ),
+                        "Appointment preview loaded",
+                      )
+                    }
+                  >
+                    Preview Core Committee memberships
+                  </Button>
+                )}
+                {selection.status === "PUBLISHED" && appointmentPreview && (
+                  <div className="text-sm">
+                    Outgoing memberships:{" "}
+                    {appointmentPreview.currentCoreCommittee.memberships.length}. New memberships:{" "}
+                    {appointmentPreview.selected.length}.{" "}
+                    <Button
+                      disabled={busy}
+                      onClick={() =>
+                        void act(
+                          () =>
+                            apiClient.post(
+                              `/api/core-committee-selections/${id}/appointments`,
+                              {},
+                              accessToken!,
+                            ),
+                          "Core Committee memberships confirmed",
+                        )
+                      }
+                    >
+                      Confirm memberships
+                    </Button>
+                  </div>
+                )}
+                {selection.status === "MEMBERSHIP_CONFIRMED" && (
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      void act(
+                        () =>
+                          apiClient.post(
+                            `/api/core-committee-selections/${id}/archive`,
+                            {},
+                            accessToken!,
+                          ),
+                        "Core Committee selection archived",
+                      )
+                    }
+                  >
+                    Archive selection
+                  </Button>
+                )}
               </div>
               <p className="text-sm text-(--color-text-secondary)">
                 This workflow records Council-led selection. It has no voter groups, ballots,
                 quorum, or vote counting.
               </p>
               <div className="flex flex-wrap gap-3 text-sm">
-                <Link className="underline" href={`/dashboard/core-committee-selections/${id}/dashboard`}>Core dashboard</Link>
-                <Link className="underline" href={`/dashboard/core-committee-selections/${id}/applications`}>Applications</Link>
-                <Link className="underline" href={`/dashboard/core-committee-selections/${id}/shortlist`}>Shortlist</Link>
-                <Link className="underline" href={`/dashboard/core-committee-selections/${id}/interviews`}>Interviews</Link>
-                <Link className="underline" href={`/dashboard/core-committee-selections/${id}/results`}>Results</Link>
+                <Link
+                  className="underline"
+                  href={`/dashboard/core-committee-selections/${id}/dashboard`}
+                >
+                  Core dashboard
+                </Link>
+                <Link
+                  className="underline"
+                  href={`/dashboard/core-committee-selections/${id}/applications`}
+                >
+                  Applications
+                </Link>
+                <Link
+                  className="underline"
+                  href={`/dashboard/core-committee-selections/${id}/shortlist`}
+                >
+                  Shortlist
+                </Link>
+                <Link
+                  className="underline"
+                  href={`/dashboard/core-committee-selections/${id}/interviews`}
+                >
+                  Interviews
+                </Link>
+                <Link
+                  className="underline"
+                  href={`/dashboard/core-committee-selections/${id}/results`}
+                >
+                  Results
+                </Link>
               </div>
               <Config
                 selection={selection}
@@ -295,14 +564,25 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                     const value = new FormData(event.currentTarget).get("newClosingDate");
                     if (!value) return;
                     void act(
-                      () => apiClient.post(`/api/core-committee-selections/${id}/deadline-extension`, { newClosingDate: new Date(String(value)).toISOString() }, accessToken!),
+                      () =>
+                        apiClient.post(
+                          `/api/core-committee-selections/${id}/deadline-extension`,
+                          { newClosingDate: new Date(String(value)).toISOString() },
+                          accessToken!,
+                        ),
                       "Closing date extended",
                     );
                   }}
                 >
                   <div>
                     <Label htmlFor="new-close">Extend closing date</Label>
-                    <Input id="new-close" name="newClosingDate" required type="datetime-local" min={local(selection.applicationCloseAt)} />
+                    <Input
+                      id="new-close"
+                      name="newClosingDate"
+                      required
+                      type="datetime-local"
+                      min={local(selection.applicationCloseAt)}
+                    />
                   </div>
                   <Button disabled={busy}>Extend closing date</Button>
                 </form>
@@ -312,8 +592,21 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
               <h2 className="text-lg font-semibold">Domains / positions</h2>
               {selection.positions.map((position) => (
                 <div key={position.id} className="rounded border border-(--color-border) p-3">
-                  <p className="font-medium">{position.title} · {position.seats} position{position.seats === 1 ? "" : "s"}</p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-(--color-text-secondary)">{position.description}</p>
+                  <p className="font-medium">
+                    {position.title} · {position.seats} position{position.seats === 1 ? "" : "s"}
+                  </p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-(--color-text-secondary)">
+                    {position.description}
+                  </p>
+                  {selection.status === "DRAFT" && accessToken && (
+                    <PositionQuestions
+                      position={position}
+                      selectionId={id}
+                      accessToken={accessToken}
+                      busy={busy}
+                      onSaved={() => void load()}
+                    />
+                  )}
                 </div>
               ))}
               {selection.status === "DRAFT" && (
@@ -342,7 +635,12 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                     <Input name="title" required placeholder="Domain title" />
                     <Input name="seats" required type="number" min={1} defaultValue={1} />
                   </div>
-                  <textarea name="description" required placeholder="Long domain brief" className="min-h-32 w-full rounded border border-(--color-border) bg-(--color-background) p-3" />
+                  <textarea
+                    name="description"
+                    required
+                    placeholder="Long domain brief"
+                    className="min-h-32 w-full rounded border border-(--color-border) bg-(--color-background) p-3"
+                  />
                   <Button disabled={busy}>+ Add domain</Button>
                 </form>
               )}
@@ -350,18 +648,29 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
             <Card className="space-y-3 border-(--color-danger)">
               <div>
                 <h2 className="text-lg font-semibold">Danger zone</h2>
-                <p className="text-sm text-(--color-text-secondary)">Permanently remove this Core Committee recruitment and its selection-owned data.</p>
+                <p className="text-sm text-(--color-text-secondary)">
+                  Permanently remove this Core Committee recruitment and its selection-owned data.
+                </p>
               </div>
               <Button
                 disabled={busy || ["MEMBERSHIP_CONFIRMED", "ARCHIVED"].includes(selection.status)}
                 variant="destructive"
                 onClick={() => {
-                  const confirmation = selection.status === "DRAFT"
-                    ? window.confirm("Delete this Core Committee application form?") ? "DELETE CORE SELECTION" : ""
-                    : window.prompt("Type DELETE CORE SELECTION to permanently delete this application and its responses.") ?? "";
+                  const confirmation =
+                    selection.status === "DRAFT"
+                      ? window.confirm("Delete this Core Committee application form?")
+                        ? "DELETE CORE SELECTION"
+                        : ""
+                      : (window.prompt(
+                          "Type DELETE CORE SELECTION to permanently delete this application and its responses.",
+                        ) ?? "");
                   if (!confirmation) return;
                   void act(async () => {
-                    await apiClient.post(`/api/core-committee-selections/${id}/delete`, { confirmation }, accessToken!);
+                    await apiClient.post(
+                      `/api/core-committee-selections/${id}/delete`,
+                      { confirmation },
+                      accessToken!,
+                    );
                     router.push("/dashboard/core-committee-selections");
                   }, "Core Committee application deleted");
                 }}
@@ -369,7 +678,9 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                 Delete application form
               </Button>
               {["MEMBERSHIP_CONFIRMED", "ARCHIVED"].includes(selection.status) && (
-                <p className="text-sm text-(--color-text-secondary)">Membership-confirmed selections remain preserved as governance history.</p>
+                <p className="text-sm text-(--color-text-secondary)">
+                  Membership-confirmed selections remain preserved as governance history.
+                </p>
               )}
             </Card>
           </>

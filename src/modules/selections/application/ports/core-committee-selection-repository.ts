@@ -14,6 +14,8 @@ export interface CoreCommitteeSelectionLifecycleNotificationRecipients {
   selectionId: string;
   selectionTitle: string;
   candidateUserIds: string[];
+  shortlistedCandidateUserIds?: string[];
+  notShortlistedCandidateUserIds?: string[];
   selectedCandidateUserIds: string[];
   notSelectedCandidateUserIds: string[];
 }
@@ -48,6 +50,16 @@ export interface CoreCommitteeSelectionCouncilProcessingDTO {
     applicationStatus: string;
     status: string;
     positions: Array<{ positionId: string; title: string }>;
+    questions: readonly {
+      key: string;
+      label: string;
+      type: "TEXT" | "LONG_TEXT" | "NUMBER" | "EMAIL" | "DROPDOWN" | "RADIO" | "CHECKBOX" | "DATE";
+      description: string | null;
+      required: boolean;
+      options: readonly string[];
+      validation: { min?: number; max?: number } | null;
+      displayOrder: number;
+    }[];
     scrutiny: Array<{ decision: string; createdAt: Date }>;
     shortlist: Array<{ positionId: string; createdAt: Date }>;
     interviews: Array<{
@@ -138,8 +150,23 @@ export interface CoreCommitteeSelectionRepository {
     selectionId: string;
     candidateId: string;
     positionIds: string[];
+    shortlisted?: boolean;
     actorUserId: string;
   }): Promise<{ candidateId: string; candidateUserId: string; selectionTitle: string }>;
+  publishShortlist(input: {
+    selectionId: string;
+    actorUserId: string;
+  }): Promise<{
+    published: true;
+    idempotent: boolean;
+    notificationRecipients?: {
+      candidateUserIds: string[];
+      shortlistedCandidateUserIds: string[];
+      notShortlistedCandidateUserIds: string[];
+      selectionId: string;
+      selectionTitle: string;
+    };
+  }>;
   createInterview(input: {
     selectionId: string;
     candidateId: string;

@@ -13,9 +13,9 @@ function applicationStatus(selection: StudentCoreCommitteeSelectionSummary): str
     if (selection.application.result) {
       return selection.application.result.outcome === "SELECTED" ? "Final selected" : "Final not selected";
     }
-    if (selection.application.status === "INELIGIBLE") return "Not shortlisted";
+    if (selection.application.shortlistOutcome === "NOT_SHORTLISTED") return "Not shortlisted";
     if (selection.application.status === "CORRECTION_REQUIRED") return "Update requested";
-    if (selection.application.status === "SHORTLISTED") return "Shortlisted";
+    if (selection.application.shortlistOutcome === "SHORTLISTED") return "Shortlisted";
     if (selection.application.status === "WITHDRAWN") return "Withdrawn";
     if (selection.status === "APPLICATION_OPEN") return "Submitted";
     if (["SCRUTINY", "CORRECTIONS", "SHORTLIST", "INTERVIEWS", "COUNCIL_REVIEW", "SELECTION_DECIDED"].includes(selection.status))

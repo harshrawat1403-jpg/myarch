@@ -13,15 +13,21 @@ import { FormRenderer } from "@/components/forms/form-renderer";
 
 function lifecycleLabel(selection: StudentCoreCommitteeSelectionDetail): string {
   if (selection.application?.result)
-    return selection.application.result.outcome === "SELECTED" ? "Final selected" : "Final not selected";
-  if (selection.application?.status === "INELIGIBLE") return "Not shortlisted";
-  if (selection.application?.status === "SHORTLISTED") return "Shortlisted";
+    return selection.application.result.outcome === "SELECTED"
+      ? "Final selected"
+      : "Final not selected";
+  if (selection.application?.shortlistOutcome === "NOT_SHORTLISTED") return "Not shortlisted";
+  if (selection.application?.shortlistOutcome === "SHORTLISTED") return "Shortlisted";
   if (selection.application?.status === "CORRECTION_REQUIRED") return "Update requested";
   if (selection.application && selection.status === "APPLICATION_OPEN") return "Submitted";
   if (selection.application) return "Under review";
   const now = Date.now();
   if (now < new Date(selection.applicationOpenAt).getTime()) return "Opens soon";
-  if (selection.status === "APPLICATION_OPEN" && now < new Date(selection.applicationCloseAt).getTime()) return "Open";
+  if (
+    selection.status === "APPLICATION_OPEN" &&
+    now < new Date(selection.applicationCloseAt).getTime()
+  )
+    return "Open";
   if (selection.status === "PUBLISHED") return "Result published";
   return "Closed";
 }
@@ -40,14 +46,28 @@ export default function StudentCoreCommitteeDetailPage() {
 
   const load = async () => {
     if (!accessToken || !params.id) return;
-    setSelection(await apiClient.get<StudentCoreCommitteeSelectionDetail>(`/api/student/core-committee-selections/${params.id}`, accessToken));
+    setSelection(
+      await apiClient.get<StudentCoreCommitteeSelectionDetail>(
+        `/api/student/core-committee-selections/${params.id}`,
+        accessToken,
+      ),
+    );
   };
   useEffect(() => {
     if (!accessToken || !params.id) return;
     void apiClient
-      .get<StudentCoreCommitteeSelectionDetail>(`/api/student/core-committee-selections/${params.id}`, accessToken)
+      .get<StudentCoreCommitteeSelectionDetail>(
+        `/api/student/core-committee-selections/${params.id}`,
+        accessToken,
+      )
       .then(setSelection)
-      .catch((error) => setMessage(error instanceof ApiError ? error.message : "Unable to load this Core Committee application."));
+      .catch((error) =>
+        setMessage(
+          error instanceof ApiError
+            ? error.message
+            : "Unable to load this Core Committee application.",
+        ),
+      );
   }, [accessToken, params.id]);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -60,9 +80,9 @@ export default function StudentCoreCommitteeDetailPage() {
   );
   const withinWindow = Boolean(
     selection &&
-      selection.status === "APPLICATION_OPEN" &&
-      new Date(selection.applicationOpenAt).getTime() <= now &&
-      now < new Date(selection.applicationCloseAt).getTime(),
+    selection.status === "APPLICATION_OPEN" &&
+    new Date(selection.applicationOpenAt).getTime() <= now &&
+    now < new Date(selection.applicationCloseAt).getTime(),
   );
 
   async function submit() {
@@ -85,25 +105,222 @@ export default function StudentCoreCommitteeDetailPage() {
     }
   }
 
-  if (!selection) return <p className="text-sm text-(--color-text-secondary)">{message || "Loading application…"}</p>;
+  if (!selection)
+    return (
+      <p className="text-sm text-(--color-text-secondary)">{message || "Loading application…"}</p>
+    );
   const label = lifecycleLabel(selection);
-  const clientFields = selection.fields.map((field) => ({ ...field, formId: "core-committee" }));
+  const selectedQuestions =
+    selection.positions.find(
+      (position) => position.id === (selection.application?.domain.id ?? selectedDomainId),
+    )?.questions ?? [];
+  const clientFields = selectedQuestions.map((field) => ({ ...field, formId: "core-committee" }));
 
   return (
     <div className="max-w-4xl space-y-6">
-      <Link href="/student/core-committee" className="text-sm underline">Back to Core Committee</Link>
-      {message && <p role="status" className="rounded border border-(--color-border) p-3 text-sm">{message}</p>}
+      <Link href="/student/core-committee" className="text-sm underline">
+        Back to Core Committee
+      </Link>
+      {message && (
+        <p role="status" className="rounded border border-(--color-border) p-3 text-sm">
+          {message}
+        </p>
+      )}
       <Card className="space-y-5">
-        <header className="space-y-2"><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold">{selection.title}</h1><Badge variant={label === "Open" ? "active" : "neutral"}>{label}</Badge></div><p className="text-sm text-(--color-text-secondary)">Applications open {new Date(selection.applicationOpenAt).toLocaleString()} and close {new Date(selection.applicationCloseAt).toLocaleString()}.</p></header>
-        <section className="space-y-2"><h2 className="font-medium">Application brief</h2><p className="whitespace-pre-wrap text-sm text-(--color-text-secondary)">{selection.brief}</p></section>
+        <header className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold">{selection.title}</h1>
+            <Badge variant={label === "Open" ? "active" : "neutral"}>{label}</Badge>
+          </div>
+          <p className="text-sm text-(--color-text-secondary)">
+            Applications open {new Date(selection.applicationOpenAt).toLocaleString()} and close{" "}
+            {new Date(selection.applicationCloseAt).toLocaleString()}.
+          </p>
+        </header>
+        <section className="space-y-2">
+          <h2 className="font-medium">Application brief</h2>
+          <p className="whitespace-pre-wrap text-sm text-(--color-text-secondary)">
+            {selection.brief}
+          </p>
+        </section>
+        <section className="rounded border border-(--color-border) bg-(--color-surface) p-3 text-sm">
+          <h2 className="font-medium">What happens next</h2>
+          <p className="mt-1 text-(--color-text-secondary)">
+            Applications are checked after the closing date. If shortlisted, interview details
+            appear here and notifications are sent through the portal. Results are visible only
+            after the Secretary publishes them.
+          </p>
+        </section>
 
         {selection.application ? (
-          <section className="space-y-3 border-t border-(--color-border) pt-4"><h2 className="font-medium">Your submitted application</h2><p className="text-sm">Selected domain: <strong>{selection.application.domain.title}</strong></p><p className="text-sm">Submitted {new Date(selection.application.submittedAt).toLocaleString()} · {label}</p>{(selection.application.interviews ?? []).length > 0 && <div className="space-y-2"><h3 className="font-medium">Interviews</h3>{(selection.application.interviews ?? []).map((interview) => <div key={interview.id} className="rounded border border-(--color-border) p-3 text-sm"><p>{interview.status.replaceAll("_", " ")}{interview.scheduledAt ? ` · ${new Date(interview.scheduledAt).toLocaleString()}` : ""}</p>{interview.durationMinutes && <p>Duration: {interview.durationMinutes} minutes</p>}{interview.mode && <p>Mode: {interview.mode}</p>}{interview.location && <p>Venue/link: {interview.location}</p>}{interview.candidateInstructions && <p>{interview.candidateInstructions}</p>}</div>)}</div>}{selection.application.result && <p className="rounded border border-(--color-border) p-3 text-sm">Final result: {selection.application.result.outcome === "SELECTED" ? "Selected" : "Not selected"} · Published {new Date(selection.application.result.publishedAt).toLocaleString()}</p>}{clientFields.length > 0 && <FormRenderer fields={clientFields} answers={selection.application.answers} readOnly />}</section>
+          <section className="space-y-3 border-t border-(--color-border) pt-4">
+            <h2 className="font-medium">Your submitted application</h2>
+            <p className="text-sm">
+              Selected domain: <strong>{selection.application.domain.title}</strong>
+            </p>
+            <p className="text-sm">
+              Submitted {new Date(selection.application.submittedAt).toLocaleString()} · {label}
+            </p>
+            {(selection.application.interviews ?? []).length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-medium">Interviews</h3>
+                {(selection.application.interviews ?? []).map((interview) => (
+                  <div
+                    key={interview.id}
+                    className="rounded border border-(--color-border) p-3 text-sm"
+                  >
+                    <p>
+                      {interview.status.replaceAll("_", " ")}
+                      {interview.scheduledAt
+                        ? ` · ${new Date(interview.scheduledAt).toLocaleString()}`
+                        : ""}
+                    </p>
+                    {interview.durationMinutes && (
+                      <p>Duration: {interview.durationMinutes} minutes</p>
+                    )}
+                    {interview.mode && <p>Mode: {interview.mode}</p>}
+                    {interview.location && <p>Venue/link: {interview.location}</p>}
+                    {interview.candidateInstructions && <p>{interview.candidateInstructions}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {selection.application.result && (
+              <p className="rounded border border-(--color-border) p-3 text-sm">
+                Final result:{" "}
+                {selection.application.result.outcome === "SELECTED" ? "Selected" : "Not selected"}{" "}
+                · Published {new Date(selection.application.result.publishedAt).toLocaleString()}
+              </p>
+            )}
+            {selection.application.shortlistOutcome === "SHORTLISTED" && (
+              <p className="rounded border border-(--color-border) p-3 text-sm">
+                You have been shortlisted for the next stage.
+              </p>
+            )}
+            {selection.application.shortlistOutcome === "NOT_SHORTLISTED" && (
+              <p className="rounded border border-(--color-border) p-3 text-sm">
+                Your application was not shortlisted for the next stage.
+              </p>
+            )}
+            {clientFields.length > 0 && (
+              <FormRenderer
+                fields={clientFields}
+                answers={selection.application.answers}
+                readOnly
+              />
+            )}
+          </section>
         ) : (
           <>
-            <section className="space-y-3 border-t border-(--color-border) pt-4"><div><h2 className="font-medium">Choose one domain</h2><p className="text-sm text-(--color-text-secondary)">You may apply for exactly one domain in this selection.</p></div>{selection.positions.map((position) => <label key={position.id} className={`block cursor-pointer rounded border p-4 ${selectedDomainId === position.id ? "border-(--color-accent)" : "border-(--color-border)"}`}><div className="flex gap-3"><input type="radio" name="domain" checked={selectedDomainId === position.id} disabled={!withinWindow || busy} onChange={() => { setSelectedDomainId(position.id); setReviewing(false); setConfirmed(false); }} /><div className="space-y-1"><p className="font-medium">{position.title}</p><p className="text-sm text-(--color-text-secondary)">{position.seats} {position.seats === 1 ? "position" : "positions"}</p><p className="whitespace-pre-wrap text-sm text-(--color-text-secondary)">{position.description}</p></div></div></label>)}</section>
-            {!withinWindow && <p className="rounded border border-(--color-border) p-3 text-sm">{now < new Date(selection.applicationOpenAt).getTime() ? `Applications open on ${new Date(selection.applicationOpenAt).toLocaleString()}.` : `Applications closed on ${new Date(selection.applicationCloseAt).toLocaleString()}.`}</p>}
-            {withinWindow && selectedDomain && <section className="space-y-4 border-t border-(--color-border) pt-4"><div><h2 className="font-medium">Application questions</h2><p className="text-sm text-(--color-text-secondary)">Applying for {selectedDomain.title}.</p></div>{clientFields.length > 0 && <FormRenderer fields={clientFields} answers={answers} onChange={(key, value) => setAnswers({ ...answers, [key]: value })} />}{!reviewing ? <Button type="button" variant="primary" disabled={busy} onClick={() => setReviewing(true)}>Review application</Button> : <div className="space-y-3 rounded border border-(--color-border) p-4"><h2 className="font-medium">Review and submit</h2><p className="text-sm">Application: {selection.title}</p><p className="text-sm">Selected domain: {selectedDomain.title} · {selectedDomain.seats} {selectedDomain.seats === 1 ? "position" : "positions"}</p>{clientFields.length > 0 && <FormRenderer fields={clientFields} answers={answers} readOnly />}<label className="flex gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />I confirm that I want to apply for this domain.</label><div className="flex gap-2"><Button type="button" variant="primary" disabled={busy || !confirmed} onClick={() => void submit()}>Submit application</Button><Button type="button" disabled={busy} onClick={() => setReviewing(false)}>Back</Button></div></div>}</section>}
+            <section className="space-y-3 border-t border-(--color-border) pt-4">
+              <div>
+                <h2 className="font-medium">Choose one domain</h2>
+                <p className="text-sm text-(--color-text-secondary)">
+                  You may apply for exactly one domain in this selection.
+                </p>
+              </div>
+              {selection.positions.map((position) => (
+                <label
+                  key={position.id}
+                  className={`block cursor-pointer rounded border p-4 ${selectedDomainId === position.id ? "border-(--color-accent)" : "border-(--color-border)"}`}
+                >
+                  <div className="flex gap-3">
+                    <input
+                      type="radio"
+                      name="domain"
+                      checked={selectedDomainId === position.id}
+                      disabled={!withinWindow || busy}
+                      onChange={() => {
+                        setSelectedDomainId(position.id);
+                        setReviewing(false);
+                        setConfirmed(false);
+                      }}
+                    />
+                    <div className="space-y-1">
+                      <p className="font-medium">{position.title}</p>
+                      <p className="text-sm text-(--color-text-secondary)">
+                        {position.seats} {position.seats === 1 ? "position" : "positions"}
+                      </p>
+                      <p className="whitespace-pre-wrap text-sm text-(--color-text-secondary)">
+                        {position.description}
+                      </p>
+                    </div>
+                  </div>
+                </label>
+              ))}
+              {!selection.positions.length && (
+                <p className="text-sm text-(--color-text-secondary)">
+                  No domains are available for this intake yet.
+                </p>
+              )}
+            </section>
+            {!withinWindow && (
+              <p className="rounded border border-(--color-border) p-3 text-sm">
+                {now < new Date(selection.applicationOpenAt).getTime()
+                  ? `Applications open on ${new Date(selection.applicationOpenAt).toLocaleString()}.`
+                  : `Applications closed on ${new Date(selection.applicationCloseAt).toLocaleString()}.`}
+              </p>
+            )}
+            {withinWindow && selectedDomain && (
+              <section className="space-y-4 border-t border-(--color-border) pt-4">
+                <div>
+                  <h2 className="font-medium">Application questions</h2>
+                  <p className="text-sm text-(--color-text-secondary)">
+                    Applying for {selectedDomain.title}.
+                  </p>
+                </div>
+                {clientFields.length > 0 && (
+                  <FormRenderer
+                    fields={clientFields}
+                    answers={answers}
+                    onChange={(key, value) => setAnswers({ ...answers, [key]: value })}
+                  />
+                )}
+                {!reviewing ? (
+                  <Button
+                    type="button"
+                    variant="primary"
+                    disabled={busy}
+                    onClick={() => setReviewing(true)}
+                  >
+                    Review application
+                  </Button>
+                ) : (
+                  <div className="space-y-3 rounded border border-(--color-border) p-4">
+                    <h2 className="font-medium">Review and submit</h2>
+                    <p className="text-sm">Application: {selection.title}</p>
+                    <p className="text-sm">
+                      Selected domain: {selectedDomain.title} · {selectedDomain.seats}{" "}
+                      {selectedDomain.seats === 1 ? "position" : "positions"}
+                    </p>
+                    {clientFields.length > 0 && (
+                      <FormRenderer fields={clientFields} answers={answers} readOnly />
+                    )}
+                    <label className="flex gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={confirmed}
+                        onChange={(event) => setConfirmed(event.target.checked)}
+                      />
+                      I confirm that I want to apply for this domain.
+                    </label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="primary"
+                        disabled={busy || !confirmed}
+                        onClick={() => void submit()}
+                      >
+                        Submit application
+                      </Button>
+                      <Button type="button" disabled={busy} onClick={() => setReviewing(false)}>
+                        Back
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
           </>
         )}
       </Card>
