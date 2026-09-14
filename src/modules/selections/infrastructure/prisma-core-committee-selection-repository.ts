@@ -803,19 +803,14 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     actorUserId: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      const selection = await this.requireStage(tx, input.selectionId, "SHORTLIST");
-      if (selection.shortlistPublishedAt)
-        throw new CoreCommitteeSelectionError("The published shortlist cannot be changed");
+      const selection = await lockSelection(tx, input.selectionId);
       const candidate = await tx.coreCommitteeSelectionCandidate.findUnique({
         where: { id_selectionId: { id: input.candidateId, selectionId: input.selectionId } },
         include: { positions: true },
       });
-      if (
-        !candidate ||
-        !["ELIGIBLE", "SHORTLISTED", "INELIGIBLE"].includes(candidate.status)
-      )
+      if (!candidate || candidate.status === "WITHDRAWN")
         throw new CoreCommitteeSelectionError(
-          "Only eligible candidates may be shortlisted",
+          "Candidate not found or withdrawn",
           "validation",
         );
       const valid = new Set(candidate.positions.map((position) => position.positionId));
@@ -900,12 +895,7 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     actorUserId: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      const selection = await this.requireStage(tx, input.selectionId, "INTERVIEWS");
-      if (!selection.shortlistPublishedAt)
-        throw new CoreCommitteeSelectionError(
-          "Publish the shortlist before scheduling interviews",
-          "validation",
-        );
+      const selection = await lockSelection(tx, input.selectionId);
       const listed = await tx.coreCommitteeSelectionShortlistEntry.findFirst({
         where: {
           selectionId: input.selectionId,
@@ -969,12 +959,7 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     actorUserId: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      const selection = await this.requireStage(tx, input.selectionId, "INTERVIEWS");
-      if (!selection.shortlistPublishedAt)
-        throw new CoreCommitteeSelectionError(
-          "Publish the shortlist before managing interviews",
-          "validation",
-        );
+      const selection = await lockSelection(tx, input.selectionId);
       const existing = await tx.coreCommitteeSelectionInterview.findFirst({
         where: { id: input.interviewId, selectionId: input.selectionId, status: "SCHEDULED" },
         include: {

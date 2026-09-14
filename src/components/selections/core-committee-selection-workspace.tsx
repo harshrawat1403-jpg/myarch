@@ -345,8 +345,6 @@ export function CoreCommitteeSelectionWorkspace({ id, view }: { id: string; view
           token={accessToken!}
           act={act}
           busy={busy}
-          lifecycle={selection.status}
-          shortlistPublished={Boolean(selection.shortlistPublishedAt)}
         />
       )}
       {view === "results" && (
@@ -457,16 +455,19 @@ function ApplicationPanel({
             <div className="flex gap-2">
               <Badge variant="neutral">{candidate.status}</Badge>
               <Button onClick={() => onDetail(candidate)}>View application</Button>
-              {["ELIGIBLE", "SHORTLISTED", "INELIGIBLE"].includes(candidate.status) && (
-                <>
-                  <Button disabled={busy} onClick={() => onShortlist(candidate)}>
-                    {candidate.status === "SHORTLISTED" ? "Keep shortlisted" : "Shortlist"}
-                  </Button>
-                  <Button disabled={busy} onClick={() => onReject(candidate)}>
-                    Not shortlisted
-                  </Button>
-                </>
-              )}
+              <Button
+                disabled={busy}
+                variant={shortlistDecision(candidate) === "SHORTLISTED" ? "secondary" : "primary"}
+                onClick={() =>
+                  shortlistDecision(candidate) === "SHORTLISTED"
+                    ? onReject(candidate)
+                    : onShortlist(candidate)
+                }
+              >
+                {shortlistDecision(candidate) === "SHORTLISTED"
+                  ? "Shortlisted"
+                  : "Shortlist candidate"}
+              </Button>
             </div>
           </div>
         ))}
@@ -569,16 +570,12 @@ function InterviewPanel({
   token,
   act,
   busy,
-  lifecycle,
-  shortlistPublished,
 }: {
   candidates: Candidate[];
   selectionId: string;
   token: string;
   act: (op: () => Promise<unknown>, success: string) => Promise<void>;
   busy: boolean;
-  lifecycle: string;
-  shortlistPublished: boolean;
 }) {
   const [candidateId, setCandidateId] = useState("");
   const [positionId, setPositionId] = useState("");
@@ -596,24 +593,10 @@ function InterviewPanel({
   const availableInterviewCandidates = interviewCandidates(candidates);
   return (
     <div className="space-y-4">
-      {lifecycle !== "INTERVIEWS" ? (
+      {!availableInterviewCandidates.length ? (
         <Card>
           <p className="text-sm text-(--color-text-secondary)">
-            {lifecycle === "APPLICATION_OPEN" || lifecycle === "APPLICATION_CLOSED"
-              ? "Close applications before finalizing the shortlist."
-              : "Move the selection to Interviews after publishing the shortlist."}
-          </p>
-        </Card>
-      ) : !shortlistPublished ? (
-        <Card>
-          <p className="text-sm text-(--color-text-secondary)">
-            Publish the shortlist before scheduling interviews.
-          </p>
-        </Card>
-      ) :       !availableInterviewCandidates.length ? (
-        <Card>
-          <p className="text-sm text-(--color-text-secondary)">
-            No shortlisted candidates available for interview scheduling yet.
+            No shortlisted candidates yet. Mark candidates as shortlisted from Applications.
           </p>
         </Card>
       ) : null}
