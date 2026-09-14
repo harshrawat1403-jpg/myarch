@@ -2679,8 +2679,8 @@ model CoreCommitteeSelectionDecision {
   candidate          CoreCommitteeSelectionCandidate       @relation(fields: [candidateId, selectionId], references: [id, selectionId], onDelete: Restrict)
   positionId         String                                @db.Uuid
   position           CoreCommitteeSelectionPosition        @relation(fields: [positionId, selectionId], references: [id, selectionId], onDelete: Restrict)
-  councilCommitteeId String                                @db.Uuid
-  councilCommittee   Committee                             @relation(fields: [councilCommitteeId], references: [id], onDelete: Restrict)
+  councilCommitteeId String?                               @db.Uuid
+  councilCommittee   Committee?                            @relation(fields: [councilCommitteeId], references: [id], onDelete: Restrict)
   outcome            CoreCommitteeSelectionDecisionOutcome
   state              CoreCommitteeSelectionDecisionState   @default(RECORDED)
   internalNote       String

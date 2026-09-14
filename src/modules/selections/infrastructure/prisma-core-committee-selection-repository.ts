@@ -1287,21 +1287,11 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
             "validation",
           );
       }
-      const councilCommittee = await tx.committee.findFirst({
-        where: {
-          type: "STUDENT_COUNCIL",
-          status: "ACTIVE",
-          academicYear: selection.academicYear,
-        },
-        select: { id: true },
-      });
-      if (!councilCommittee)
-        throw new CoreCommitteeSelectionError("No active Council is configured for this selection", "validation");
       const data = {
         selectionId: input.selectionId,
         candidateId: input.candidateId,
         positionId: input.positionId,
-        councilCommitteeId: councilCommittee.id,
+        councilCommitteeId: existing?.councilCommitteeId ?? null,
         outcome: input.outcome,
         internalNote: "Secretary final result",
         decidedByUserId: input.actorUserId,

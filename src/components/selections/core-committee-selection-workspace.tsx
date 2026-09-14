@@ -369,7 +369,6 @@ export function CoreCommitteeSelectionWorkspace({ id, view }: { id: string; view
             )
           }
           onPublish={() => {
-            if (!window.confirm("Publish final results to all applicants?")) return;
             void act(
               () =>
                 apiClient.post(
@@ -836,17 +835,41 @@ function ResultsPanel({
   onDecision: (candidate: Candidate, positionId: string, outcome: "SELECTED" | "NOT_SELECTED") => void;
   onPublish: () => void;
 }) {
+  const [confirmingPublish, setConfirmingPublish] = useState(false);
   return (
     <div className="space-y-4">
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="font-medium">Final results</p>
+          <h2 className="text-xl font-semibold">Final Results</h2>
           <p className="text-sm text-(--color-text-secondary)">
-            {published ? "Results are published and final decisions are frozen." : "Final decisions remain internal until published."}
+            Choose the final result for shortlisted candidates. Results remain private until published.
           </p>
         </div>
-        {!published && <Button disabled={busy} onClick={onPublish}>Publish results</Button>}
+        <div className="flex items-center gap-3">
+          <Badge variant={published ? "active" : "neutral"}>{published ? "PUBLISHED" : "DRAFT"}</Badge>
+          {!published && <Button disabled={busy} onClick={() => setConfirmingPublish(true)}>Publish results</Button>}
+        </div>
       </Card>
+      {confirmingPublish && (
+        <Card className="space-y-3 border-(--color-accent)">
+          <p className="font-medium">Publish final results?</p>
+          <p className="text-sm text-(--color-text-secondary)">
+            Students will be able to see their final selection status after publication.
+          </p>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setConfirmingPublish(false)}>Cancel</Button>
+            <Button
+              disabled={busy}
+              onClick={() => {
+                setConfirmingPublish(false);
+                onPublish();
+              }}
+            >
+              Publish results
+            </Button>
+          </div>
+        </Card>
+      )}
       {positions.map((position) => {
         const underReview = resultsCandidates(candidates, position.id);
         const selected = underReview.filter((candidate) =>
@@ -859,9 +882,13 @@ function ResultsPanel({
             <div>
               <h2 className="font-semibold">{position.title}</h2>
               <p className="text-sm text-(--color-text-secondary)">
-                Capacity {position.seats} · Candidates under review {underReview.length} · Selected{" "}
-                {selected.length} · Remaining {Math.max(0, position.seats - selected.length)}
+                {position.seats} {position.seats === 1 ? "position" : "positions"} · {underReview.length} shortlisted · {selected.length} selected
               </p>
+              {selected.length >= position.seats && (
+                <p className="text-xs text-(--color-text-secondary)">
+                  {selected.length} of {position.seats} positions filled.
+                </p>
+              )}
             </div>
             {underReview.map((candidate) => {
               const decision = candidate.decisions.find((item) => item.positionId === position.id);
@@ -878,30 +905,32 @@ function ResultsPanel({
                     {candidate.rollNumber ?? "No roll recorded"} · {position.title}
                     {interview ? ` · Interview ${interview.status}` : ""}
                   </p>
-                  <p className="text-sm">Decision: {outcome}</p>
+                  <p className="mt-1 text-sm">
+                    Final result: <strong>{outcome}</strong>
+                  </p>
                 </div>
                 {!published && (
                   <div className="flex gap-2">
-                    {outcome === "SELECTED" ? (
-                      <Button disabled={busy} onClick={() => onDecision(candidate, position.id, "NOT_SELECTED")}>
-                        Mark not selected
-                      </Button>
-                    ) : (
-                      <Button disabled={busy} onClick={() => onDecision(candidate, position.id, "SELECTED")}>
-                        Select
-                      </Button>
-                    )}
-                    {outcome !== "NOT_SELECTED" && (
-                      <Button disabled={busy} onClick={() => onDecision(candidate, position.id, "NOT_SELECTED")}>
-                        Not selected
-                      </Button>
-                    )}
+                    <Button
+                      disabled={busy}
+                      variant={outcome === "SELECTED" ? "primary" : "secondary"}
+                      onClick={() => onDecision(candidate, position.id, "SELECTED")}
+                    >
+                      Select
+                    </Button>
+                    <Button
+                      disabled={busy}
+                      variant={outcome === "NOT_SELECTED" ? "primary" : "secondary"}
+                      onClick={() => onDecision(candidate, position.id, "NOT_SELECTED")}
+                    >
+                      Not selected
+                    </Button>
                   </div>
                 )}
               </div>
               );
             })}
-            {!underReview.length && <p className="text-sm">No decisions yet.</p>}
+            {!underReview.length && <p className="text-sm">No shortlisted candidates.</p>}
           </Card>
         );
       })}
