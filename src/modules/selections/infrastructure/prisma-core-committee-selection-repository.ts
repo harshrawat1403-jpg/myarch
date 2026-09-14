@@ -1304,8 +1304,12 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     }
     throw lastError;
   }
-  private async finalizedSelection(tx: PrismaTypes.TransactionClient, selectionId: string) {
-    const selection = await lockSelection(tx, selectionId);
+  private async finalizedSelection(
+    tx: PrismaTypes.TransactionClient,
+    selectionId: string,
+    lockedSelection?: SelectionRow,
+  ) {
+    const selection = lockedSelection ?? (await lockSelection(tx, selectionId));
     const decisions = await tx.coreCommitteeSelectionDecision.findMany({
       where: { selectionId, state: "FINALIZED" },
       include: { position: true, candidate: { include: { positions: true } } },
@@ -1368,45 +1372,48 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     };
   }
   async publish(input: { selectionId: string; actorUserId: string }) {
-    return this.serializable(async (tx) => {
-      const selection = await lockSelection(tx, input.selectionId);
-      if (selection.publication)
-        return { published: true as const, idempotent: true };
-      const { decisions, selected } = await this.finalizedSelection(tx, selection.id);
-      const candidates = await tx.coreCommitteeSelectionCandidate.findMany({
-        where: { selectionId: selection.id },
-        select: { applicantUserId: true },
-      });
-      const publication = await tx.coreCommitteeSelectionPublication.upsert({
-        where: { selectionId: selection.id },
-        create: { selectionId: selection.id, publishedByUserId: input.actorUserId },
-        update: {},
-      });
-      await tx.coreCommitteeSelection.update({
-        where: { id: selection.id },
-        data: { status: "PUBLISHED" },
-      });
-      await new PrismaAuditRecorder(tx).record({
-        actorUserId: input.actorUserId,
-        action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_RESULT_PUBLISHED,
-        targetEntityType: "CoreCommitteeSelection",
-        targetEntityId: selection.id,
-      });
-      return {
-        published: true as const,
-        idempotent: false,
-        publication,
-        notificationRecipients: {
-          selectionId: selection.id,
-          selectionTitle: selection.title,
-          candidateUserIds: candidates.map((candidate) => candidate.applicantUserId),
-          selectedCandidateUserIds: selected.map((decision) => decision.candidate.applicantUserId),
-          notSelectedCandidateUserIds: decisions
-            .filter((decision) => decision.outcome === "NOT_SELECTED")
-            .map((decision) => decision.candidate.applicantUserId),
-        },
-      };
-    });
+    return this.serializable(
+      async (tx) => {
+        const selection = await lockSelection(tx, input.selectionId);
+        if (selection.publication)
+          return { published: true as const, idempotent: true };
+        const { decisions, selected } = await this.finalizedSelection(tx, selection.id, selection);
+        const candidates = await tx.coreCommitteeSelectionCandidate.findMany({
+          where: { selectionId: selection.id },
+          select: { applicantUserId: true },
+        });
+        const publication = await tx.coreCommitteeSelectionPublication.upsert({
+          where: { selectionId: selection.id },
+          create: { selectionId: selection.id, publishedByUserId: input.actorUserId },
+          update: {},
+        });
+        await tx.coreCommitteeSelection.update({
+          where: { id: selection.id },
+          data: { status: "PUBLISHED" },
+        });
+        await new PrismaAuditRecorder(tx).record({
+          actorUserId: input.actorUserId,
+          action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_RESULT_PUBLISHED,
+          targetEntityType: "CoreCommitteeSelection",
+          targetEntityId: selection.id,
+        });
+        return {
+          published: true as const,
+          idempotent: false,
+          publication,
+          notificationRecipients: {
+            selectionId: selection.id,
+            selectionTitle: selection.title,
+            candidateUserIds: candidates.map((candidate) => candidate.applicantUserId),
+            selectedCandidateUserIds: selected.map((decision) => decision.candidate.applicantUserId),
+            notSelectedCandidateUserIds: decisions
+              .filter((decision) => decision.outcome === "NOT_SELECTED")
+              .map((decision) => decision.candidate.applicantUserId),
+          },
+        };
+      },
+      { maxWait: 10000, timeout: 20000 },
+    );
   }
   async appointmentPreview(selectionId: string) {
     return this.serializable(async (tx) => {
