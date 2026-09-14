@@ -188,8 +188,13 @@ export default function StudentCoreCommitteeDetailPage() {
             {selection.application.result && (
               <p className="rounded border border-(--color-border) p-3 text-sm">
                 Final result:{" "}
-                {selection.application.result.outcome === "SELECTED" ? "Selected" : "Not selected"}{" "}
-                · Published {new Date(selection.application.result.publishedAt).toLocaleString()}
+                <strong>
+                  {selection.application.result.outcome === "SELECTED" ? "SELECTED" : "NOT SELECTED"}
+                </strong>
+                <br />
+                {selection.application.result.outcome === "SELECTED"
+                  ? `You have been selected for ${selection.application.domain.title}.`
+                  : "You were not selected for the final position."}
               </p>
             )}
             {selection.application.shortlistOutcome === "SHORTLISTED" && (

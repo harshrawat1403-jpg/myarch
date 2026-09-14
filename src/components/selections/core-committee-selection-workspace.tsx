@@ -67,6 +67,7 @@ type Selection = {
   applicationOpenAt: string;
   applicationCloseAt: string;
   shortlistPublishedAt: string | null;
+  finalResultsPublishedAt: string | null;
 };
 type WorkspaceView = "dashboard" | "applications" | "shortlist" | "interviews" | "results";
 
@@ -353,7 +354,7 @@ export function CoreCommitteeSelectionWorkspace({ id, view }: { id: string; view
         <ResultsPanel
           candidates={processing.candidates}
           positions={processing.positions}
-          published={selection.status === "PUBLISHED" || selection.status === "MEMBERSHIP_CONFIRMED" || selection.status === "ARCHIVED"}
+          published={Boolean(selection.finalResultsPublishedAt)}
           busy={busy}
           onDecision={(candidate, positionId, outcome) =>
             act(

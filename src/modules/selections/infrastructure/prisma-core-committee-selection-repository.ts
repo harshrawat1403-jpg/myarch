@@ -33,6 +33,7 @@ import type {
 } from "../application/ports/core-committee-selection-repository";
 
 const selectionInclude = {
+  publication: { select: { publishedAt: true } },
   positions: {
     orderBy: { displayOrder: "asc" as const },
     include: { questions: { orderBy: { displayOrder: "asc" as const } } },
@@ -57,6 +58,7 @@ function toRecord(row: SelectionRow): CoreCommitteeSelectionRecord {
     brief: row.brief,
     academicYear: row.academicYear,
     status: row.status,
+    finalResultsPublishedAt: row.publication?.publishedAt ?? null,
     applicationOpenAt: row.applicationOpenAt,
     applicationCloseAt: row.applicationCloseAt,
     shortlistPublishedAt: row.shortlistPublishedAt,
@@ -133,6 +135,7 @@ function studentResult(
   publication: { publishedAt: Date } | null,
 ): StudentCoreCommitteeResult | null {
   if (!publication) return null;
+  if (!candidate.decisions.length) return null;
   return {
     outcome: candidate.decisions.some((decision) => decision.outcome === "SELECTED")
       ? "SELECTED"
@@ -1360,11 +1363,7 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
   async publish(input: { selectionId: string; actorUserId: string }) {
     return this.serializable(async (tx) => {
       const selection = await lockSelection(tx, input.selectionId);
-      if (
-        selection.status === "PUBLISHED" ||
-        selection.status === "MEMBERSHIP_CONFIRMED" ||
-        selection.status === "ARCHIVED"
-      )
+      if (selection.publication)
         return { published: true as const, idempotent: true };
       const { decisions, selected } = await this.finalizedSelection(tx, selection.id);
       const candidates = await tx.coreCommitteeSelectionCandidate.findMany({

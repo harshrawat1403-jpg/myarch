@@ -7,6 +7,7 @@ import type {
 export interface CoreCommitteeSelectionRecord extends CoreCommitteeSelectionConfig {
   id: string;
   status: CoreCommitteeSelectionStatus;
+  finalResultsPublishedAt: Date | null;
   configurationLockedAt: Date | null;
   shortlistPublishedAt: Date | null;
   createdAt: Date;
