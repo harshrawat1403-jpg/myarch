@@ -244,6 +244,10 @@ export class DecideRegistrationRequestUseCase {
         temporaryPassword: tempPassword,
       })
       .catch(() => false);
+    await this.deps.registrationRequestRepository.markCredentialsEmailDelivery(
+      updated.id,
+      credentialsEmailSent,
+    );
 
     return { request: updated, tempPassword, credentialsEmailSent };
   }

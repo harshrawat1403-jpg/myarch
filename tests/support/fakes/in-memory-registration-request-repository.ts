@@ -35,6 +35,7 @@ export class InMemoryRegistrationRequestRepository implements RegistrationReques
       decidedAt: null,
       rejectionReason: null,
       resultingStudentProfileId: null,
+      credentialsEmailSent: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -113,5 +114,11 @@ export class InMemoryRegistrationRequestRepository implements RegistrationReques
     const existing = this.byId.get(id);
     if (!existing) return;
     this.byId.set(id, { ...existing, emailVerifiedAt: new Date() });
+  }
+
+  async markCredentialsEmailDelivery(id: string, sent: boolean): Promise<void> {
+    const existing = this.byId.get(id);
+    if (!existing) return;
+    this.byId.set(id, { ...existing, credentialsEmailSent: sent, updatedAt: new Date() });
   }
 }

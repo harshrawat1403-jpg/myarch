@@ -5,7 +5,10 @@ import {
   InvalidVerificationTokenError,
   VerificationTokenExpiredError,
 } from "@/modules/auth";
-import { markRegistrationRequestEmailVerified } from "@/modules/registration";
+import {
+  getPublicRegistrationVerificationStatus,
+  markRegistrationRequestEmailVerified,
+} from "@/modules/registration";
 import { badRequest, tooManyRequests } from "@/lib/http-errors";
 import { tokenConsumptionRateLimiter } from "@/lib/rate-limiters";
 import { clientIp } from "@/lib/client-ip";
@@ -43,9 +46,11 @@ export async function POST(req: NextRequest): Promise<Response> {
 
     if (result.registrationRequestId) {
       await markRegistrationRequestEmailVerified(result.registrationRequestId);
+      const registration = await getPublicRegistrationVerificationStatus(result.registrationRequestId);
+      return NextResponse.json({ data: { email: result.email, registration } });
     }
 
-    return NextResponse.json({ data: { email: result.email } });
+    return NextResponse.json({ data: { email: result.email, registration: null, accountExists: result.userId !== null } });
   } catch (err) {
     if (err instanceof InvalidVerificationTokenError) return badRequest(err.message);
     if (err instanceof VerificationTokenExpiredError) return badRequest(err.message);

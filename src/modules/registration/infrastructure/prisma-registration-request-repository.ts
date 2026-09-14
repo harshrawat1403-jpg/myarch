@@ -123,6 +123,13 @@ export class PrismaRegistrationRequestRepository implements RegistrationRequestR
       data: { emailVerifiedAt: new Date() },
     });
   }
+
+  async markCredentialsEmailDelivery(id: string, sent: boolean): Promise<void> {
+    await this.prisma.registrationRequest.update({
+      where: { id },
+      data: { credentialsEmailSent: sent },
+    });
+  }
 }
 
 function toDomain(row: PrismaRegistrationRequest): RegistrationRequestRecord {
@@ -142,6 +149,7 @@ function toDomain(row: PrismaRegistrationRequest): RegistrationRequestRecord {
     decidedAt: row.decidedAt,
     rejectionReason: row.rejectionReason,
     resultingStudentProfileId: row.resultingStudentProfileId,
+    credentialsEmailSent: row.credentialsEmailSent,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

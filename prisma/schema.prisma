@@ -855,6 +855,7 @@ model RegistrationRequest {
 
   resultingStudentProfileId String?         @unique @db.Uuid
   resultingStudentProfile   StudentProfile? @relation(fields: [resultingStudentProfileId], references: [id])
+  credentialsEmailSent     Boolean?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

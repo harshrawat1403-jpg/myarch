@@ -47,4 +47,5 @@ export interface RegistrationRequestRepository {
 
   /** MYARCH Phase 1 — called only from /api/auth/verify-email/route.ts once VerifyEmailUseCase confirms the token, never from within the auth module itself (see that route's own doc comment). */
   markEmailVerified(id: string): Promise<void>;
+  markCredentialsEmailDelivery(id: string, sent: boolean): Promise<void>;
 }

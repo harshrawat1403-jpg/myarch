@@ -8,6 +8,7 @@ export type {
   RegistrationRequestSearchFilters,
   RegistrationRequestStatus,
   RegistrationSubmittedData,
+  PublicRegistrationVerificationStatus,
 } from "./domain/entities";
 export {
   RegistrationBatchNotFoundError,
@@ -32,3 +33,4 @@ export { resendRegistrationCredentialsRouteHandler } from "./presentation/route-
 // (never by the auth module itself — see that route's own doc comment for
 // why this cross-module step lives at the route layer instead).
 export { markRegistrationRequestEmailVerified } from "./infrastructure/container";
+export { getPublicRegistrationVerificationStatus } from "./infrastructure/container";

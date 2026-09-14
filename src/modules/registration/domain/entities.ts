@@ -30,8 +30,15 @@ export interface RegistrationRequestRecord {
   readonly decidedAt: Date | null;
   readonly rejectionReason: string | null;
   readonly resultingStudentProfileId: string | null;
+  readonly credentialsEmailSent?: boolean | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
+}
+
+export interface PublicRegistrationVerificationStatus {
+  readonly status: RegistrationRequestStatus;
+  readonly accountExists: boolean;
+  readonly credentialsEmailSent: boolean | null;
 }
 
 export interface RegistrationRequestSearchFilters {

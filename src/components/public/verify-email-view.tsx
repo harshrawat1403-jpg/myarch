@@ -8,6 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, FieldError } from "@/components/ui/input";
 
 type Status = "verifying" | "success" | "error" | "resend";
+type RegistrationStatus = {
+  status: "SUBMITTED" | "REVIEWED" | "NEEDS_ATTENTION" | "APPROVED" | "REJECTED";
+  accountExists: boolean;
+  credentialsEmailSent: boolean | null;
+};
 type ResendStatus = "idle" | "loading" | "sent" | "rate-limited" | "error";
 
 /** MYARCH Phase 1 (§2.4) — public, unauthenticated. Auto-submits the ?token= from the emailed verification link on mount. */
@@ -16,6 +21,8 @@ export function VerifyEmailView() {
   const token = searchParams.get("token") ?? "";
   const [status, setStatus] = useState<Status>(token ? "verifying" : "resend");
   const [message, setMessage] = useState<string | null>(null);
+  const [registration, setRegistration] = useState<RegistrationStatus | null>(null);
+  const [accountExists, setAccountExists] = useState(false);
 
   const [resendEmail, setResendEmail] = useState("");
   const [resendStatus, setResendStatus] = useState<ResendStatus>("idle");
@@ -39,6 +46,9 @@ export function VerifyEmailView() {
           setStatus("error");
           return;
         }
+        const body = await res.json().catch(() => null);
+        setRegistration(body?.data?.registration ?? null);
+        setAccountExists(body?.data?.accountExists === true);
         setStatus("success");
       } catch {
         if (!cancelled) {
@@ -104,14 +114,45 @@ export function VerifyEmailView() {
   }
 
   if (status === "success") {
+    if (registration?.status === "REJECTED") {
+      return (
+        <div className="mt-6 space-y-4 text-center text-sm text-(--color-text-secondary)">
+          <p className="font-medium text-(--color-danger)">Your registration was not approved.</p>
+          <p>The department has reviewed your registration and it was rejected.</p>
+        </div>
+      );
+    }
+    if (accountExists && !registration) {
+      return (
+        <div className="mt-6 space-y-4 text-center text-sm text-(--color-text-secondary)">
+          <p className="font-medium text-(--color-text-primary)">Your email has been verified.</p>
+          <Link href="/login" className="inline-flex w-full items-center justify-center rounded-md bg-(--color-accent) px-4 py-2 font-medium text-white hover:opacity-90">
+            Go to Sign In
+          </Link>
+        </div>
+      );
+    }
+    if (registration?.status === "APPROVED" && registration.accountExists) {
+      const credentialsMessage =
+        registration.credentialsEmailSent === true
+          ? "Your login credentials have been sent to your registered email."
+          : "Your account has been created, but login credentials could not be delivered. Please contact the department.";
+      return (
+        <div className="mt-6 space-y-4 text-center text-sm text-(--color-text-secondary)">
+          <p className="font-medium text-(--color-text-primary)">Your MYARCH account has been created.</p>
+          <p>{credentialsMessage}</p>
+          <Link href="/login" className="inline-flex w-full items-center justify-center rounded-md bg-(--color-accent) px-4 py-2 font-medium text-white hover:opacity-90">
+            Go to Sign In
+          </Link>
+        </div>
+      );
+    }
     return (
-      <p className="mt-6 text-center text-sm text-(--color-text-secondary)">
-        Your email has been verified. You can now{" "}
-        <Link href="/login" className="font-medium text-(--color-accent) hover:underline">
-          sign in
-        </Link>
-        .
-      </p>
+      <div className="mt-6 space-y-4 text-center text-sm text-(--color-text-secondary)">
+        <p className="font-medium text-(--color-text-primary)">Email verified successfully</p>
+        <p>Your registration is now waiting for department approval.</p>
+        <p>You will receive your MYARCH login credentials by email once your account is approved.</p>
+      </div>
     );
   }
 

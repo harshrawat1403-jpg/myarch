@@ -48,6 +48,16 @@ export async function markRegistrationRequestEmailVerified(registrationRequestId
   await registrationRequestRepository.markEmailVerified(registrationRequestId);
 }
 
+export async function getPublicRegistrationVerificationStatus(registrationRequestId: string) {
+  const request = await registrationRequestRepository.findById(registrationRequestId);
+  if (!request) return null;
+  return {
+    status: request.status,
+    accountExists: request.resultingStudentProfileId !== null,
+    credentialsEmailSent: request.credentialsEmailSent,
+  };
+}
+
 export const listRegisterableBatchesUseCase = new ListRegisterableBatchesUseCase({
   registerableBatchLookup,
 });

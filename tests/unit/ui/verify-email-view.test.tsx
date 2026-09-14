@@ -5,8 +5,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const fetchMock = vi.fn();
 
+const navigationState = { params: new URLSearchParams() };
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => navigationState.params,
 }));
 
 import { VerifyEmailView } from "../../../src/components/public/verify-email-view";
@@ -18,7 +19,71 @@ function jsonResponse(status: number, body: unknown) {
 describe("VerifyEmailView — resend verification (MYARCH product-completion pass)", () => {
   beforeEach(() => {
     fetchMock.mockReset();
+    navigationState.params = new URLSearchParams();
     vi.stubGlobal("fetch", fetchMock);
+  });
+
+  it("shows approval waiting guidance after a verified pending registration without Sign In", async () => {
+    navigationState.params = new URLSearchParams("token=pending-token");
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        data: {
+          email: "student@example.edu",
+          registration: { status: "REVIEWED", accountExists: false, credentialsEmailSent: null },
+        },
+      }),
+    );
+    render(<VerifyEmailView />);
+    expect(await screen.findByText("Email verified successfully")).toBeInTheDocument();
+    expect(screen.getByText(/waiting for department approval/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /sign in/i })).not.toBeInTheDocument();
+  });
+
+  it("shows Sign In only when an approved account exists and never exposes a password", async () => {
+    navigationState.params = new URLSearchParams("token=approved-token");
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        data: {
+          email: "student@example.edu",
+          registration: { status: "APPROVED", accountExists: true, credentialsEmailSent: true },
+        },
+      }),
+    );
+    render(<VerifyEmailView />);
+    expect(await screen.findByText("Your MYARCH account has been created.")).toBeInTheDocument();
+    expect(screen.getByText(/credentials have been sent/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go to Sign In" })).toHaveAttribute("href", "/login");
+    expect(screen.queryByText(/temporary/i)).not.toBeInTheDocument();
+  });
+
+  it("shows contact guidance when credentials delivery is unknown or failed", async () => {
+    navigationState.params = new URLSearchParams("token=approved-token");
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        data: {
+          email: "student@example.edu",
+          registration: { status: "APPROVED", accountExists: true, credentialsEmailSent: null },
+        },
+      }),
+    );
+    render(<VerifyEmailView />);
+    expect(await screen.findByText(/credentials could not be delivered/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go to Sign In" })).toBeInTheDocument();
+  });
+
+  it("shows a rejected state without Sign In", async () => {
+    navigationState.params = new URLSearchParams("token=rejected-token");
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        data: {
+          email: "student@example.edu",
+          registration: { status: "REJECTED", accountExists: false, credentialsEmailSent: null },
+        },
+      }),
+    );
+    render(<VerifyEmailView />);
+    expect(await screen.findByText(/registration was not approved/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /sign in/i })).not.toBeInTheDocument();
   });
 
   it("shows the resend guidance and a resend form when no token is present", () => {
