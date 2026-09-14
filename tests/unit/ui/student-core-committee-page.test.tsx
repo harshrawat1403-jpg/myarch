@@ -76,6 +76,31 @@ describe("student Core Committee application UI", () => {
     expect(screen.queryByRole("button", { name: "Submit application" })).not.toBeInTheDocument();
   });
 
+  it("submits empty answers for a managed Core form with no questions", async () => {
+    state.fetch.mockImplementation((path: string, options?: { method?: string; body?: string }) => {
+      if (path === "/api/student/core-committee-selections/selection-1" && options?.method === "GET")
+        return response({ ...selection, fields: [] });
+      if (path === "/api/student/core-committee-selections/selection-1/application" && options?.method === "POST")
+        return response({ id: "application-1" });
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    const user = userEvent.setup();
+    render(<StudentCoreCommitteeDetailPage />);
+    await screen.findByText("Technical Coordinator");
+    await user.click(screen.getByRole("radio", { name: /technical coordinator/i }));
+    await user.click(screen.getByRole("button", { name: "Review application" }));
+    await user.click(screen.getByRole("checkbox", { name: /I confirm that I want to apply/i }));
+    await user.click(screen.getByRole("button", { name: "Submit application" }));
+
+    await waitFor(() => {
+      const post = state.fetch.mock.calls.find(([path, options]) =>
+        path === "/api/student/core-committee-selections/selection-1/application" &&
+        options?.method === "POST",
+      );
+      expect(JSON.parse(post![1].body)).toEqual({ positionId: "domain-1", answers: {} });
+    });
+  });
+
   it("keeps submit controls unavailable after the application window closes", async () => {
     state.fetch.mockImplementation((path: string) => {
       if (path === "/api/student/core-committee-selections/selection-1")

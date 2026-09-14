@@ -74,6 +74,8 @@ function studentRoute(
         if (error instanceof DuplicateFormApplicationError || error instanceof FormNotAvailableError)
           return conflict(error.message);
         if (error instanceof InvalidFormAnswerError) return badRequest(error.message);
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2028")
+          return conflict("Core Committee application could not be completed; refresh and retry");
         throw error;
       }
     },

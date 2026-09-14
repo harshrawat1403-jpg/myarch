@@ -233,6 +233,43 @@ describe("Phase 5 repository consistency", () => {
     expect(tx.formSubmission.create).not.toHaveBeenCalled();
   });
 
+  it("uses a bounded transaction and persists an empty-answer Core application with its selected domain", async () => {
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ status: "PUBLISHED", deadline: null }]),
+      formSubmission: { create: vi.fn().mockResolvedValue({ id: "submission-1" }) },
+      formApplication: { create: vi.fn().mockResolvedValue({ id: "application-1" }) },
+    };
+    const transaction = vi.fn(async (callback: (value: typeof tx) => unknown) => callback(tx));
+    const associateCandidate = vi.fn().mockResolvedValue(undefined);
+    const repository = new PrismaFormApplicationRepository(
+      { $transaction: transaction } as never,
+      associateCandidate,
+    );
+    vi.spyOn(repository, "findById").mockResolvedValue(application("SUBMITTED"));
+
+    await expect(repository.createSubmitted({
+      formId: "managed-form-1",
+      applicantUserId: student.userId,
+      studentProfileId: student.studentProfileId!,
+      answers: {},
+      actorUserId: student.userId,
+      coreCommitteeSelectionPositionIds: ["domain-1"],
+    })).resolves.toMatchObject({ id: "application-1" });
+
+    expect(transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({ maxWait: 10_000, timeout: 20_000 }),
+    );
+    expect(tx.formSubmission.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ answers: {} }),
+    }));
+    expect(associateCandidate).toHaveBeenCalledWith(tx, expect.objectContaining({
+      formId: "managed-form-1",
+      applicationId: "application-1",
+      coreCommitteeSelectionPositionIds: ["domain-1"],
+    }));
+  });
+
   it("maps a concurrent submission unique violation to the domain duplicate error", async () => {
     const duplicate = new Prisma.PrismaClientKnownRequestError("duplicate", { code: "P2002", clientVersion: "6.3.1" });
     const tx = {

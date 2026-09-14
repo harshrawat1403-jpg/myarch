@@ -33,7 +33,7 @@ export class PrismaFormApplicationRepository implements ApplicationRepository {
   async createSubmitted(data: CreateFormApplicationData): Promise<FormApplicationRecord> {
     let applicationId: string;
     try {
-      applicationId = await this.prisma.$transaction(async (tx) => {
+      const submit = async (tx: Prisma.TransactionClient) => {
         const formRows = await tx.$queryRaw<Array<{ status: string; deadline: Date | null }>>`
           SELECT "status", "deadline"
           FROM "forms"
@@ -59,7 +59,17 @@ export class PrismaFormApplicationRepository implements ApplicationRepository {
         });
         await this.associateCandidate?.(tx, { formId: data.formId, applicationId: application.id, applicantUserId: data.applicantUserId, electionPositionIds: data.electionPositionIds, coreCommitteeSelectionPositionIds: data.coreCommitteeSelectionPositionIds });
         return application.id;
-      });
+      };
+      applicationId = data.coreCommitteeSelectionPositionIds?.length
+        ? await this.prisma.$transaction(submit, {
+            // A Core application adds locked selection, eligibility, and
+            // candidate/domain writes to the Form submission transaction.
+            // Keep the larger bound local to this workflow rather than
+            // relaxing generic Form submissions globally.
+            maxWait: 10_000,
+            timeout: 20_000,
+          })
+        : await this.prisma.$transaction(submit);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw new DuplicateFormApplicationError();
       throw error;

@@ -57,6 +57,22 @@ describe("student Core Committee applications", () => {
     });
   });
 
+  it("submits empty answers when the managed Core form has no questions", async () => {
+    const { useCases, submitter } = setup();
+    await expect(useCases.submit({
+      actor: student,
+      selectionId: detail.id,
+      positionId: "domain-1",
+      answers: {},
+    })).resolves.toEqual({ id: "application-1" });
+
+    expect(submitter.execute).toHaveBeenCalledWith(expect.objectContaining({
+      formId: "managed-form-id",
+      answers: {},
+      coreCommitteeSelectionPositionIds: ["domain-1"],
+    }));
+  });
+
   it("does not expose a submission path when the selection has no linked application form", async () => {
     const { useCases, repository, submitter } = setup();
     repository.getStudentApplicationFormId.mockResolvedValue(null);
