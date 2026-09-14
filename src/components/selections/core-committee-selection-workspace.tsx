@@ -85,6 +85,10 @@ export const interviewCandidates = (candidates: Candidate[]) =>
       shortlistDecision(candidate) === "SHORTLISTED" &&
       !candidate.interviews.some((interview) => ["PLANNED", "SCHEDULED"].includes(interview.status)),
   );
+export const resultsCandidates = (candidates: Candidate[], positionId: string) =>
+  candidates.filter((candidate) =>
+    candidate.shortlist.some((entry) => entry.positionId === positionId),
+  );
 
 export function CoreCommitteeSelectionWorkspace({ id, view }: { id: string; view: WorkspaceView }) {
   const { accessToken } = useAuth();
@@ -844,9 +848,7 @@ function ResultsPanel({
         {!published && <Button disabled={busy} onClick={onPublish}>Publish results</Button>}
       </Card>
       {positions.map((position) => {
-        const underReview = candidates.filter((candidate) =>
-          candidate.positions.some((entry) => entry.positionId === position.id),
-        );
+        const underReview = resultsCandidates(candidates, position.id);
         const selected = underReview.filter((candidate) =>
           candidate.decisions.some(
             (decision) => decision.positionId === position.id && decision.outcome === "SELECTED",

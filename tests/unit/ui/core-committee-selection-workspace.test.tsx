@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   interviewCandidates,
+  resultsCandidates,
   shortlistDecision,
 } from "../../../src/components/selections/core-committee-selection-workspace";
 
@@ -61,5 +62,14 @@ describe("Core Committee applicant review decisions", () => {
       ],
     });
     expect(interviewCandidates([candidate(), candidate({ id: "not-shortlisted", status: "INELIGIBLE" }), shortlisted, scheduled]).map((item) => item.id)).toEqual(["shortlisted"]);
+  });
+
+  it("only exposes shortlisted candidates in Results for each position", () => {
+    const shortlisted = candidate({
+      id: "shortlisted",
+      status: "SHORTLISTED",
+      shortlist: [{ positionId: "position", createdAt: "" }],
+    });
+    expect(resultsCandidates([shortlisted, candidate(), candidate({ id: "not-shortlisted", status: "INELIGIBLE" })], "position").map((item) => item.id)).toEqual(["shortlisted"]);
   });
 });

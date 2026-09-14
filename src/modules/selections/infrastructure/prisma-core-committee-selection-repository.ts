@@ -1267,6 +1267,7 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
           selectionId: input.selectionId,
           status: { not: "WITHDRAWN" },
           positions: { some: { positionId: input.positionId } },
+          shortlistEntries: { some: { positionId: input.positionId, selectionId: input.selectionId } },
         },
       });
       if (!candidate)
