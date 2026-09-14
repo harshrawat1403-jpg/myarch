@@ -348,7 +348,35 @@ export function CoreCommitteeSelectionWorkspace({ id, view }: { id: string; view
         />
       )}
       {view === "results" && (
-        <ResultsPanel candidates={processing.candidates} positions={processing.positions} />
+        <ResultsPanel
+          candidates={processing.candidates}
+          positions={processing.positions}
+          published={selection.status === "PUBLISHED" || selection.status === "MEMBERSHIP_CONFIRMED" || selection.status === "ARCHIVED"}
+          busy={busy}
+          onDecision={(candidate, positionId, outcome) =>
+            act(
+              () =>
+                apiClient.post(
+                  `/api/core-committee-selections/${id}/decisions/secretary`,
+                  { candidateId: candidate.id, positionId, outcome },
+                  accessToken!,
+                ),
+              outcome === "SELECTED" ? "Candidate selected" : "Candidate marked not selected",
+            )
+          }
+          onPublish={() => {
+            if (!window.confirm("Publish final results to all applicants?")) return;
+            void act(
+              () =>
+                apiClient.post(
+                  `/api/core-committee-selections/${id}/publish`,
+                  {},
+                  accessToken!,
+                ),
+              "Results published",
+            );
+          }}
+        />
       )}
       {detail && (
         <ApplicationDetail
@@ -792,12 +820,29 @@ function InterviewPanel({
 function ResultsPanel({
   candidates,
   positions,
+  published,
+  busy,
+  onDecision,
+  onPublish,
 }: {
   candidates: Candidate[];
   positions: Processing["positions"];
+  published: boolean;
+  busy: boolean;
+  onDecision: (candidate: Candidate, positionId: string, outcome: "SELECTED" | "NOT_SELECTED") => void;
+  onPublish: () => void;
 }) {
   return (
     <div className="space-y-4">
+      <Card className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-medium">Final results</p>
+          <p className="text-sm text-(--color-text-secondary)">
+            {published ? "Results are published and final decisions are frozen." : "Final decisions remain internal until published."}
+          </p>
+        </div>
+        {!published && <Button disabled={busy} onClick={onPublish}>Publish results</Button>}
+      </Card>
       {positions.map((position) => {
         const underReview = candidates.filter((candidate) =>
           candidate.positions.some((entry) => entry.positionId === position.id),
@@ -816,18 +861,44 @@ function ResultsPanel({
                 {selected.length} · Remaining {Math.max(0, position.seats - selected.length)}
               </p>
             </div>
-            {underReview.map((candidate) => (
+            {underReview.map((candidate) => {
+              const decision = candidate.decisions.find((item) => item.positionId === position.id);
+              const outcome = decision?.outcome ?? "PENDING";
+              const interview = candidate.interviews.find((item) => item.positionId === position.id);
+              return (
               <div
                 key={candidate.id}
                 className="flex flex-wrap justify-between gap-3 border-t border-(--color-border) pt-3"
               >
-                <span>
-                  {candidate.candidateName} ·{" "}
-                  {candidate.decisions.find((decision) => decision.positionId === position.id)
-                    ?.outcome ?? "PENDING"}
-                </span>
+                <div>
+                  <p className="font-medium">{candidate.candidateName}</p>
+                  <p className="text-sm text-(--color-text-secondary)">
+                    {candidate.rollNumber ?? "No roll recorded"} · {position.title}
+                    {interview ? ` · Interview ${interview.status}` : ""}
+                  </p>
+                  <p className="text-sm">Decision: {outcome}</p>
+                </div>
+                {!published && (
+                  <div className="flex gap-2">
+                    {outcome === "SELECTED" ? (
+                      <Button disabled={busy} onClick={() => onDecision(candidate, position.id, "NOT_SELECTED")}>
+                        Mark not selected
+                      </Button>
+                    ) : (
+                      <Button disabled={busy} onClick={() => onDecision(candidate, position.id, "SELECTED")}>
+                        Select
+                      </Button>
+                    )}
+                    {outcome !== "NOT_SELECTED" && (
+                      <Button disabled={busy} onClick={() => onDecision(candidate, position.id, "NOT_SELECTED")}>
+                        Not selected
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
             {!underReview.length && <p className="text-sm">No decisions yet.</p>}
           </Card>
         );

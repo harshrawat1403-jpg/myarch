@@ -37,6 +37,7 @@ function setup(currentCouncil: string | null = "council") {
     rescheduleInterview: vi.fn(),
     cancelInterview: vi.fn(),
     completeInterview: vi.fn(),
+    recordSecretaryDecision: vi.fn(),
     currentCouncilCommittee: vi.fn().mockResolvedValue(currentCouncil),
     recordCouncilReview: vi.fn(),
     recordDecision: vi.fn(),
@@ -245,5 +246,30 @@ describe("Core Committee selection authority", () => {
       shortlisted: false,
       actorUserId: "secretary",
     });
+  });
+  it("allows only the Secretary to record a final result", async () => {
+      const { useCases, repository } = setup();
+      repository.recordSecretaryDecision.mockResolvedValue({ outcome: "SELECTED" });
+      const candidateId = "00000000-0000-4000-8000-000000000002";
+      const positionId = "00000000-0000-4000-8000-000000000003";
+      await useCases.secretaryDecision(secretary, "selection", {
+        candidateId,
+        positionId,
+        outcome: "SELECTED",
+      });
+      expect(repository.recordSecretaryDecision).toHaveBeenCalledWith({
+        selectionId: "selection",
+        candidateId,
+        positionId,
+        outcome: "SELECTED",
+        actorUserId: "secretary",
+      });
+      await expect(
+        useCases.secretaryDecision(councilMember, "selection", {
+          candidateId,
+          positionId,
+          outcome: "NOT_SELECTED",
+        }),
+      ).rejects.toThrow("Only the Secretary may administer Core Committee selections");
   });
 });

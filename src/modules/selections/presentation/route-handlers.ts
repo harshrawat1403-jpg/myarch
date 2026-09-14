@@ -246,6 +246,11 @@ export const decideCoreCommitteeSelectionRouteHandler = route(
   async (req, actor, id) => coreCommitteeSelectionUseCases.decision(actor, id, await body(req)),
   false,
 );
+export const secretaryDecisionCoreCommitteeSelectionRouteHandler = route(
+  async (req, actor, id) =>
+    coreCommitteeSelectionUseCases.secretaryDecision(actor, id, await body(req)),
+  true,
+);
 export const finalizeCoreCommitteeSelectionDecisionRouteHandler = route(
   async (_req, actor, id, context) =>
     coreCommitteeSelectionUseCases.finalizeDecision(actor, id, await decisionId(context)),

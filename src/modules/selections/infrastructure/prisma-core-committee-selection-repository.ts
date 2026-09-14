@@ -1250,6 +1250,77 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
       };
     });
   }
+  async recordSecretaryDecision(input: {
+    selectionId: string;
+    candidateId: string;
+    positionId: string;
+    outcome: "SELECTED" | "NOT_SELECTED";
+    actorUserId: string;
+  }) {
+    return this.serializable(async (tx) => {
+      const selection = await lockSelection(tx, input.selectionId);
+      if (selection.status === "PUBLISHED" || selection.status === "MEMBERSHIP_CONFIRMED" || selection.status === "ARCHIVED")
+        throw new CoreCommitteeSelectionError("Published results cannot be changed", "validation");
+      const candidate = await tx.coreCommitteeSelectionCandidate.findFirst({
+        where: {
+          id: input.candidateId,
+          selectionId: input.selectionId,
+          status: { not: "WITHDRAWN" },
+          positions: { some: { positionId: input.positionId } },
+        },
+      });
+      if (!candidate)
+        throw new CoreCommitteeSelectionError("Candidate not found for this Core Committee position", "notFound");
+      const position = selection.positions.find((item) => item.id === input.positionId);
+      if (!position) throw new CoreCommitteeSelectionError("Core Committee domain not found", "notFound");
+      const existing = await tx.coreCommitteeSelectionDecision.findUnique({
+        where: { candidateId_positionId: { candidateId: input.candidateId, positionId: input.positionId } },
+      });
+      if (input.outcome === "SELECTED" && existing?.outcome !== "SELECTED") {
+        const selected = await tx.coreCommitteeSelectionDecision.count({
+          where: { selectionId: input.selectionId, positionId: input.positionId, outcome: "SELECTED" },
+        });
+        if (selected >= position.seats)
+          throw new CoreCommitteeSelectionError(
+            `Selected candidates exceed available seats for ${position.title}`,
+            "validation",
+          );
+      }
+      const councilCommittee = await tx.committee.findFirst({
+        where: {
+          type: "STUDENT_COUNCIL",
+          status: "ACTIVE",
+          academicYear: selection.academicYear,
+        },
+        select: { id: true },
+      });
+      if (!councilCommittee)
+        throw new CoreCommitteeSelectionError("No active Council is configured for this selection", "validation");
+      const data = {
+        selectionId: input.selectionId,
+        candidateId: input.candidateId,
+        positionId: input.positionId,
+        councilCommitteeId: councilCommittee.id,
+        outcome: input.outcome,
+        internalNote: "Secretary final result",
+        decidedByUserId: input.actorUserId,
+        decidedAt: new Date(),
+        state: "FINALIZED" as const,
+        finalizedByUserId: input.actorUserId,
+        finalizedAt: new Date(),
+      };
+      const decision = existing
+        ? await tx.coreCommitteeSelectionDecision.update({ where: { id: existing.id }, data })
+        : await tx.coreCommitteeSelectionDecision.create({ data });
+      await new PrismaAuditRecorder(tx).record({
+        actorUserId: input.actorUserId,
+        action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_DECISION_RECORDED,
+        targetEntityType: "CoreCommitteeSelectionDecision",
+        targetEntityId: decision.id,
+      });
+      return decision;
+    });
+  }
   async finalizeDecision(input: { selectionId: string; decisionId: string; actorUserId: string }) {
     return this.prisma.$transaction(async (tx) => {
       const selection = await lockSelection(tx, input.selectionId);

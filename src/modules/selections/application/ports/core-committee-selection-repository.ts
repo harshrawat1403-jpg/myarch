@@ -220,6 +220,13 @@ export interface CoreCommitteeSelectionRepository {
     outcome: "SELECTED" | "NOT_SELECTED";
     internalNote: string;
   }): Promise<unknown>;
+  recordSecretaryDecision(input: {
+    selectionId: string;
+    candidateId: string;
+    positionId: string;
+    outcome: "SELECTED" | "NOT_SELECTED";
+    actorUserId: string;
+  }): Promise<unknown>;
   finalizeDecision(input: {
     selectionId: string;
     decisionId: string;

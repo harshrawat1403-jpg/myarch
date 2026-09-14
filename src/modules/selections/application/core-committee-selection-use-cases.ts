@@ -342,6 +342,22 @@ export class CoreCommitteeSelectionUseCases {
       ...value,
     });
   }
+  async secretaryDecision(actor: AuthenticatedActor, selectionId: string, input: unknown) {
+    requireSelectionSecretary(actor);
+    const value = z
+      .object({
+        candidateId: z.string().uuid(),
+        positionId: z.string().uuid(),
+        outcome: z.enum(["SELECTED", "NOT_SELECTED"]),
+      })
+      .strict()
+      .parse(input);
+    return this.repository.recordSecretaryDecision({
+      selectionId,
+      ...value,
+      actorUserId: actor.userId,
+    });
+  }
   async finalizeDecision(actor: AuthenticatedActor, selectionId: string, decisionId: string) {
     requireSelectionSecretary(actor);
     return this.repository.finalizeDecision({ selectionId, decisionId, actorUserId: actor.userId });
