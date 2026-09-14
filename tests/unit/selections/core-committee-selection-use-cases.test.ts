@@ -213,4 +213,26 @@ describe("Core Committee selection authority", () => {
     expect(notifications.notify).toHaveBeenCalledWith(expect.objectContaining({ template: "CORE_COMMITTEE_SELECTION_INTERVIEW_CANCELLED" }));
     for (const call of notifications.notify.mock.calls) expect(JSON.stringify(call[0])).not.toContain("private");
   });
+  it("passes both shortlist decisions through the Secretary boundary", async () => {
+    const { useCases, repository } = setup();
+    repository.shortlist.mockResolvedValue({
+      candidateId: "candidate",
+      candidateUserId: "student",
+      selectionTitle: "Core",
+    });
+    const candidateId = "00000000-0000-4000-8000-000000000002";
+    const positionId = "00000000-0000-4000-8000-000000000003";
+    await useCases.shortlist(secretary, "selection", {
+      candidateId,
+      positionIds: [positionId],
+      shortlisted: false,
+    });
+    expect(repository.shortlist).toHaveBeenCalledWith({
+      selectionId: "selection",
+      candidateId,
+      positionIds: [positionId],
+      shortlisted: false,
+      actorUserId: "secretary",
+    });
+  });
 });

@@ -73,6 +73,18 @@ type WorkspaceView = "dashboard" | "applications" | "shortlist" | "interviews" |
 const dateTime = (value: string | null) => (value ? new Date(value).toLocaleString() : "—");
 const domainOf = (candidate: Candidate) =>
   candidate.positions.map((position) => position.title).join(", ");
+export const shortlistDecision = (candidate: Candidate) =>
+  candidate.shortlist.length > 0
+    ? "SHORTLISTED"
+    : candidate.status === "INELIGIBLE"
+      ? "NOT_SHORTLISTED"
+      : "PENDING";
+export const interviewCandidates = (candidates: Candidate[]) =>
+  candidates.filter(
+    (candidate) =>
+      shortlistDecision(candidate) === "SHORTLISTED" &&
+      !candidate.interviews.some((interview) => ["PLANNED", "SCHEDULED"].includes(interview.status)),
+  );
 
 export function CoreCommitteeSelectionWorkspace({ id, view }: { id: string; view: WorkspaceView }) {
   const { accessToken } = useAuth();
@@ -91,6 +103,7 @@ export function CoreCommitteeSelectionWorkspace({ id, view }: { id: string; view
     ]);
     setSelection(selectionResult);
     setProcessing(processingResult);
+    return processingResult;
   }, [accessToken, id]);
   useEffect(() => {
     void load().catch((error) =>
@@ -114,7 +127,10 @@ export function CoreCommitteeSelectionWorkspace({ id, view }: { id: string; view
     setMessage("");
     try {
       await operation();
-      await load();
+      const refreshed = await load();
+      if (refreshed && detail) {
+        setDetail(refreshed.candidates.find((candidate) => candidate.id === detail.id) ?? null);
+      }
       setMessage(success);
     } catch (error) {
       setMessage(
@@ -336,7 +352,42 @@ export function CoreCommitteeSelectionWorkspace({ id, view }: { id: string; view
       {view === "results" && (
         <ResultsPanel candidates={processing.candidates} positions={processing.positions} />
       )}
-      {detail && <ApplicationDetail candidate={detail} close={() => setDetail(null)} />}
+      {detail && (
+        <ApplicationDetail
+          candidate={detail}
+          close={() => setDetail(null)}
+          onShortlist={() =>
+            act(
+              () =>
+                apiClient.post(
+                  `/api/core-committee-selections/${id}/shortlist`,
+                  {
+                    candidateId: detail.id,
+                    positionIds: detail.positions.map((position) => position.positionId),
+                  },
+                  accessToken!,
+                ),
+              "Candidate shortlisted",
+            )
+          }
+          onReject={() =>
+            act(
+              () =>
+                apiClient.post(
+                  `/api/core-committee-selections/${id}/shortlist`,
+                  {
+                    candidateId: detail.id,
+                    positionIds: detail.positions.map((position) => position.positionId),
+                    shortlisted: false,
+                  },
+                  accessToken!,
+                ),
+              "Candidate marked not shortlisted",
+            )
+          }
+          busy={busy}
+        />
+      )}
     </div>
   );
 }
@@ -542,14 +593,7 @@ function InterviewPanel({
         selected.positions.find((position) => position.positionId === entry.positionId),
       )
       .filter((position): position is Candidate["positions"][number] => Boolean(position)) ?? [];
-  const interviewCandidates = candidates.filter(
-    (candidate) =>
-      candidate.status === "SHORTLISTED" &&
-      candidate.shortlist.length > 0 &&
-      !candidate.interviews.some((interview) =>
-        ["PLANNED", "SCHEDULED"].includes(interview.status),
-      ),
-  );
+  const availableInterviewCandidates = interviewCandidates(candidates);
   return (
     <div className="space-y-4">
       {lifecycle !== "INTERVIEWS" ? (
@@ -566,7 +610,7 @@ function InterviewPanel({
             Publish the shortlist before scheduling interviews.
           </p>
         </Card>
-      ) : !interviewCandidates.length ? (
+      ) :       !availableInterviewCandidates.length ? (
         <Card>
           <p className="text-sm text-(--color-text-secondary)">
             No shortlisted candidates available for interview scheduling yet.
@@ -611,7 +655,7 @@ function InterviewPanel({
               className="w-full rounded border border-(--color-border) p-2"
             >
               <option value="">Select candidate</option>
-              {interviewCandidates
+              {availableInterviewCandidates
                 .map((candidate) => (
                   <option key={candidate.id} value={candidate.id}>
                     {candidate.candidateName} — {domainOf(candidate)}
@@ -813,7 +857,19 @@ function ResultsPanel({
     </div>
   );
 }
-function ApplicationDetail({ candidate, close }: { candidate: Candidate; close: () => void }) {
+function ApplicationDetail({
+  candidate,
+  close,
+  onShortlist,
+  onReject,
+  busy,
+}: {
+  candidate: Candidate;
+  close: () => void;
+  onShortlist: () => void;
+  onReject: () => void;
+  busy: boolean;
+}) {
   const questions = candidate.questions;
   const fields = questions.map((question) => ({
     ...question,
@@ -843,6 +899,32 @@ function ApplicationDetail({ candidate, close }: { candidate: Candidate; close: 
           <p className="text-sm text-(--color-text-secondary)">
             No questions were configured for this intake.
           </p>
+        )}
+      </section>
+      <section className="space-y-2 border-t border-(--color-border) pt-3">
+        <h3 className="font-medium">Shortlist decision</h3>
+        <Badge variant="neutral">
+          {shortlistDecision(candidate)}
+        </Badge>
+        {!candidate.shortlist.length && candidate.status !== "INELIGIBLE" && (
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={busy} onClick={onShortlist}>
+              Shortlist candidate
+            </Button>
+            <Button disabled={busy} onClick={onReject}>
+              Not shortlist
+            </Button>
+          </div>
+        )}
+        {candidate.shortlist.length > 0 && (
+          <Button disabled={busy} onClick={onReject}>
+            Mark not shortlisted
+          </Button>
+        )}
+        {candidate.status === "INELIGIBLE" && !candidate.shortlist.length && (
+          <Button disabled={busy} onClick={onShortlist}>
+            Shortlist candidate
+          </Button>
         )}
       </section>
     </Card>
