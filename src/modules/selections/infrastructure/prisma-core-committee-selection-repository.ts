@@ -8,6 +8,7 @@ import { PrismaAuditRecorder } from "@/lib/audit";
 import { AUDIT_ACTIONS } from "@/lib/audit-actions";
 import {
   CoreCommitteeSelectionError,
+  assertSelectionConfigurable,
   assertSelectionDraft,
   assertSelectionTransition,
   validateCoreCommitteeAnswers,
@@ -405,7 +406,7 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
   async update(id: string, config: CoreCommitteeSelectionConfig, actorUserId: string) {
     const row = await this.prisma.$transaction(async (tx) => {
       const current = await lockSelection(tx, id);
-      assertSelectionDraft(current.status);
+      assertSelectionConfigurable(current.status);
       const updated = await tx.coreCommitteeSelection.update({
         where: { id },
         data: config,
@@ -475,11 +476,19 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
   ) {
     return this.prisma.$transaction(async (tx) => {
       const selection = await lockSelection(tx, selectionId);
-      assertSelectionDraft(selection.status);
+      assertSelectionConfigurable(selection.status);
       const { questions, ...positionConfig } = config;
       const data = { ...positionConfig, identityKey: identityKey(config.title) };
       let savedPositionId = positionId;
       if (positionId) {
+        const applicationsForPosition = await tx.coreCommitteeSelectionCandidatePosition.count({
+          where: { selectionId, positionId },
+        });
+        if (applicationsForPosition > 0 && questions !== undefined)
+          throw new CoreCommitteeSelectionError(
+            "Questions for a domain with submitted applications cannot be changed",
+            "validation",
+          );
         const result = await tx.coreCommitteeSelectionPosition.updateMany({
           where: { id: positionId, selectionId },
           data,
@@ -494,17 +503,19 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
       }
       if (!savedPositionId)
         throw new CoreCommitteeSelectionError("Selection position could not be saved");
-      await tx.coreCommitteeSelectionQuestion.deleteMany({
-        where: { selectionId, positionId: savedPositionId },
-      });
-      if (questions?.length)
-        await tx.coreCommitteeSelectionQuestion.createMany({
-          data: questions.map((question) => ({
-            ...toQuestionCreate(question),
-            selectionId,
-            positionId: savedPositionId,
-          })),
+      if (questions !== undefined) {
+        await tx.coreCommitteeSelectionQuestion.deleteMany({
+          where: { selectionId, positionId: savedPositionId },
         });
+        if (questions.length)
+          await tx.coreCommitteeSelectionQuestion.createMany({
+            data: questions.map((question) => ({
+              ...toQuestionCreate(question),
+              selectionId,
+              positionId: savedPositionId,
+            })),
+          });
+      }
       await new PrismaAuditRecorder(tx).record({
         actorUserId,
         action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_POSITION_SAVED,
@@ -519,6 +530,43 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
         throw new CoreCommitteeSelectionError("Core Committee selection not found", "notFound");
       return toRecord(updated);
     });
+  }
+  async deletePosition(input: { selectionId: string; positionId: string; actorUserId: string }) {
+    const row = await this.prisma.$transaction(async (tx) => {
+      const selection = await lockSelection(tx, input.selectionId);
+      assertSelectionConfigurable(selection.status);
+      const position = await tx.coreCommitteeSelectionPosition.findFirst({
+        where: { id: input.positionId, selectionId: selection.id },
+        select: { id: true },
+      });
+      if (!position) throw new CoreCommitteeSelectionError("Selection position not found", "notFound");
+      const applications = await tx.coreCommitteeSelectionCandidatePosition.count({
+        where: { selectionId: selection.id, positionId: position.id },
+      });
+      if (applications > 0)
+        throw new CoreCommitteeSelectionError(
+          "This domain already has submitted applications and cannot be permanently deleted.",
+          "validation",
+        );
+      await tx.coreCommitteeSelectionQuestion.deleteMany({
+        where: { selectionId: selection.id, positionId: position.id },
+      });
+      await tx.coreCommitteeSelectionPosition.delete({ where: { id: position.id } });
+      await new PrismaAuditRecorder(tx).record({
+        actorUserId: input.actorUserId,
+        action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_POSITION_SAVED,
+        targetEntityType: "CoreCommitteeSelection",
+        targetEntityId: selection.id,
+        metadata: { positionId: position.id, operation: "deleted" },
+      });
+      const updated = await tx.coreCommitteeSelection.findUnique({
+        where: { id: selection.id },
+        include: selectionInclude,
+      });
+      if (!updated) throw new CoreCommitteeSelectionError("Core Committee selection not found", "notFound");
+      return updated;
+    });
+    return toRecord(row);
   }
   async linkForm(selectionId: string, formId: string, actorUserId: string) {
     return this.prisma.$transaction(async (tx) => {
@@ -1573,15 +1621,23 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
             "validation",
           );
 
-        const [applications, shortlisted, interviews] = await Promise.all([
+        const [applications, formApplications, formSubmissions, shortlisted, interviews] = await Promise.all([
           tx.coreCommitteeSelectionCandidate.count({ where: { selectionId: selection.id } }),
+          selection.applicationForm
+            ? tx.formApplication.count({ where: { submission: { formId: selection.applicationForm.formId } } })
+            : 0,
+          selection.applicationForm
+            ? tx.formSubmission.count({ where: { formId: selection.applicationForm.formId } })
+            : 0,
           tx.coreCommitteeSelectionShortlistEntry.count({ where: { selectionId: selection.id } }),
           tx.coreCommitteeSelectionInterview.count({ where: { selectionId: selection.id } }),
         ]);
-        if (
-          (selection.status !== "DRAFT" || applications > 0) &&
-          input.confirmation !== "DELETE CORE SELECTION"
-        )
+        if (applications > 0 || formApplications > 0 || formSubmissions > 0)
+          throw new CoreCommitteeSelectionError(
+            "This Core Committee form has submitted applications and cannot be permanently deleted. Applicant history has been preserved.",
+            "validation",
+          );
+        if (selection.status !== "DRAFT" && input.confirmation !== "DELETE CORE SELECTION")
           throw new CoreCommitteeSelectionError(
             "Type DELETE CORE SELECTION to permanently delete this Core Committee application",
             "validation",

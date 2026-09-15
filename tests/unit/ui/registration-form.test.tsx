@@ -27,6 +27,18 @@ describe("RegistrationForm — public student registration (V4.0 B1)", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/registration/batches");
   });
 
+  it("shows a safe error and prevents submission when registration cannot load batches", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: { code: "INTERNAL_SERVER_ERROR", message: "Registration is temporarily unavailable. Please try again shortly." } }),
+    });
+    render(<RegistrationForm />);
+
+    expect(await screen.findByText("Registration is temporarily unavailable. Please try again shortly.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /submit application/i })).toBeDisabled();
+  });
+
   it("shows validation errors for empty required fields and does not submit", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(BATCHES));
     const user = userEvent.setup();

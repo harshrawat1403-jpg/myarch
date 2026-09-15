@@ -113,6 +113,11 @@ export interface CoreCommitteeSelectionRepository {
     config: CoreCommitteeSelectionPositionConfig,
     actorUserId: string,
   ): Promise<CoreCommitteeSelectionRecord>;
+  deletePosition(input: {
+    selectionId: string;
+    positionId: string;
+    actorUserId: string;
+  }): Promise<CoreCommitteeSelectionRecord>;
   linkForm(
     selectionId: string,
     formId: string,

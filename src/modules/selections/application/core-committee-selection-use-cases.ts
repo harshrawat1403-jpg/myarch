@@ -66,6 +66,10 @@ export class CoreCommitteeSelectionUseCases {
     requireSelectionSecretary(actor);
     return this.repository.linkForm(selectionId, formId, actor.userId);
   }
+  async deletePosition(actor: AuthenticatedActor, selectionId: string, positionId: string) {
+    requireSelectionSecretary(actor);
+    return this.repository.deletePosition({ selectionId, positionId, actorUserId: actor.userId });
+  }
   async transition(actor: AuthenticatedActor, selectionId: string, input: unknown) {
     requireSelectionSecretary(actor);
     const status = z

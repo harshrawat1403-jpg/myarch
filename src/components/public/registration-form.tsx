@@ -33,6 +33,7 @@ interface FormErrors {
 export function RegistrationForm() {
   const [batches, setBatches] = useState<BatchOption[]>([]);
   const [isLoadingBatches, setIsLoadingBatches] = useState(true);
+  const [batchLoadError, setBatchLoadError] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -52,11 +53,15 @@ export function RegistrationForm() {
     (async () => {
       try {
         const res = await fetch("/api/registration/batches");
-        const body = await res.json();
-        if (!cancelled && res.ok) setBatches(body.data ?? []);
+        const body = await res.json().catch(() => null);
+        if (!cancelled && res.ok) setBatches(body?.data ?? []);
+        else if (!cancelled)
+          setBatchLoadError(
+            body?.error?.message ?? "Registration is temporarily unavailable. Please try again shortly.",
+          );
       } catch {
-        // Leaving the list empty just shows "no batches available" below —
-        // the form itself doesn't need a retry mechanism for this.
+        if (!cancelled)
+          setBatchLoadError("Registration is temporarily unavailable. Please try again shortly.");
       } finally {
         if (!cancelled) setIsLoadingBatches(false);
       }
@@ -157,9 +162,11 @@ export function RegistrationForm() {
             ))}
           </Select>
           <FieldError>{errors.batchId}</FieldError>
-          {!isLoadingBatches && batches.length === 0 && (
+          {batchLoadError ? (
+            <p className="mt-1 text-xs text-(--color-danger)">{batchLoadError}</p>
+          ) : !isLoadingBatches && batches.length === 0 ? (
             <p className="mt-1 text-xs text-(--color-text-secondary)">No batches are currently open for registration.</p>
-          )}
+          ) : null}
         </div>
 
         <div>
@@ -185,7 +192,12 @@ export function RegistrationForm() {
 
         {serverError && <p className="text-sm text-(--color-danger)">{serverError}</p>}
 
-        <Button type="submit" variant="primary" className="w-full py-3 text-base" disabled={isSubmitting}>
+        <Button
+          type="submit"
+          variant="primary"
+          className="w-full py-3 text-base"
+          disabled={isSubmitting || isLoadingBatches || Boolean(batchLoadError)}
+        >
           {isSubmitting ? "Submitting…" : "Submit Application"}
         </Button>
       </form>

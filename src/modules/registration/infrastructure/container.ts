@@ -40,6 +40,9 @@ export const submitRegistrationRequestUseCase = new SubmitRegistrationRequestUse
   existingAccountLookup,
   reviewerLookup,
   notificationService,
+  prepareEmailVerification: () => {
+    getIssueEmailVerificationTokenUseCase();
+  },
   issueEmailVerificationToken: (input) => getIssueEmailVerificationTokenUseCase().execute(input),
 });
 

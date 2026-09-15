@@ -183,6 +183,74 @@ function PositionQuestions({
     </div>
   );
 }
+function DomainEditor({
+  position,
+  busy,
+  save,
+  remove,
+}: {
+  position: CoreCommitteeSelectionRecord["positions"][number];
+  busy: boolean;
+  save: (value: unknown) => Promise<void>;
+  remove: () => Promise<void>;
+}) {
+  return (
+    <form
+      className="mt-3 grid gap-3 border-t border-(--color-border) pt-3 sm:grid-cols-[1fr_8rem]"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget);
+        void save({
+          title: data.get("title"),
+          description: data.get("description"),
+          seats: Number(data.get("seats")),
+          displayOrder: position.displayOrder,
+        });
+      }}
+    >
+      <div>
+        <Label htmlFor={`position-${position.id}-title`}>Domain name</Label>
+        <Input id={`position-${position.id}-title`} name="title" required defaultValue={position.title} />
+      </div>
+      <div>
+        <Label htmlFor={`position-${position.id}-seats`}>Positions</Label>
+        <Input
+          id={`position-${position.id}-seats`}
+          name="seats"
+          required
+          type="number"
+          min={1}
+          defaultValue={position.seats}
+        />
+      </div>
+      <div className="sm:col-span-2">
+        <Label htmlFor={`position-${position.id}-description`}>Domain brief and instructions</Label>
+        <textarea
+          id={`position-${position.id}-description`}
+          name="description"
+          required
+          defaultValue={position.description}
+          className="min-h-28 w-full rounded border border-(--color-border) bg-(--color-background) p-3"
+        />
+      </div>
+      <div className="flex flex-wrap gap-2 sm:col-span-2">
+        <Button disabled={busy} type="submit">
+          Save domain
+        </Button>
+        <Button
+          disabled={busy}
+          type="button"
+          variant="destructive"
+          onClick={() => {
+            if (window.confirm(`Remove ${position.title}? Domains with applications will be kept.`)) void remove();
+          }}
+        >
+          Remove domain
+        </Button>
+      </div>
+    </form>
+  );
+}
 function Config({
   selection,
   busy,
@@ -252,9 +320,9 @@ function Config({
           defaultValue={local(selection?.applicationCloseAt)}
         />
       </div>
-      {(!selection || selection.status === "DRAFT") && (
+      {(!selection || selection.status === "DRAFT" || selection.status === "APPLICATION_OPEN") && (
         <Button className="self-end" disabled={busy} type="submit">
-          {selection ? "Save configuration" : "Create Core Committee selection"}
+          {selection ? "Save form" : "Create Core Committee selection"}
         </Button>
       )}
     </form>
@@ -376,7 +444,7 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                             { status: "APPLICATION_OPEN" },
                             accessToken!,
                           ),
-                        "Applications opened and configuration locked",
+                        "Applications opened",
                       )
                     }
                   >
@@ -433,6 +501,7 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                   Results
                 </Link>
               </div>
+              <h2 className="text-lg font-semibold">Edit form</h2>
               <Config
                 selection={selection}
                 busy={busy}
@@ -484,6 +553,33 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                   <p className="mt-2 whitespace-pre-wrap text-sm text-(--color-text-secondary)">
                     {position.description}
                   </p>
+                  {(selection.status === "DRAFT" || selection.status === "APPLICATION_OPEN") && (
+                    <DomainEditor
+                      position={position}
+                      busy={busy}
+                      save={(data) =>
+                        act(
+                          () =>
+                            apiClient.put(
+                              `/api/core-committee-selections/${id}/positions/${position.id}`,
+                              data,
+                              accessToken!,
+                            ),
+                          "Domain updated",
+                        )
+                      }
+                      remove={() =>
+                        act(
+                          () =>
+                            apiClient.delete(
+                              `/api/core-committee-selections/${id}/positions/${position.id}`,
+                              accessToken!,
+                            ),
+                          "Domain removed",
+                        )
+                      }
+                    />
+                  )}
                   {selection.status === "DRAFT" && accessToken && (
                     <PositionQuestions
                       position={position}
@@ -495,7 +591,7 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                   )}
                 </div>
               ))}
-              {selection.status === "DRAFT" && (
+              {(selection.status === "DRAFT" || selection.status === "APPLICATION_OPEN") && (
                 <form
                   className="space-y-3 rounded border border-(--color-border) p-4"
                   onSubmit={(event) => {

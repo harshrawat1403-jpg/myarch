@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertSelectionConfigurable,
   assertSelectionTransition,
   coreCommitteeSelectionConfigSchema,
   coreCommitteeSelectionPositionSchema,
@@ -26,6 +27,13 @@ describe("Core Committee selection lifecycle", () => {
     });
     expect(result.success).toBe(true);
     expect(result.success && Object.keys(result.data)).not.toContain("studentQuorumPercent");
+  });
+  it("keeps Secretary configuration available while the application form is published", () => {
+    expect(() => assertSelectionConfigurable("DRAFT")).not.toThrow();
+    expect(() => assertSelectionConfigurable("APPLICATION_OPEN")).not.toThrow();
+    expect(() => assertSelectionConfigurable("APPLICATION_CLOSED")).toThrow(
+      "Core Committee configuration can be edited only while applications are open",
+    );
   });
   it("accepts lightweight position questions and rejects duplicate keys within a position", () => {
     const question = {

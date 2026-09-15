@@ -27,6 +27,7 @@ function setup(currentCouncil: string | null = "council") {
     create: vi.fn(),
     update: vi.fn(),
     savePosition: vi.fn(),
+    deletePosition: vi.fn(),
     extendDeadline: vi.fn(),
     linkForm: vi.fn(),
     transition: vi.fn(),
@@ -127,6 +128,19 @@ describe("Core Committee selection authority", () => {
     await expect(
       useCases.delete(councilMember, "selection", { confirmation: "DELETE CORE SELECTION" }),
     ).rejects.toBeInstanceOf(NotAuthorizedError);
+  });
+  it("reserves domain deletion for the Secretary", async () => {
+    const { useCases, repository } = setup();
+    const positionId = "00000000-0000-4000-8000-000000000003";
+    await useCases.deletePosition(secretary, "selection", positionId);
+    expect(repository.deletePosition).toHaveBeenCalledWith({
+      selectionId: "selection",
+      positionId,
+      actorUserId: "secretary",
+    });
+    await expect(useCases.deletePosition(councilMember, "selection", positionId)).rejects.toBeInstanceOf(
+      NotAuthorizedError,
+    );
   });
   it("uses the internal projection only for the Secretary and the safe projection for current Council", async () => {
     const { useCases, repository } = setup();

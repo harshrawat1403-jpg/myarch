@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { badRequest, conflict, notFound, tooManyRequests } from "@/lib/http-errors";
+import { badRequest, conflict, internalServerError, notFound, tooManyRequests } from "@/lib/http-errors";
 import { publicRegistrationRateLimiter } from "@/lib/rate-limiters";
 import { clientIp } from "@/lib/client-ip";
 import { submitRegistrationRequestUseCase } from "../../infrastructure/container";
@@ -36,6 +36,7 @@ export async function submitRegistrationRequestRouteHandler(req: NextRequest): P
     if (err instanceof RegistrationBatchNotOpenError) return badRequest(err.message);
     if (err instanceof DuplicateRegistrationEmailError) return conflict(err.message);
     if (err instanceof DuplicateRegistrationRollNumberError) return conflict(err.message);
-    throw err;
+    console.error("[registration] submission failed", err);
+    return internalServerError("We could not submit your registration right now. Please try again shortly.");
   }
 }

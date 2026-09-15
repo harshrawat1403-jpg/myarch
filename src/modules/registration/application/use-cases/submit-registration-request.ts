@@ -26,6 +26,8 @@ export interface SubmitRegistrationRequestUseCaseDeps {
   existingAccountLookup: ExistingAccountLookup;
   reviewerLookup: RegistrationReviewerLookup;
   notificationService: NotificationService;
+  /** Validates the verification flow before persisting a registration request. */
+  prepareEmailVerification: () => void;
   /** MYARCH Phase 1 (§2.4) — injected rather than importing auth's use case directly, matching this module's existing dependency-injection convention for every other cross-module primitive (runApproveTransaction, sendRejectionEmail, ...). */
   issueEmailVerificationToken: (input: IssueEmailVerificationTokenInput) => Promise<EmailVerificationDeliveryResult>;
 }
@@ -43,6 +45,9 @@ export class SubmitRegistrationRequestUseCase {
   constructor(private readonly deps: SubmitRegistrationRequestUseCaseDeps) {}
 
   async execute(input: SubmitRegistrationRequestInput): Promise<RegistrationRequestRecord> {
+    // Avoid leaving a request that the applicant cannot verify when the
+    // deployment's auth/email configuration is invalid.
+    this.deps.prepareEmailVerification();
     const batch = await this.deps.batchLookup.findById(input.batchId);
     if (!batch) throw new RegistrationBatchNotFoundError();
     if (batch.status !== "ACTIVE") throw new RegistrationBatchNotOpenError();

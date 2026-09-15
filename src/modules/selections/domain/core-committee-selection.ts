@@ -176,6 +176,18 @@ export function assertSelectionDraft(status: CoreCommitteeSelectionStatus): void
       "Selection configuration is locked after applications open",
     );
 }
+/**
+ * A published Core Committee application is represented by APPLICATION_OPEN.
+ * Its operational configuration can still be corrected by the Secretary, but
+ * closed and historical selections must remain stable.
+ */
+export function assertSelectionConfigurable(status: CoreCommitteeSelectionStatus): void {
+  if (status !== "DRAFT" && status !== "APPLICATION_OPEN")
+    throw new CoreCommitteeSelectionError(
+      "Core Committee configuration can be edited only while applications are open",
+      "validation",
+    );
+}
 const transitions: Record<CoreCommitteeSelectionStatus, readonly CoreCommitteeSelectionStatus[]> = {
   DRAFT: ["APPLICATION_OPEN"],
   APPLICATION_OPEN: ["APPLICATION_CLOSED"],

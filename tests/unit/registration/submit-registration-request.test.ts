@@ -21,6 +21,7 @@ function buildContext() {
   const existingAccountLookup = new FakeExistingAccountLookup();
   const reviewerLookup = new FakeRegistrationReviewerLookup();
   const notificationService = new FakeNotificationService();
+  const prepareEmailVerification = vi.fn();
   const issueEmailVerificationToken = vi.fn().mockResolvedValue(undefined);
   batchLookup.seed(ACTIVE_BATCH, "ACTIVE", "B.Arch 2027");
   batchLookup.seed(GRADUATED_BATCH, "GRADUATED");
@@ -32,6 +33,7 @@ function buildContext() {
     existingAccountLookup,
     reviewerLookup,
     notificationService,
+    prepareEmailVerification,
     issueEmailVerificationToken,
   });
 
@@ -42,6 +44,7 @@ function buildContext() {
     existingAccountLookup,
     reviewerLookup,
     notificationService,
+    prepareEmailVerification,
     issueEmailVerificationToken,
   };
 }
@@ -64,6 +67,19 @@ describe("SubmitRegistrationRequestUseCase", () => {
     const request = await ctx.useCase.execute(VALID_INPUT);
     expect(request.status).toBe("SUBMITTED");
     expect(request.email).toBe("prospective@example.com");
+    expect(ctx.prepareEmailVerification).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks verification configuration before persisting a request", async () => {
+    ctx.prepareEmailVerification.mockImplementation(() => {
+      throw new Error("missing production verification configuration");
+    });
+
+    await expect(ctx.useCase.execute(VALID_INPUT)).rejects.toThrow("missing production verification configuration");
+    await expect(
+      ctx.registrationRequestRepository.hasPendingByEmail("prospective@example.com"),
+    ).resolves.toBe(false);
+    expect(ctx.issueEmailVerificationToken).not.toHaveBeenCalled();
   });
 
   it("normalizes email to lowercase and trims fields", async () => {

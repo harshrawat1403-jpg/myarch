@@ -38,6 +38,11 @@ export function conflict(message: string): NextResponse {
   return NextResponse.json({ error: { code: "CONFLICT", message } }, { status: 409 });
 }
 
+/** A safe client-facing failure message for unexpected server-side faults. */
+export function internalServerError(message = "Something went wrong. Please try again later."): NextResponse {
+  return NextResponse.json({ error: { code: "INTERNAL_SERVER_ERROR", message } }, { status: 500 });
+}
+
 export function tooManyRequests(message: string, retryAfterMs?: number): NextResponse {
   const headers = retryAfterMs
     ? { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) }

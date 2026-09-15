@@ -103,6 +103,11 @@ const decisionId = async (context: unknown) =>
     .string()
     .uuid()
     .parse(await extractRouteParam(context, "decisionId"));
+const positionId = async (context: unknown) =>
+  z
+    .string()
+    .uuid()
+    .parse(await extractRouteParam(context, "positionId"));
 export const listCoreCommitteeSelectionsRouteHandler = route(
   (_req, actor) => coreCommitteeSelectionUseCases.list(actor),
   false,
@@ -172,6 +177,11 @@ export const saveCoreCommitteeSelectionPositionRouteHandler = route(
   true,
   true,
   201,
+);
+export const deleteCoreCommitteeSelectionPositionRouteHandler = route(
+  async (_req, actor, id, context) =>
+    coreCommitteeSelectionUseCases.deletePosition(actor, id, await positionId(context)),
+  true,
 );
 export const linkCoreCommitteeSelectionFormRouteHandler = route(
   async (req, actor, id) =>

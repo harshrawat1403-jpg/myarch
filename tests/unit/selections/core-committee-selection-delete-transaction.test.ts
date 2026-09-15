@@ -81,7 +81,7 @@ describe("Core Committee permanent deletion transaction", () => {
     expect(deleteMany).toHaveBeenCalled();
   });
 
-  it("keeps a populated deletion and its audit record on the transaction client", async () => {
+  it("refuses to delete a populated selection before any applicant records are touched", async () => {
     const deleteMany = vi.fn().mockResolvedValue({ count: 1 });
     const deleteAppointment = vi.fn().mockResolvedValue({ count: 1 });
     const deleteDecision = vi.fn().mockResolvedValue({ count: 1 });
@@ -104,6 +104,8 @@ describe("Core Committee permanent deletion transaction", () => {
         findMany: vi.fn().mockResolvedValue([{ id: "candidate", applicationId: "application" }]),
         deleteMany,
       },
+      formApplication: { count: vi.fn().mockResolvedValue(1) },
+      formSubmission: { count: vi.fn().mockResolvedValue(1) },
       coreCommitteeSelectionShortlistEntry: { count: vi.fn().mockResolvedValue(1), deleteMany },
       coreCommitteeSelectionInterview: {
         count: vi.fn().mockResolvedValue(1),
@@ -136,40 +138,17 @@ describe("Core Committee permanent deletion transaction", () => {
         actorUserId: "secretary",
         confirmation: "DELETE CORE SELECTION",
       }),
-    ).resolves.toEqual({ applications: 1, shortlisted: 1, interviews: 1 });
+    ).rejects.toMatchObject({
+      message: "This Core Committee form has submitted applications and cannot be permanently deleted. Applicant history has been preserved.",
+    });
 
-    expect(tx.coreCommitteeSelectionInterviewHistory.deleteMany).toHaveBeenCalledWith({
-      where: { interviewId: { in: ["interview"] } },
-    });
-    expect(tx.coreCommitteeSelectionCandidatePosition.deleteMany).toHaveBeenCalledWith({
-      where: { candidateId: { in: ["candidate"] } },
-    });
-    expect(tx.coreCommitteeSelectionAppointment.deleteMany).toHaveBeenCalledWith({
-      where: { selectionId: "selection" },
-    });
-    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
-      deleteDecision.mock.invocationCallOrder[0]!,
-    );
-    expect(deleteAppointment.mock.invocationCallOrder[0]).toBeLessThan(
-      deleteDecision.mock.invocationCallOrder[0]!,
-    );
-    expect(tx.form.delete).toHaveBeenCalledWith({ where: { id: "managed-form" } });
-    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
-    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
-      deletePublication.mock.invocationCallOrder[0]!,
-    );
-    expect(tx.auditLog.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          targetEntityId: "selection",
-          metadata: {
-            title: "Populated Core",
-            lifecycleState: "APPLICATION_OPEN",
-            applications: 1,
-            interviews: 1,
-          },
-        }),
-      }),
-    );
+    expect(tx.coreCommitteeSelection.delete).not.toHaveBeenCalled();
+    expect(deleteMany).not.toHaveBeenCalled();
+    expect(deleteAppointment).not.toHaveBeenCalled();
+    expect(deleteDecision).not.toHaveBeenCalled();
+    expect(deletePublication).not.toHaveBeenCalled();
+    expect(tx.form.delete).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
 });
