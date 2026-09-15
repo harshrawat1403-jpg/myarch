@@ -26,8 +26,16 @@ export class CoreCommitteeSelectionUseCases {
     return this.repository.list(actor.role === "SECRETARY");
   }
   async get(actor: AuthenticatedActor, id: string) {
+    if (actor.role !== "SECRETARY" && actor.role !== "STUDENT")
+      throw new NotAuthorizedError(
+        "Core Committee selection access is limited to students and the Secretary",
+      );
     const selection = await this.repository.get(id);
-    if (!selection || (actor.role !== "SECRETARY" && selection.status === "DRAFT"))
+    if (
+      !selection ||
+      (actor.role !== "SECRETARY" &&
+        (selection.status === "DRAFT" || selection.status === "ARCHIVED"))
+    )
       throw new CoreCommitteeSelectionError("Core Committee selection not found", "notFound");
     return selection;
   }
@@ -402,6 +410,10 @@ export class CoreCommitteeSelectionUseCases {
   async archive(actor: AuthenticatedActor, selectionId: string) {
     requireSelectionSecretary(actor);
     return this.repository.archive({ selectionId, actorUserId: actor.userId });
+  }
+  async restore(actor: AuthenticatedActor, selectionId: string) {
+    requireSelectionSecretary(actor);
+    return this.repository.restore({ selectionId, actorUserId: actor.userId });
   }
   async delete(actor: AuthenticatedActor, selectionId: string, input: unknown) {
     requireSelectionSecretary(actor);

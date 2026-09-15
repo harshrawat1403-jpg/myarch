@@ -375,6 +375,8 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
   };
   if (role !== "SECRETARY")
     return <p>Only the Secretary may administer Core Committee selections.</p>;
+  const activeItems = items.filter((item) => item.status !== "ARCHIVED");
+  const archivedItems = items.filter((item) => item.status === "ARCHIVED");
   return (
     <div className="max-w-5xl space-y-6">
       <div>
@@ -407,9 +409,9 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
             />
           </Card>
           <section className="space-y-3">
-            <h2 className="text-lg font-semibold">All Core Committee selections</h2>
-            {!items.length && <p>No Core Committee selections yet.</p>}
-            {items.map((item) => (
+            <h2 className="text-lg font-semibold">Active forms</h2>
+            {!activeItems.length && <p>No active Core Committee forms.</p>}
+            {activeItems.map((item) => (
               <Link
                 className="block"
                 key={item.id}
@@ -424,6 +426,24 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
               </Link>
             ))}
           </section>
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold">Archived forms</h2>
+            {!archivedItems.length && <p>No archived Core Committee forms.</p>}
+            {archivedItems.map((item) => (
+              <Link
+                className="block"
+                key={item.id}
+                href={`/dashboard/core-committee-selections/${item.id}`}
+              >
+                <Card className="flex justify-between">
+                  <div>
+                    {item.title}
+                    <p className="text-sm">{item.academicYear} · Archived</p>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </section>
         </>
       ) : (
         selection && (
@@ -431,6 +451,46 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
             <Link href="/dashboard/core-committee-selections" className="text-sm underline">
               All Core Committee selections
             </Link>
+            {selection.status === "ARCHIVED" && (
+              <Card className="space-y-3 border-(--color-border)">
+                <div>
+                  <h2 className="text-lg font-semibold">Archived form</h2>
+                  <p className="text-sm text-(--color-text-secondary)">
+                    Students cannot view or apply to this form. Existing applicant and selection history remains available to the Secretary.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    className="rounded border border-(--color-border) px-3 py-2 text-sm"
+                    href={`/dashboard/core-committee-selections/${id}/applications`}
+                  >
+                    View applications
+                  </Link>
+                  <Link
+                    className="rounded border border-(--color-border) px-3 py-2 text-sm"
+                    href={`/dashboard/core-committee-selections/${id}#form-details`}
+                  >
+                    View form
+                  </Link>
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      void act(
+                        () =>
+                          apiClient.post(
+                            `/api/core-committee-selections/${id}/restore`,
+                            {},
+                            accessToken!,
+                          ),
+                        "Form restored. Application availability follows its saved status and dates.",
+                      )
+                    }
+                  >
+                    Restore / unarchive
+                  </Button>
+                </div>
+              </Card>
+            )}
             <Card className="space-y-4">
               <div className="flex flex-wrap justify-between gap-3">
                 {selection.status === "DRAFT" ? (
@@ -501,7 +561,9 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
                   Results
                 </Link>
               </div>
-              <h2 className="text-lg font-semibold">Edit form</h2>
+              <h2 id="form-details" className="text-lg font-semibold">
+                {selection.status === "ARCHIVED" ? "Form details" : "Edit form"}
+              </h2>
               <Config
                 selection={selection}
                 busy={busy}
@@ -671,6 +733,37 @@ export function CoreCommitteeSelectionAdmin({ id }: { id?: string }) {
               >
                 Delete application form
               </Button>
+              {selection.status !== "ARCHIVED" && (
+                <>
+                  <Button
+                    disabled={busy}
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          "Archive this form? Students will no longer be able to view or apply, but all applicant history will be preserved.",
+                        )
+                      )
+                        return;
+                      void act(
+                        () =>
+                          apiClient.post(
+                            `/api/core-committee-selections/${id}/archive`,
+                            {},
+                            accessToken!,
+                          ),
+                        "Form archived. Students can no longer view or apply to it.",
+                      );
+                    }}
+                  >
+                    Archive application form
+                  </Button>
+                  <p className="text-sm text-(--color-text-secondary)">
+                    Archive preserves submitted applications and selection history. Empty forms can be permanently deleted instead.
+                  </p>
+                </>
+              )}
               {["MEMBERSHIP_CONFIRMED", "ARCHIVED"].includes(selection.status) && (
                 <p className="text-sm text-(--color-text-secondary)">
                   Membership-confirmed selections remain preserved as governance history.

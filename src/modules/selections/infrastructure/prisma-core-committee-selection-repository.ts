@@ -264,7 +264,9 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
   constructor(private readonly prisma: PrismaClient) {}
   async list(includeDrafts: boolean) {
     const rows = await this.prisma.coreCommitteeSelection.findMany({
-      where: includeDrafts ? undefined : { status: { not: "DRAFT" } },
+      // This legacy authenticated list remains student-accessible, so it
+      // must enforce the same archived boundary as the dedicated student API.
+      where: includeDrafts ? undefined : { status: { notIn: ["DRAFT", "ARCHIVED"] } },
       include: selectionInclude,
       orderBy: { createdAt: "desc" },
     });
@@ -279,7 +281,9 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
   }
   async listForStudent(studentUserId: string): Promise<StudentCoreCommitteeSelectionSummary[]> {
     const rows = await this.prisma.coreCommitteeSelection.findMany({
-      where: { status: { not: "DRAFT" } },
+      // Archived selections are preserved for the Secretary, but must not
+      // appear in the student catalogue.
+      where: { status: { notIn: ["DRAFT", "ARCHIVED"] } },
       include: {
         publication: { select: { publishedAt: true } },
         candidates: {
@@ -305,7 +309,8 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     studentUserId: string,
   ): Promise<StudentCoreCommitteeSelectionDetail | null> {
     const row = await this.prisma.coreCommitteeSelection.findFirst({
-      where: { id, status: { not: "DRAFT" } },
+      // Apply the catalogue boundary again for direct student routes.
+      where: { id, status: { notIn: ["DRAFT", "ARCHIVED"] } },
       include: {
         positions: {
           orderBy: { displayOrder: "asc" },
@@ -367,8 +372,16 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
     };
   }
   async getStudentApplicationFormId(selectionId: string): Promise<string | null> {
+    const now = new Date();
     const selection = await this.prisma.coreCommitteeSelection.findFirst({
-      where: { id: selectionId, status: { not: "DRAFT" } },
+      // Server-side submission preflight. Candidate association repeats this
+      // state/window check under a row lock before the transaction commits.
+      where: {
+        id: selectionId,
+        status: "APPLICATION_OPEN",
+        applicationOpenAt: { lte: now },
+        applicationCloseAt: { gt: now },
+      },
       select: { applicationForm: { select: { formId: true } } },
     });
     return selection?.applicationForm?.formId ?? null;
@@ -1589,22 +1602,96 @@ export class PrismaCoreCommitteeSelectionRepository implements CoreCommitteeSele
   async archive(input: { selectionId: string; actorUserId: string }) {
     return this.serializable(async (tx) => {
       const selection = await lockSelection(tx, input.selectionId);
-      if (selection.status !== "MEMBERSHIP_CONFIRMED")
+      if (selection.status === "ARCHIVED")
         throw new CoreCommitteeSelectionError(
-          "Core Committee selection may be archived only after membership confirmation",
+          "Core Committee selection is already archived",
           "validation",
         );
+      const [candidates, formApplications, formSubmissions] = await Promise.all([
+        tx.coreCommitteeSelectionCandidate.count({ where: { selectionId: selection.id } }),
+        selection.applicationForm
+          ? tx.formApplication.count({ where: { submission: { formId: selection.applicationForm.formId } } })
+          : 0,
+        selection.applicationForm
+          ? tx.formSubmission.count({ where: { formId: selection.applicationForm.formId } })
+          : 0,
+      ]);
+      if (!candidates && !formApplications && !formSubmissions)
+        throw new CoreCommitteeSelectionError(
+          "This Core Committee form has no submitted applications and can be permanently deleted instead.",
+          "validation",
+        );
+      // Managed Core forms are archived too, so a stale generic form request
+      // fails before it can create a submission. Legacy linked forms remain
+      // untouched because they are not selection-owned.
+      if (selection.applicationForm?.managedForm)
+        await tx.form.update({
+          where: { id: selection.applicationForm.formId },
+          data: { status: "ARCHIVED" },
+        });
       await tx.coreCommitteeSelection.update({
         where: { id: selection.id },
-        data: { status: "ARCHIVED" },
+        data: { status: "ARCHIVED", statusBeforeArchive: selection.status },
       });
       await new PrismaAuditRecorder(tx).record({
         actorUserId: input.actorUserId,
         action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_ARCHIVED,
         targetEntityType: "CoreCommitteeSelection",
         targetEntityId: selection.id,
+        metadata: {
+          priorStatus: selection.status,
+          candidates,
+          formApplications,
+          formSubmissions,
+        },
       });
       return { archived: true };
+    });
+  }
+  async restore(input: { selectionId: string; actorUserId: string }) {
+    return this.serializable(async (tx) => {
+      const selection = await lockSelection(tx, input.selectionId);
+      if (selection.status !== "ARCHIVED")
+        throw new CoreCommitteeSelectionError(
+          "Only archived Core Committee selections can be restored",
+          "validation",
+        );
+
+      const now = new Date();
+      let status = selection.statusBeforeArchive ?? "MEMBERSHIP_CONFIRMED";
+      if (status === "APPLICATION_OPEN") {
+        if (now < selection.applicationOpenAt) status = "DRAFT";
+        else if (now >= selection.applicationCloseAt) status = "APPLICATION_CLOSED";
+      }
+
+      if (selection.applicationForm?.managedForm) {
+        const formStatus =
+          status === "APPLICATION_OPEN"
+            ? "PUBLISHED"
+            : status === "DRAFT"
+              ? "DRAFT"
+              : "CLOSED";
+        await tx.form.update({
+          where: { id: selection.applicationForm.formId },
+          data: {
+            status: formStatus,
+            deadline: selection.applicationCloseAt,
+            ...(formStatus === "PUBLISHED" ? { publishedAt: now } : {}),
+          },
+        });
+      }
+      await tx.coreCommitteeSelection.update({
+        where: { id: selection.id },
+        data: { status, statusBeforeArchive: null },
+      });
+      await new PrismaAuditRecorder(tx).record({
+        actorUserId: input.actorUserId,
+        action: AUDIT_ACTIONS.CORE_COMMITTEE_SELECTION_RESTORED,
+        targetEntityType: "CoreCommitteeSelection",
+        targetEntityId: selection.id,
+        metadata: { restoredStatus: status },
+      });
+      return { restored: true, status };
     });
   }
   async delete(input: {

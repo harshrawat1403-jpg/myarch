@@ -2387,6 +2387,9 @@ model CoreCommitteeSelection {
   brief                       String                                    @default("")
   academicYear                String
   status                      CoreCommitteeSelectionStatus              @default(DRAFT)
+  // The lifecycle state to resume on restore. Nullable preserves every
+  // existing production record without a data rewrite.
+  statusBeforeArchive         CoreCommitteeSelectionStatus?
   applicationOpenAt           DateTime
   applicationCloseAt          DateTime
   shortlistPublishedAt       DateTime?

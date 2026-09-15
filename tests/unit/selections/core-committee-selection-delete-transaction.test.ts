@@ -2,6 +2,67 @@ import { describe, expect, it, vi } from "vitest";
 import { PrismaCoreCommitteeSelectionRepository } from "../../../src/modules/selections/infrastructure/prisma-core-committee-selection-repository";
 
 describe("Core Committee permanent deletion transaction", () => {
+  it("archives submitted history and restores it without reopening an expired application window", async () => {
+    const selection: {
+      id: string;
+      status: string;
+      statusBeforeArchive: string | null;
+      applicationOpenAt: Date;
+      applicationCloseAt: Date;
+      positions: never[];
+      applicationForm: { managedForm: boolean; formId: string; form: { status: string } };
+    } = {
+      id: "selection",
+      status: "APPLICATION_OPEN",
+      statusBeforeArchive: null,
+      applicationOpenAt: new Date("2020-01-01T00:00:00.000Z"),
+      applicationCloseAt: new Date("2020-01-02T00:00:00.000Z"),
+      positions: [],
+      applicationForm: { managedForm: true, formId: "managed-form", form: { status: "PUBLISHED" } },
+    };
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      coreCommitteeSelection: {
+        findUnique: vi.fn().mockResolvedValue(selection),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      coreCommitteeSelectionCandidate: { count: vi.fn().mockResolvedValue(1) },
+      formApplication: { count: vi.fn().mockResolvedValue(1) },
+      formSubmission: { count: vi.fn().mockResolvedValue(1) },
+      form: { update: vi.fn().mockResolvedValue({}) },
+      auditLog: { create: vi.fn().mockResolvedValue({}) },
+    };
+    const root = {
+      $transaction: vi.fn(async (work: (client: typeof tx) => Promise<unknown>) => work(tx)),
+    };
+    const repository = new PrismaCoreCommitteeSelectionRepository(root as never);
+
+    await expect(
+      repository.archive({ selectionId: "selection", actorUserId: "secretary" }),
+    ).resolves.toEqual({ archived: true });
+    expect(tx.coreCommitteeSelection.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: "ARCHIVED", statusBeforeArchive: "APPLICATION_OPEN" } }),
+    );
+    expect(tx.form.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: "ARCHIVED" } }),
+    );
+
+    selection.status = "ARCHIVED";
+    selection.statusBeforeArchive = "APPLICATION_OPEN";
+    await expect(
+      repository.restore({ selectionId: "selection", actorUserId: "secretary" }),
+    ).resolves.toEqual({ restored: true, status: "APPLICATION_CLOSED" });
+    expect(tx.coreCommitteeSelection.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: { status: "APPLICATION_CLOSED", statusBeforeArchive: null } }),
+    );
+    expect(tx.form.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "CLOSED" }) }),
+    );
+    expect(tx.coreCommitteeSelectionCandidate.count).toHaveBeenCalled();
+    expect(tx.formApplication.count).toHaveBeenCalled();
+    expect(tx.formSubmission.count).toHaveBeenCalled();
+  });
+
   it("deletes a legacy Draft selection through one bounded transaction client", async () => {
     const deleteMany = vi.fn().mockResolvedValue({ count: 0 });
     const deleteAppointment = vi.fn().mockResolvedValue({ count: 0 });

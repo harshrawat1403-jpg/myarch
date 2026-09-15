@@ -250,6 +250,7 @@ export interface CoreCommitteeSelectionRepository {
     actorUserId: string;
   }): Promise<CoreCommitteeSelectionAppointmentResult>;
   archive(input: { selectionId: string; actorUserId: string }): Promise<unknown>;
+  restore(input: { selectionId: string; actorUserId: string }): Promise<unknown>;
   delete(input: {
     selectionId: string;
     actorUserId: string;

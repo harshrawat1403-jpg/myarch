@@ -288,6 +288,10 @@ export const archiveCoreCommitteeSelectionRouteHandler = route(
   (_req, actor, id) => coreCommitteeSelectionUseCases.archive(actor, id),
   true,
 );
+export const restoreCoreCommitteeSelectionRouteHandler = route(
+  (_req, actor, id) => coreCommitteeSelectionUseCases.restore(actor, id),
+  true,
+);
 export const deleteCoreCommitteeSelectionRouteHandler = route(
   async (req, actor, id) => coreCommitteeSelectionUseCases.delete(actor, id, await body(req)),
   false,

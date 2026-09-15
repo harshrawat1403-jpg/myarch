@@ -50,6 +50,7 @@ function setup(currentCouncil: string | null = "council") {
     appointmentPreview: vi.fn(),
     confirmAppointments: vi.fn(),
     archive: vi.fn(),
+    restore: vi.fn(),
     delete: vi.fn(),
   };
   const notifications = { notify: vi.fn().mockResolvedValue(undefined) };
@@ -128,6 +129,29 @@ describe("Core Committee selection authority", () => {
     await expect(
       useCases.delete(councilMember, "selection", { confirmation: "DELETE CORE SELECTION" }),
     ).rejects.toBeInstanceOf(NotAuthorizedError);
+  });
+  it("reserves archive and restore operations for the Secretary", async () => {
+    const { useCases, repository } = setup();
+    await useCases.archive(secretary, "selection");
+    await useCases.restore(secretary, "selection");
+    expect(repository.archive).toHaveBeenCalledWith({
+      selectionId: "selection",
+      actorUserId: "secretary",
+    });
+    expect(repository.restore).toHaveBeenCalledWith({
+      selectionId: "selection",
+      actorUserId: "secretary",
+    });
+    await expect(useCases.archive(councilMember, "selection")).rejects.toBeInstanceOf(NotAuthorizedError);
+    await expect(useCases.restore(councilMember, "selection")).rejects.toBeInstanceOf(NotAuthorizedError);
+  });
+  it("does not expose an archived selection through the legacy student get route", async () => {
+    const { useCases, repository } = setup();
+    repository.get.mockResolvedValue({ ...selection, status: "ARCHIVED" });
+    await expect(useCases.get(councilMember, "selection")).rejects.toMatchObject({
+      kind: "notFound",
+    });
+    await expect(useCases.get(secretary, "selection")).resolves.toMatchObject({ status: "ARCHIVED" });
   });
   it("reserves domain deletion for the Secretary", async () => {
     const { useCases, repository } = setup();
