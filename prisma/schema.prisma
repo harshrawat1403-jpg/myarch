@@ -233,6 +233,76 @@ enum RecruiterApprovalStatus {
   REJECTED
 }
 
+// Simplified TNP + Alumni platform. These enums deliberately have distinct
+// names from the legacy placement and alumni lifecycles so both products can
+// coexist without changing historical records or behavior.
+enum TalentProfileVisibility {
+  DRAFT
+  PUBLISHED
+  HIDDEN
+}
+
+enum TalentDocumentKind {
+  RESUME
+  PORTFOLIO
+}
+
+enum TalentDocumentVisibility {
+  PRIVATE
+  PUBLISHED
+}
+
+enum RecruiterCompanyRole {
+  OWNER
+  RECRUITER
+}
+
+enum RecruitmentOpportunityType {
+  PLACEMENT
+  INTERNSHIP
+}
+
+enum RecruitmentOpportunityStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  COMPLETED
+}
+
+enum RecruitmentWorkMode {
+  ONSITE
+  HYBRID
+  REMOTE
+}
+
+enum RecruitmentApplicationStatus {
+  APPLIED
+  SHORTLISTED
+  SELECTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum RecruitmentOutcomeStatus {
+  SEEKING
+  PLACED
+  HIGHER_STUDIES
+  ENTREPRENEURSHIP
+  NOT_SEEKING
+  OTHER
+}
+
+enum AlumniNetworkApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AlumniNetworkVisibility {
+  HIDDEN
+  DIRECTORY
+}
+
 // V4.0 B1: SUBMITTED → (REVIEWED | NEEDS_ATTENTION, Coordinator, non-final)
 // → (APPROVED | REJECTED, Secretary, final — Q1). Coordinator's mark is
 // advisory context for the Secretary's decision, not a gate.
@@ -368,6 +438,7 @@ model User {
   studentProfile     StudentProfile?
   recruiterProfile   RecruiterProfile?
   alumniProfile      AlumniProfile?
+  alumniNetworkProfile AlumniNetworkProfile?
 
   refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
@@ -391,6 +462,11 @@ model User {
   lastEditedPublications       Publication[]               @relation("PublicationLastEditedBy")
   createdPublicationVersions   PublicationVersion[]        @relation("PublicationVersionCreatedBy")
   generatedPublicationExports  PublicationExport[]         @relation("PublicationExportGeneratedBy")
+
+  recruiterCompanyMemberships     RecruiterCompanyMembership[]
+  recruitmentOpportunitiesCreated RecruitmentOpportunity[] @relation("RecruitmentOpportunityCreatedBy")
+  recruitmentApplicationChanges   RecruitmentApplicationStatusHistory[] @relation("RecruitmentApplicationChangedBy")
+  recruitmentPlacementOutcomes    RecruitmentPlacementOutcome[] @relation("RecruitmentOutcomeRecordedBy")
 
   // MYARCH Phase 2 (§3.8) — Task/Follow-up Engine.
   tasksOwned         Task[]        @relation("TaskOwner")
@@ -721,6 +797,9 @@ model StudentProfile {
   applications                 Application[]
   formSubmissions              FormSubmission[]              @relation("FormSubmissionStudent")
   alumniProfile                AlumniProfile?
+  talentProfile                TalentProfile?
+  recruitmentApplications      RecruitmentApplication[]
+  recruitmentPlacementOutcome  RecruitmentPlacementOutcome?
 
   @@index([batchId])
   @@map("student_profiles")
@@ -899,6 +978,10 @@ model FileAsset {
   usedAsContentOverrideOf        ContentOverride[]           @relation("ContentOverrideFile")
   usedAsContentOverrideDraftOf   ContentOverride[]           @relation("ContentOverrideDraftFile")
   usedAsPortfolioImageOf         StudentPortfolioImage?      @relation("PortfolioImageFile")
+  usedAsTalentDocumentOf         TalentDocument?             @relation("TalentDocumentFile")
+  usedAsTalentProjectCoverOf     TalentProject?              @relation("TalentProjectCoverFile")
+  usedAsTalentProjectImageOf     TalentProjectImage?         @relation("TalentProjectImageFile")
+  usedAsRecruitmentResumeSnapshotOf RecruitmentApplication[] @relation("RecruitmentApplicationResumeSnapshot")
 
   @@index([ownerUserId])
   @@map("file_assets")
@@ -1122,6 +1205,286 @@ model AlumniProfile {
 
   @@index([graduationYear])
   @@map("alumni_profiles")
+}
+
+// ---------------------------------------------------------------------------
+// Simplified TNP + Alumni Platform (side-by-side with legacy modules)
+// ---------------------------------------------------------------------------
+
+// Student-controlled professional presentation. Verified academic data stays
+// on StudentProfile/StudentPrivateProfile and is resolved through a
+// compatibility adapter instead of being copied here.
+model TalentProfile {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  studentProfileId     String                  @unique @db.Uuid
+  studentProfile       StudentProfile          @relation(fields: [studentProfileId], references: [id])
+  professionalHeadline String?
+  bio                  String?
+  specialization       String?
+  interests            String[]                @default([])
+  linkedInUrl          String?
+  behanceUrl           String?
+  portfolioWebsiteUrl  String?
+  visibility           TalentProfileVisibility @default(DRAFT)
+  resumeVisible        Boolean                 @default(false)
+  cgpaVisible          Boolean                 @default(false)
+  contactVisible       Boolean                 @default(false)
+  placementAvailable   Boolean                 @default(true)
+  internshipAvailable  Boolean                 @default(true)
+  featured             Boolean                 @default(false)
+  projects             TalentProject[]
+  skills               TalentSkill[]
+  experiences          TalentExperience[]
+  achievements         TalentAchievement[]
+  documents            TalentDocument[]
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  @@index([visibility])
+  @@map("talent_profiles")
+}
+
+model TalentProject {
+  id                  String                  @id @default(uuid()) @db.Uuid
+  talentProfileId     String                  @db.Uuid
+  talentProfile       TalentProfile           @relation(fields: [talentProfileId], references: [id])
+  title               String
+  slug                String                  @unique
+  projectType         String?
+  academicPeriod      String?
+  shortDescription    String?
+  detailedDescription String?
+  coverFileId         String?                 @unique @db.Uuid
+  coverFile           FileAsset?              @relation("TalentProjectCoverFile", fields: [coverFileId], references: [id])
+  externalUrl         String?
+  skills              String[]                @default([])
+  software            String[]                @default([])
+  sortOrder           Int                     @default(0)
+  visibility          TalentProfileVisibility @default(DRAFT)
+  images              TalentProjectImage[]
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  @@index([talentProfileId, sortOrder])
+  @@index([visibility])
+  @@map("talent_projects")
+}
+
+model TalentProjectImage {
+  id              String        @id @default(uuid()) @db.Uuid
+  talentProjectId String        @db.Uuid
+  talentProject   TalentProject @relation(fields: [talentProjectId], references: [id])
+  fileId          String        @unique @db.Uuid
+  file            FileAsset     @relation("TalentProjectImageFile", fields: [fileId], references: [id])
+  caption         String?
+  sortOrder       Int           @default(0)
+  createdAt       DateTime      @default(now())
+
+  @@index([talentProjectId, sortOrder])
+  @@map("talent_project_images")
+}
+
+model TalentSkill {
+  id              String        @id @default(uuid()) @db.Uuid
+  talentProfileId String        @db.Uuid
+  talentProfile   TalentProfile @relation(fields: [talentProfileId], references: [id])
+  name            String
+  createdAt       DateTime      @default(now())
+
+  @@unique([talentProfileId, name])
+  @@index([name])
+  @@map("talent_skills")
+}
+
+model TalentExperience {
+  id              String        @id @default(uuid()) @db.Uuid
+  talentProfileId String        @db.Uuid
+  talentProfile   TalentProfile @relation(fields: [talentProfileId], references: [id])
+  organization    String
+  role            String
+  description     String?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([talentProfileId])
+  @@map("talent_experiences")
+}
+
+model TalentAchievement {
+  id              String        @id @default(uuid()) @db.Uuid
+  talentProfileId String        @db.Uuid
+  talentProfile   TalentProfile @relation(fields: [talentProfileId], references: [id])
+  title           String
+  issuer          String?
+  achievedAt      DateTime?
+  description     String?
+  createdAt       DateTime      @default(now())
+
+  @@index([talentProfileId])
+  @@map("talent_achievements")
+}
+
+model TalentDocument {
+  id              String                   @id @default(uuid()) @db.Uuid
+  talentProfileId String                   @db.Uuid
+  talentProfile   TalentProfile            @relation(fields: [talentProfileId], references: [id])
+  kind            TalentDocumentKind
+  fileId          String                   @unique @db.Uuid
+  file            FileAsset                @relation("TalentDocumentFile", fields: [fileId], references: [id])
+  visibility      TalentDocumentVisibility @default(PRIVATE)
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  @@unique([talentProfileId, kind])
+  @@map("talent_documents")
+}
+
+// A recruiter is structurally related to one or more companies. Access to
+// company-private recruitment data is always checked through this table.
+model RecruitingCompany {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String   @unique
+  website       String?
+  description   String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  memberships   RecruiterCompanyMembership[]
+  opportunities RecruitmentOpportunity[]
+  outcomes      RecruitmentPlacementOutcome[]
+
+  @@map("recruiting_companies")
+}
+
+model RecruiterCompanyMembership {
+  id        String               @id @default(uuid()) @db.Uuid
+  userId    String               @db.Uuid
+  user      User                 @relation(fields: [userId], references: [id])
+  companyId String               @db.Uuid
+  company   RecruitingCompany    @relation(fields: [companyId], references: [id])
+  role      RecruiterCompanyRole @default(RECRUITER)
+  createdAt DateTime             @default(now())
+
+  @@unique([userId, companyId])
+  @@index([companyId])
+  @@map("recruiter_company_memberships")
+}
+
+model RecruitmentOpportunity {
+  id                        String                       @id @default(uuid()) @db.Uuid
+  companyId                 String                       @db.Uuid
+  company                   RecruitingCompany            @relation(fields: [companyId], references: [id])
+  createdByUserId           String                       @db.Uuid
+  createdBy                 User                         @relation("RecruitmentOpportunityCreatedBy", fields: [createdByUserId], references: [id])
+  type                      RecruitmentOpportunityType
+  title                     String
+  description               String?
+  location                  String?
+  workMode                  RecruitmentWorkMode?
+  ctc                       Decimal?                     @db.Decimal(12, 2)
+  stipend                   Decimal?                     @db.Decimal(12, 2)
+  internshipDurationMonths  Int?
+  minimumCgpa               Decimal?                     @db.Decimal(4, 2)
+  eligibleProgramCodes      String[]                     @default([])
+  eligibleBatchIds          String[]                     @default([]) @db.Uuid
+  deadline                  DateTime?
+  driveDate                 DateTime?
+  status                    RecruitmentOpportunityStatus @default(DRAFT)
+  applications              RecruitmentApplication[]
+  createdAt                 DateTime                     @default(now())
+  updatedAt                 DateTime                     @updatedAt
+
+  @@index([companyId, status])
+  @@index([status, deadline])
+  @@map("recruitment_opportunities")
+}
+
+model RecruitmentApplication {
+  id                    String                       @id @default(uuid()) @db.Uuid
+  studentProfileId      String                       @db.Uuid
+  studentProfile        StudentProfile               @relation(fields: [studentProfileId], references: [id])
+  opportunityId         String                       @db.Uuid
+  opportunity           RecruitmentOpportunity       @relation(fields: [opportunityId], references: [id])
+  currentStatus         RecruitmentApplicationStatus @default(APPLIED)
+  submittedResumeFileId String?                      @db.Uuid
+  submittedResumeFile   FileAsset?                   @relation("RecruitmentApplicationResumeSnapshot", fields: [submittedResumeFileId], references: [id])
+  appliedAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+  statusHistory         RecruitmentApplicationStatusHistory[]
+
+  @@unique([studentProfileId, opportunityId])
+  @@index([opportunityId, currentStatus])
+  @@index([studentProfileId])
+  @@map("recruitment_applications")
+}
+
+// No update/delete route is introduced for this model. It is append-only
+// history, created atomically with the current-status update.
+model RecruitmentApplicationStatusHistory {
+  id                       String                       @id @default(uuid()) @db.Uuid
+  recruitmentApplicationId String                       @db.Uuid
+  recruitmentApplication   RecruitmentApplication       @relation(fields: [recruitmentApplicationId], references: [id])
+  fromStatus               RecruitmentApplicationStatus?
+  toStatus                 RecruitmentApplicationStatus
+  note                     String?
+  changedByUserId          String                       @db.Uuid
+  changedBy                User                         @relation("RecruitmentApplicationChangedBy", fields: [changedByUserId], references: [id])
+  occurredAt               DateTime                     @default(now())
+
+  @@index([recruitmentApplicationId, occurredAt])
+  @@map("recruitment_application_status_history")
+}
+
+model RecruitmentPlacementOutcome {
+  id               String                   @id @default(uuid()) @db.Uuid
+  studentProfileId String                   @unique @db.Uuid
+  studentProfile   StudentProfile           @relation(fields: [studentProfileId], references: [id])
+  status           RecruitmentOutcomeStatus @default(SEEKING)
+  companyId        String?                  @db.Uuid
+  company          RecruitingCompany?       @relation(fields: [companyId], references: [id])
+  role             String?
+  ctc              Decimal?                 @db.Decimal(12, 2)
+  placementDate    DateTime?
+  recordedByUserId String                   @db.Uuid
+  recordedBy       User                     @relation("RecruitmentOutcomeRecordedBy", fields: [recordedByUserId], references: [id])
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  @@index([status])
+  @@map("recruitment_placement_outcomes")
+}
+
+// Imported and self-registering alumni share one clean model. `email` makes
+// matching stable identity explicit without attempting account-claiming in
+// this phase; a linked User is unique when an approved account exists.
+model AlumniNetworkProfile {
+  id                  String                       @id @default(uuid()) @db.Uuid
+  userId              String?                      @unique @db.Uuid
+  user                User?                        @relation(fields: [userId], references: [id])
+  email               String?                      @unique
+  fullName            String
+  graduationYear      Int
+  program             String?
+  currentCompany      String?
+  currentRole         String?
+  industry            String?
+  city                String?
+  linkedInUrl         String?
+  websiteUrl          String?
+  bio                 String?
+  expertise           String[]                     @default([])
+  mentorshipAvailable Boolean                      @default(false)
+  contributionOptIn   Boolean                      @default(false)
+  visibility          AlumniNetworkVisibility     @default(HIDDEN)
+  approvalStatus      AlumniNetworkApprovalStatus @default(PENDING)
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+
+  @@index([approvalStatus, visibility])
+  @@index([graduationYear])
+  @@map("alumni_network_profiles")
 }
 
 // ---------------------------------------------------------------------------
