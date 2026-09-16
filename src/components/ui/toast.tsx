@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 
 export type ToastVariant = "success" | "error";
@@ -39,8 +39,12 @@ const VARIANT_STYLES: Record<ToastVariant, { icon: typeof CheckCircle2; classes:
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<readonly ActiveToast[]>([]);
+  const dismissalTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   const dismiss = useCallback((id: string) => {
+    const timer = dismissalTimers.current.get(id);
+    if (timer) clearTimeout(timer);
+    dismissalTimers.current.delete(id);
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }, []);
 
@@ -49,13 +53,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       const id = crypto.randomUUID();
       const duration = toast.duration ?? DEFAULT_DURATION_MS;
       setToasts((current) => [...current, { ...toast, duration, id }]);
-      setTimeout(() => dismiss(id), duration);
+      dismissalTimers.current.set(id, setTimeout(() => dismiss(id), duration));
     },
     [dismiss],
   );
 
   const success = useCallback((message: string) => show({ message, variant: "success" }), [show]);
   const error = useCallback((message: string) => show({ message, variant: "error" }), [show]);
+
+  // Tests and client-side navigation can unmount this provider before an
+  // auto-dismiss fires. Clearing outstanding callbacks prevents a stale
+  // state update after the React tree (or JSDOM window) has gone away.
+  useEffect(() => () => {
+    dismissalTimers.current.forEach((timer) => clearTimeout(timer));
+    dismissalTimers.current.clear();
+  }, []);
 
   return (
     <ToastContext.Provider value={{ show, success, error }}>
